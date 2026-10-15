@@ -1,0 +1,258 @@
+@import "tailwindcss";
+
+/*
+ * Design System tokens (docs/DESIGN-SYSTEM.md, CLAUDE.md "Design System").
+ * Dark-only theme: values live in :root; components never hardcode colors.
+ */
+:root {
+  --bg-deep: #050816;
+  --bg: #0a0f24;
+  --bg-violet: #150f38;
+  --surface: #111833;
+  --surface-raised: #18214a;
+  --line: #232c57;
+  --line-strong: #5b6ab8;
+  --text: #f4f6ff;
+  --text-muted: #b4bde0;
+  --text-subtle: #8f9ac4;
+  --on-accent: #04121a;
+  --cyan: #22d3ee;
+  --violet: #8b5cf6;
+  --violet-soft: #b9a3ff;
+  --magenta: #e879f9;
+  --lime: #a3e635;
+  --gold: #fbbf24;
+  --danger: #fb7185;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  /* Semantic colors (shadcn names mapped to the Design System) */
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--cyan);
+  --color-primary-foreground: var(--on-accent);
+  --color-secondary: var(--surface-raised);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface-raised);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--lime);
+  --color-accent-foreground: var(--on-accent);
+  --color-destructive: var(--danger);
+  --color-border: var(--line);
+  --color-input: var(--line-strong);
+  --color-ring: var(--cyan);
+
+  /* Design System palette */
+  --color-bg-deep: var(--bg-deep);
+  --color-bg-violet: var(--bg-violet);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text-muted: var(--text-muted);
+  --color-text-subtle: var(--text-subtle);
+  --color-on-accent: var(--on-accent);
+  --color-cyan: var(--cyan);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-magenta: var(--magenta);
+  --color-lime: var(--lime);
+  --color-gold: var(--gold);
+  --color-danger: var(--danger);
+
+  /* Typography */
+  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-pixel: var(--font-tiny5), ui-monospace, monospace;
+}
+
+/* Literal tokens: Tailwind emits these as CSS variables and generates rounded-*, shadow-* and p-space-* utilities. */
+@theme {
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 8px 24px rgba(3, 6, 20, 0.45);
+  --shadow-glow-cyan: 0 0 0 1px rgba(34, 211, 238, 0.55), 0 0 24px rgba(34, 211, 238, 0.18);
+  --shadow-glow-magenta: 0 0 0 1px rgba(232, 121, 249, 0.5), 0 0 24px rgba(232, 121, 249, 0.16);
+  --shadow-glow-gold: 0 0 0 1px rgba(251, 191, 36, 0.55), 0 0 24px rgba(251, 191, 36, 0.18);
+
+  /* Spacing scale: space-1..space-8 are the Design System steps (4, 8, 12, 16, 20, 24, 32) */
+  --spacing-space-1: 4px;
+  --spacing-space-2: 8px;
+  --spacing-space-3: 12px;
+  --spacing-space-4: 16px;
+  --spacing-space-5: 20px;
+  --spacing-space-6: 24px;
+  --spacing-space-8: 32px;
+
+  /* Progress bars grow from empty on first paint (duration and easing from the motion tokens). */
+  --animate-progress-grow: progress-grow 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  @keyframes progress-grow {
+    from {
+      width: 0;
+    }
+  }
+
+  /* The scanner reticle: a line that sweeps up and down while the camera looks for a code. */
+  --animate-reticle-sweep: reticle-sweep 2.4s ease-in-out infinite;
+  @keyframes reticle-sweep {
+    0%,
+    100% {
+      transform: translateY(-40%);
+    }
+    50% {
+      transform: translateY(40%);
+    }
+  }
+
+  /* A wrong move in a mini-game: a short shake (skipped under reduced motion by the global rule). */
+  --animate-shake: shake 300ms ease-in-out;
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-4px);
+    }
+    75% {
+      transform: translateX(4px);
+    }
+  }
+}
+
+/*
+ * Type styles from the Design System. Prefixed `type-` so they never clash with
+ * Tailwind's `text-*` color utilities when class names are merged.
+ */
+@utility type-title-xl {
+  font-family: var(--font-display);
+  font-size: 26px;
+  line-height: 30px;
+  font-weight: 700;
+}
+@utility type-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
+}
+@utility type-heading {
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 600;
+}
+@utility type-stat {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 700;
+}
+@utility type-body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+}
+@utility type-body-sm {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+}
+@utility type-label {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+}
+@utility type-caption {
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+/*
+ * Pixel accent: game tags, one callout per screen, and (since 2026-10-12, chosen by the organizer) the "DevFest"
+ * wordmark and section headings. Never paragraphs, buttons or card text. Sizes are multiples of 8px so pixels stay crisp.
+ */
+@utility type-pixel-title {
+  font-family: var(--font-pixel);
+  font-size: 32px;
+  line-height: 32px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+@utility type-pixel-heading {
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+@utility type-pixel-tag {
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  line-height: 16px;
+  font-weight: 400;
+}
+@utility type-pixel-callout {
+  font-family: var(--font-pixel);
+  font-size: 32px;
+  line-height: 32px;
+  font-weight: 400;
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 22px;
+}
+
+/* Reduced motion: transitions and animations collapse to instant. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * The service worker serves the offline page under the URL that failed (for example /login), so the
+ * route cannot tell the app that page is showing. The page marks itself and the no-connection strip,
+ * which would only repeat it, steps aside.
+ */
+body:has([data-offline-page]) [data-offline-banner] {
+  display: none;
+}
+
+/* Printing (the codes to stick at checkpoints): plain black on white, without the space backdrop. */
+@media print {
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+}

@@ -1,0 +1,156 @@
+rules_version = '2';
+
+// Every write goes through the server (Admin SDK bypasses these rules), so clients
+// can never set xp, credits, role or squad. Reads are opened one collection at a time.
+// Everything of one edition of the event lives under events/{eventId}.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // An admin of the whole app, or an organizer whom this edition's team lists as organizer (organizers belong to
+    // one edition: their claim alone is not enough).
+    function isEditionAdmin(eventId) {
+      return request.auth != null && (
+        request.auth.token.role == "admin" ||
+        (request.auth.token.role == "organizer" &&
+          get(/databases/$(database)/documents/events/$(eventId)/team/$(request.auth.uid)).data.role == "organizer")
+      );
+    }
+
+    match /events/{eventId} {
+
+      // An attendee can read only their own profile (used by realtime in phase 2). Admins read every profile:
+      // the stage screen (phase 6) listens to the ranking from the projector with an admin session.
+      match /participants/{uid} {
+        allow read: if request.auth != null && (request.auth.uid == uid || isEditionAdmin(eventId));
+        allow write: if false;
+      }
+
+      // An attendee can read only their own check-ins. Writes are server-only: the id is {uid}_{checkpointId}.
+      match /checkins/{checkIn} {
+        allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+        allow write: if false;
+      }
+
+      // The checkpoint catalog is read by the server only (the admin manages it through server actions).
+      match /checkpoints/{checkpoint} {
+        allow read, write: if false;
+      }
+
+      // Squads are read by the server only, through a cached catalog (the admin manages them through server actions).
+      match /squads/{squad} {
+        allow read, write: if false;
+      }
+
+      // Quadrants and the venue plan are read by the server only, through a cached source.
+      match /quadrants/{quadrant} {
+        allow read, write: if false;
+      }
+      match /venue/{doc} {
+        allow read, write: if false;
+      }
+
+      // Missions hold quiz answers and keywords: server only. Completions and the XP ledger are written
+      // only by the server (XP is never client-trusted) and read through it.
+      match /missions/{mission} {
+        allow read, write: if false;
+      }
+      match /missionCompletions/{completion} {
+        allow read, write: if false;
+      }
+      match /xpLedger/{entry} {
+        allow read, write: if false;
+      }
+
+      // The Odisea de Código: a locked transmission must not be readable, so the server sends only what opened.
+      match /communications/{communication} {
+        allow read, write: if false;
+      }
+
+      // Badges and awards: only the server evaluates and writes them.
+      match /achievements/{badge} {
+        allow read, write: if false;
+      }
+      match /achievementAwards/{award} {
+        allow read, write: if false;
+      }
+
+      // Mini-game tickets and results: only the server issues and closes them.
+      match /minigamePlays/{play} {
+        allow read, write: if false;
+      }
+
+      // The final raffle: prizes and draws, written and read by the server only.
+      match /rafflePrizes/{prize} {
+        allow read, write: if false;
+      }
+      match /raffleDraws/{draw} {
+        allow read, write: if false;
+      }
+
+      // The cadet network: contacts and opt-in links. The server checks the signed contact code and writes both.
+      match /contacts/{contact} {
+        allow read, write: if false;
+      }
+      match /contactCards/{uid} {
+        allow read, write: if false;
+      }
+
+      // Squad credits: balances, contributions, prizes and redemptions. Written and read by the server only.
+      match /squadWallets/{squad} {
+        allow read, write: if false;
+      }
+      match /squadLedger/{entry} {
+        allow read, write: if false;
+      }
+      match /squadPrizes/{prize} {
+        allow read, write: if false;
+      }
+      match /squadRedemptions/{redemption} {
+        allow read, write: if false;
+      }
+
+      // Settings of the edition that admins edit (config/ranks: the rank ladder). Server only.
+      match /config/{doc} {
+        allow read, write: if false;
+      }
+      // The stage state (phase 6): the stage screen listens to it with an admin session. Written by the server only.
+      match /config/stage {
+        allow read: if isEditionAdmin(eventId);
+        allow write: if false;
+      }
+
+      // Invitations to the team (stored by the hash of their link): server only.
+      match /invites/{invite} {
+        allow read, write: if false;
+      }
+
+      // Staff and organizers of this edition: written and read by the server (the rules above read it for organizers).
+      match /team/{uid} {
+        allow read, write: if false;
+      }
+
+      // Alias reservations are an implementation detail of the server.
+      match /aliases/{alias} {
+        allow read, write: if false;
+      }
+    }
+
+    // Each person's G-Credits across editions and their ledger: written only by the server (never client-trusted).
+    match /wallets/{uid} {
+      allow read, write: if false;
+    }
+    match /walletLedger/{entry} {
+      allow read, write: if false;
+    }
+
+    // Uploaded images and their chunks: written and read by the server only (the app serves them at /media).
+    match /images/{image=**} {
+      allow read, write: if false;
+    }
+
+    // Default deny (config/app included: the server reads it with the Admin SDK).
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

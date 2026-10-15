@@ -1,0 +1,59 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { authDeps } from "@/app-shell/composition/auth.server";
+import {
+  clearSessionCookie,
+  closeSession,
+  openSession,
+  readSessionCookie,
+  refreshSessionCookie,
+  writeSessionCookie,
+} from "@/features/auth/server";
+import type { AuthErrorCode } from "@/features/auth";
+
+const bodySchema = z.object({ credential: z.string().min(1) });
+
+const STATUS_BY_CODE: Record<AuthErrorCode, number> = {
+  cancelled: 400,
+  network: 502,
+  "invalid-credential": 401,
+  "recent-sign-in-required": 401,
+  unauthenticated: 401,
+  forbidden: 403,
+  unknown: 500,
+};
+
+function failure(code: AuthErrorCode) {
+  return NextResponse.json({ error: code }, { status: STATUS_BY_CODE[code] });
+}
+
+/** Opens the session: exchanges a fresh sign-in credential for an HTTP-only session cookie. */
+export async function POST(request: Request) {
+  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return failure("invalid-credential");
+
+  const opened = await openSession(authDeps, parsed.data.credential);
+  if (!opened.ok) return failure(opened.error.code);
+
+  await writeSessionCookie(opened.value);
+  return NextResponse.json({ ok: true });
+}
+
+/** Refreshes the session: swaps the cookie for one that carries the user's current role claim. */
+export async function PUT(request: Request) {
+  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return failure("invalid-credential");
+
+  const refreshed = await refreshSessionCookie(authDeps, parsed.data.credential, await readSessionCookie());
+  if (!refreshed.ok) return failure(refreshed.error.code);
+
+  await writeSessionCookie(refreshed.value);
+  return NextResponse.json({ ok: true });
+}
+
+/** Closes the session: revokes the user's refresh tokens and clears the cookie. */
+export async function DELETE() {
+  const closed = await closeSession(authDeps, await readSessionCookie());
+  await clearSessionCookie();
+  return closed.ok ? NextResponse.json({ ok: true }) : failure(closed.error.code);
+}

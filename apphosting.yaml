@@ -1,0 +1,45 @@
+# Firebase App Hosting configuration (one of the two deployment options; the other is Vercel, see docs/deploy.md).
+# Server credentials are not needed here: on App Hosting the Admin SDK uses the backend's own service account
+# (Application Default Credentials). Secrets live in Cloud Secret Manager, never in this file.
+
+runConfig:
+  # One instance always warm, so the first cadets at the door do not wait for a cold start.
+  minInstances: 1
+  # Room for 300 attendees opening the app at once (tested with twice that, see docs/deploy.md).
+  maxInstances: 6
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 1024
+
+env:
+  # Public web config of the Firebase project (Project settings > General > Your apps). Needed at build time too,
+  # because Next.js inlines NEXT_PUBLIC_* values into the client bundle. Replace each value before the first deploy.
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: REPLACE_WITH_WEB_API_KEY
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: REPLACE_WITH_AUTH_DOMAIN
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: REPLACE_WITH_PROJECT_ID
+    availability: [BUILD, RUNTIME]
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: REPLACE_WITH_APP_ID
+    availability: [BUILD, RUNTIME]
+
+  # Server only. Create each secret once with:
+  #   firebase apphosting:secrets:set qr-signing-secret
+  #   firebase apphosting:secrets:set gemini-api-key
+  - variable: QR_SIGNING_SECRET
+    secret: qr-signing-secret
+    availability: [RUNTIME]
+  - variable: GEMINI_API_KEY
+    secret: gemini-api-key
+    availability: [RUNTIME]
+  # GEMINI_MODEL is optional: without it the app uses its tested default (see mission-suggest.server.ts).
+
+  # Version of the service worker: change it on every deploy (for example to the commit) so open phones get the
+  # "nueva versión" prompt. Without a new value the worker keeps its old version.
+  - variable: BUILD_ID
+    value: "2026-10-11-1"
+    availability: [RUNTIME]
