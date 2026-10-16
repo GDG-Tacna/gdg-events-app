@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/app-shell/composition/checkins.server", () => ({ checkInDeps: { marker: "deps" } }));
+const checkIns = vi.hoisted(() => ({ checkInDeps: { marker: "deps", limiter: { consume: vi.fn() } } }));
+vi.mock("@/app-shell/composition/checkins.server", () => checkIns);
+const speakers = vi.hoisted(() => ({ speakerCodeDeps: { marker: "speaker-codes", speakers: { find: vi.fn() } } }));
+vi.mock("@/app-shell/composition/speakers.server", () => speakers);
+const speakersServer = vi.hoisted(() => ({ verifySpeakerCode: vi.fn() }));
+vi.mock("@/features/speakers/server", () => speakersServer);
 vi.mock("@/app-shell/composition/missions.server", () => ({ missionDeps: { marker: "missions" } }));
 const achievements = vi.hoisted(() => ({ unlockAchievements: vi.fn() }));
 vi.mock("@/app-shell/composition/achievements.server", () => achievements);
@@ -10,7 +15,7 @@ vi.mock("@/app-shell/composition/economy.server", () => economy);
 const economyServer = { rewardTalk: vi.fn() };
 vi.mock("@/features/economy/server", () => economyServer);
 
-const missionsServer = { completeByCheckpoint: vi.fn() };
+const missionsServer = { completeByCheckpoint: vi.fn(), completeBySpeaker: vi.fn() };
 vi.mock("@/features/missions/server", () => missionsServer);
 
 const guards = { getSession: vi.fn() };
@@ -92,7 +97,7 @@ describe("recordCheckInAction", () => {
     const result = await recordCheckInAction("devfest:cp:entrance-main");
 
     expect(checkinsServer.recordCheckIn).toHaveBeenCalledWith(
-      { marker: "deps" },
+      checkIns.checkInDeps,
       { uid: "u1", payload: "devfest:cp:entrance-main" },
     );
     expect(result).toEqual({
@@ -196,5 +201,70 @@ describe("recordCheckInAction", () => {
     checkinsServer.recordCheckIn.mockResolvedValue({ ok: true, value: { checkpointId: "lunch", kind: "catering", recorded: true, firstEntrance: false } });
     expect(await recordCheckInAction("devfest:cp:lunch")).toMatchObject({ ok: true, talkCredits: 0 });
     expect(economyServer.rewardTalk).not.toHaveBeenCalled();
+  });
+});
+
+describe("recordCheckInAction with a speaker's code", () => {
+  const CODE = "devfest:sp:ana-torres.1800000000.sig_xxxxxxxxxxxxxxxx";
+  const ANA = { id: "ana-torres", name: "Ana Torres", active: true, uid: null };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    features.FEATURES.checkins = true;
+    achievements.unlockAchievements.mockResolvedValue([]);
+    guards.getSession.mockResolvedValue(session("attendee"));
+    checkIns.checkInDeps.limiter.consume.mockResolvedValue(true);
+    speakersServer.verifySpeakerCode.mockReturnValue({ ok: true, speakerId: "ana-torres" });
+    speakers.speakerCodeDeps.speakers.find.mockResolvedValue({ ok: true, value: ANA });
+    missionsServer.completeBySpeaker.mockResolvedValue({ ok: true, value: [{ id: "meet-ana", title: "Conoce a Ana", xpEarned: 40, creditsEarned: 10, justCompleted: true }] });
+  });
+
+  it("completes that speaker's missions without recording a check-in", async () => {
+    expect(await recordCheckInAction(CODE)).toEqual({
+      ok: true,
+      checkpointId: "ana-torres",
+      kind: "speaker",
+      recorded: true,
+      firstEntrance: false,
+      missions: [{ title: "Conoce a Ana", xpEarned: 40, creditsEarned: 10, justCompleted: true }],
+      talkCredits: 0,
+      achievements: [],
+    });
+    expect(speakersServer.verifySpeakerCode).toHaveBeenCalledWith(speakers.speakerCodeDeps, CODE);
+    expect(missionsServer.completeBySpeaker).toHaveBeenCalledWith({ marker: "missions" }, "u1", "ana-torres");
+    expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
+    expect(achievements.unlockAchievements).toHaveBeenCalledWith("u1");
+  });
+
+  it("is only for cadets, and goes through the scan limiter", async () => {
+    guards.getSession.mockResolvedValue(session("staff"));
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "forbidden" });
+
+    guards.getSession.mockResolvedValue(session("attendee"));
+    checkIns.checkInDeps.limiter.consume.mockResolvedValue(false);
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "rate-limited" });
+    expect(speakersServer.verifySpeakerCode).not.toHaveBeenCalled();
+  });
+
+  it("passes a bad or old code through, and refuses a speaker no longer offered", async () => {
+    speakersServer.verifySpeakerCode.mockReturnValueOnce({ ok: false, code: "expired-code" });
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "expired-code" });
+
+    speakers.speakerCodeDeps.speakers.find.mockResolvedValueOnce({ ok: true, value: { ...ANA, active: false } });
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "speaker-inactive" });
+
+    speakers.speakerCodeDeps.speakers.find.mockResolvedValueOnce({ ok: true, value: null });
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "invalid-code" });
+    expect(missionsServer.completeBySpeaker).not.toHaveBeenCalled();
+  });
+
+  it("still answers the meeting when missions are off for the edition, and asks for a profile when there is none", async () => {
+    features.FEATURES.missions = false;
+    expect(await recordCheckInAction(CODE)).toMatchObject({ ok: true, kind: "speaker", missions: [] });
+    expect(missionsServer.completeBySpeaker).not.toHaveBeenCalled();
+
+    features.FEATURES.missions = true;
+    missionsServer.completeBySpeaker.mockResolvedValueOnce({ ok: false, error: { code: "not-registered" } });
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "not-registered" });
   });
 });

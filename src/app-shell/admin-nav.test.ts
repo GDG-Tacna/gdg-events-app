@@ -22,4 +22,19 @@ describe("admin navigation", () => {
   it("names the areas the session may only look at", () => {
     expect(readOnlyAreas({ squads: "view", economy: "none", missions: "edit" })).toEqual(["/admin/escuadrones"]);
   });
+
+  it("gives every area its group, after the home, and lists the zones next to the plan", () => {
+    const items = adminNavItems();
+
+    expect(items[0]).toMatchObject({ href: "/admin", exact: true });
+    expect(items[0]).not.toHaveProperty("group");
+    expect(items.slice(1).every((item) => typeof item.group === "string")).toBe(true);
+    const program = items.filter((item) => item.group === "Programa").map((item) => item.href);
+    expect(program).toEqual(["/admin/charlas", "/admin/speakers", "/admin/puestos", "/admin/zonas", "/admin/mapa"]);
+  });
+
+  it("hides the zones with the plan when the map is switched off, and makes both view-only together", () => {
+    expect(adminNavItems((module) => module !== "map").map((item) => item.href)).not.toContain("/admin/zonas");
+    expect(readOnlyAreas({ map: "view" })).toEqual(["/admin/zonas", "/admin/mapa"]);
+  });
 });

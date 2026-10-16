@@ -7,10 +7,11 @@ import { FirestoreMissionStore, type MissionAdminDeps } from "@/features/mission
 import { getGalaxyMap } from "@/features/quadrants/server";
 import { err, ok } from "@/shared/lib/result";
 import { recordImages } from "./media.server";
+import { speakerStore } from "./speakers.server";
 
 /**
  * Composition root for managing missions. The quadrants come from the galaxy map, the checkpoint kinds from
- * the check-ins catalog, the mini-games from their catalog, and changes go to the admin audit trail; all bound here so the missions feature
+ * the check-ins catalog, the speakers from their catalog, the mini-games from their catalog, and changes go to the admin audit trail; all bound here so the missions feature
  * imports none of those features.
  */
 export const missionAdminDeps: MissionAdminDeps = {
@@ -25,6 +26,13 @@ export const missionAdminDeps: MissionAdminDeps = {
     kindOf: async (id) => {
       const found = await checkInDeps.catalog.find(id);
       return found.ok ? ok(found.value?.kind ?? null) : err({ code: "unknown" });
+    },
+  },
+  speakers: {
+    // Read fresh: a speaker added a moment ago must be choosable.
+    activeIds: async () => {
+      const listed = await speakerStore.list();
+      return listed.ok ? ok(new Set(listed.value.filter((speaker) => speaker.active).map((speaker) => speaker.id))) : err({ code: "unknown" });
     },
   },
   minigames: { ids: MINIGAME_IDS },

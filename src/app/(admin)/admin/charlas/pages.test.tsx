@@ -2,7 +2,7 @@ import { isValidElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-const composition = vi.hoisted(() => ({ talkAdminDeps: { marker: "talks" }, talkRooms: vi.fn() }));
+const composition = vi.hoisted(() => ({ talkAdminDeps: { marker: "talks" }, talkRooms: vi.fn(), talkSpeakers: vi.fn() }));
 vi.mock("@/app-shell/composition/talks.server", () => composition);
 vi.mock("@/app-shell/talks/manage.actions", () => ({ createTalkAction: vi.fn(), updateTalkAction: vi.fn(), setTalkActiveAction: vi.fn() }));
 
@@ -39,10 +39,12 @@ function findElement(node: ReactNode, type: unknown): { props: Record<string, un
 }
 
 const ROOMS = [{ id: "auditorio", name: "Auditorio" }];
+const SPEAKERS = [{ id: "ana-torres", name: "Ana Torres", active: true }];
 const KEYNOTE = {
   id: "keynote",
   title: "Keynote",
-  speaker: "Ana",
+  speakerIds: ["ana-torres"],
+  speaker: null,
   startsAt: new Date("2026-10-24T14:00:00Z"),
   endsAt: new Date("2026-10-24T14:45:00Z"),
   roomId: "auditorio",
@@ -55,6 +57,7 @@ describe("admin Charlas pages", () => {
     vi.resetAllMocks();
     guards.requireRole.mockResolvedValue({ uid: "a1", role: "admin", displayName: null, photoUrl: null });
     composition.talkRooms.mockResolvedValue(ROOMS);
+    composition.talkSpeakers.mockResolvedValue(SPEAKERS);
     server.listManagedTalks.mockResolvedValue({ ok: true, value: [KEYNOTE, { ...KEYNOTE, id: "cerrada", active: false }] });
   });
 
@@ -63,7 +66,7 @@ describe("admin Charlas pages", () => {
 
     expect(guards.requireRole).toHaveBeenCalledWith(["admin"]);
     expect(server.listManagedTalks).toHaveBeenCalledWith({ marker: "talks" }, { uid: "a1", role: "admin" });
-    expect((view?.props.talks as Array<{ startsAt: string; endsAt: string }>)[0]).toMatchObject({ id: "keynote", startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45" });
+    expect((view?.props.talks as Array<{ startsAt: string; endsAt: string }>)[0]).toMatchObject({ id: "keynote", speaker: "Ana Torres", startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45" });
     expect(view?.props).toMatchObject({ rooms: ROOMS, setActive: actions.setTalkActiveAction, hrefs: { create: "/admin/charlas/nueva", editBase: "/admin/charlas", projectBase: "/admin/qr" } });
   });
 
@@ -76,7 +79,7 @@ describe("admin Charlas pages", () => {
   it("offers the create form with the rooms", async () => {
     const form = findElement(await AdminNewTalkPage(), TalkForm);
 
-    expect(form?.props).toMatchObject({ mode: "create", save: actions.createTalkAction, rooms: ROOMS, listHref: "/admin/charlas" });
+    expect(form?.props).toMatchObject({ mode: "create", save: actions.createTalkAction, rooms: ROOMS, speakers: SPEAKERS, speakersHref: "/admin/speakers", listHref: "/admin/charlas" });
   });
 
   it("edits a talk, offering its QR only while it is open", async () => {

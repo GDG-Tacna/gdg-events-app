@@ -55,8 +55,8 @@ function feedbackFor(type: MissionType, next: Progress): Feedback {
 }
 
 /**
- * One mission, and how to complete it: a quiz shows its options, a keyword mission a field, a talk mission sends the
- * cadet to the scanner and a stand mission to their own QR (the staff scan it at the stand). Whether an answer is right is decided on the
+ * One mission, and how to complete it: a quiz shows its options, a keyword mission a field, a talk or speaker mission
+ * sends the cadet to the scanner and a stand mission to their own QR (the staff scan it at the stand). Whether an answer is right is decided on the
  * server; this screen shows the answer it gets back and refreshes the board behind it.
  */
 export function MissionDetailView({ mission, answer, backHref, scanHref, passHref, quadrant, minigame, achievementsHref, bonusSlot }: MissionDetailViewProps) {
@@ -151,10 +151,10 @@ export function MissionDetailView({ mission, answer, backHref, scanHref, passHre
         <KeywordForm prompt={mission.config.prompt} pending={pending} onAnswer={(value) => send({ kind: "keyword", value })} />
       ) : null}
 
-      {answerable && (mission.config.type === "talk" || mission.config.type === "stand") ? (
+      {answerable && (mission.config.type === "talk" || mission.config.type === "stand" || mission.config.type === "speaker") ? (
         <Card className="gap-space-4 flex flex-col">
           <p className="type-body text-foreground">{copy.missions.howTo[mission.config.type]}</p>
-          {mission.config.type === "talk" ? (
+          {mission.config.type !== "stand" ? (
             <ButtonLink href={scanHref} variant="primary">
               {copy.missions.scan}
             </ButtonLink>

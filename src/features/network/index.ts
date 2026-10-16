@@ -13,4 +13,3 @@ export type {
 } from "./ui/actions";
 export { CadetCardView, type CadetCardViewProps } from "./ui/CadetCardView";
 export { NetworkView, type NetworkViewProps } from "./ui/NetworkView";
-export { NetworkCard } from "./ui/NetworkCard";

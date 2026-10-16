@@ -19,6 +19,8 @@ export interface ImageFieldProps {
   disabled?: boolean;
   /** Told about each upload with its size (for example to fit the venue grid to the plan's proportions). */
   onUploaded?: (image: StoredImage) => void;
+  /** True when a change applies at once (no form to save), so the field does not ask to save. */
+  appliesAtOnce?: boolean;
 }
 
 const MIME: Record<string, string> = { jpeg: "image/jpeg", png: "image/png", webp: "image/webp", svg: "image/svg+xml" };
@@ -29,7 +31,7 @@ const t = copy.common.image;
  * server checks both again from the bytes. The image is stored when uploaded, but a record only points at it once
  * its own form is saved.
  */
-export function ImageField({ label, purpose, value, onChange, upload, disabled = false, onUploaded }: ImageFieldProps) {
+export function ImageField({ label, purpose, value, onChange, upload, disabled = false, onUploaded, appliesAtOnce = false }: ImageFieldProps) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -62,7 +64,7 @@ export function ImageField({ label, purpose, value, onChange, upload, disabled =
     if (!result.ok) return setError(t.errors[result.code as MediaErrorCode | "disabled" | "unauthenticated"] ?? t.errors.unknown);
     onChange({ path: result.image.path, url: result.image.url });
     onUploaded?.(result.image);
-    setStatus(t.uploaded);
+    setStatus(appliesAtOnce ? t.applied : t.uploaded);
   }
 
   return (

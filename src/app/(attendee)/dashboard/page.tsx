@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { squadDeps } from "@/app-shell/composition/squads.server";
 import { dashboardDeps, openMissionsSummary } from "@/app-shell/composition/dashboard.server";
+import { voteDeps } from "@/app-shell/composition/polls.server";
+import { avatarDeps } from "@/app-shell/composition/avatar.server";
 import { leaderboardDeps } from "@/app-shell/composition/leaderboard.server";
-import { networkStore } from "@/app-shell/composition/network.server";
-import { raffleCardDeps } from "@/app-shell/composition/raffle.server";
 import { currentEconomy, squadCardDeps } from "@/app-shell/composition/economy.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { DashboardView, MissionsCard, decideSquadCallout, getAttendeeOverview } from "@/features/dashboard";
@@ -12,11 +12,9 @@ import { SquadCreditsCard } from "@/features/economy";
 import { getSquadStanding } from "@/features/economy/server";
 import { StandingCard } from "@/features/leaderboard";
 import { getCadetStanding } from "@/features/leaderboard/server";
-import { NetworkCard } from "@/features/network";
-import { countContacts } from "@/features/network/server";
-import { PassCard } from "@/features/pass";
-import { RaffleTicketsCard } from "@/features/raffle";
-import { getCadetTickets } from "@/features/raffle/server";
+import { LivePollCard } from "@/features/polls";
+import { getCadetPoll } from "@/features/polls/server";
+import { getAvatarLook } from "@/features/avatar/server";
 import { InstallHint } from "@/features/pwa";
 import { SquadBadge, offeredSquads } from "@/features/squads";
 import { listSquads } from "@/features/squads/server";
@@ -44,27 +42,29 @@ export default async function DashboardPage() {
 
   // The squad catalog is optional decoration: if it cannot be read the dashboard still works, without the squad parts.
   const squads = catalog.ok ? catalog.value : [];
-  const { squadId } = overview.value;
+  const squadsOn = await moduleOn("squads");
+  // With squads switched off for the edition nothing about the attendee's squad shows.
+  const squadId = squadsOn ? overview.value.squadId : null;
   const squad = squadId === null ? null : (squads.find((candidate) => candidate.id === squadId) ?? null);
 
   const squadCallout = decideSquadCallout({
-    featureEnabled: (await moduleOn("squads")),
+    featureEnabled: squadsOn,
     squadId,
     availableSquads: offeredSquads(squads).length,
   });
 
-  const [squadCredits, contacts, standing, raffle, missions] = await Promise.all([
+  const [squadCredits, standing, missions, poll, avatarLook] = await Promise.all([
     squadId === null ? null : squadStanding(squadId),
-    (await moduleOn("network")) ? contactCount(session.uid) : null,
     (await moduleOn("leaderboard")) ? fleetStanding(session.uid) : null,
-    (await moduleOn("raffle")) ? raffleTickets(session.uid, overview.value.credits) : null,
     (await moduleOn("missions")) ? openMissionsSummary() : null,
+    FEATURES.polls && (await moduleOn("polls")) ? livePoll(session.uid) : null,
+    getAvatarLook(avatarDeps, session.uid),
   ]);
 
   return (
     <>
       <SpaceBackground />
-      <main className="pt-safe pb-safe px-space-4 py-space-6 mx-auto w-full max-w-[520px] min-[760px]:max-w-[960px]">
+      <main className="px-space-4 pt-safe-space-6 pb-safe-space-6 mx-auto w-full max-w-[520px] min-[760px]:max-w-[960px]">
         <ScreenEnter>
           <DashboardView
             overview={overview.value}
@@ -74,13 +74,13 @@ export default async function DashboardPage() {
             squadHref={ROUTES.squad}
             squadCreditsSlot={squadCredits ? <SquadCreditsCard balance={squadCredits.wallet.balance} prizes={squadCredits.prizes} /> : undefined}
             standingSlot={standing ? <StandingCard standing={standing} alias={overview.value.alias} squad={squad?.name ?? null} /> : undefined}
-            raffleSlot={raffle ? <RaffleTicketsCard tickets={raffle} /> : undefined}
-            networkSlot={contacts === null ? undefined : <NetworkCard href={ROUTES.network} contacts={contacts} />}
-            passSlot={FEATURES.checkins ? <PassCard href={ROUTES.pass} /> : undefined}
             qrHref={FEATURES.checkins ? ROUTES.pass : undefined}
             networkHref={(await moduleOn("network")) ? ROUTES.network : undefined}
+            avatarLook={avatarLook}
+            avatarHref={ROUTES.avatar}
             missionsSlot={missions ? <MissionsCard href={ROUTES.missions} xp={missions.xp} quadrants={missions.quadrants} /> : undefined}
             installSlot={<InstallHint />}
+            pollSlot={poll ? <LivePollCard poll={poll} href={ROUTES.poll} /> : undefined}
           />
         </ScreenEnter>
       </main>
@@ -105,21 +105,10 @@ async function fleetStanding(uid: string) {
   return standing.ok ? standing.value : null;
 }
 
-/**
- * The cadet's raffle tickets (their G-Credits of this edition), only while G-Credits are on. Decoration: a failed
- * read leaves the card out.
- */
-async function raffleTickets(uid: string, credits: number) {
-  const economy = await currentEconomy();
-  if (!economy.creditsEnabled) return null;
-  const tickets = await getCadetTickets(raffleCardDeps, uid, credits);
-  return tickets.ok ? tickets.value : null;
-}
-
-/** How many contacts the cadet has made, for the Red card. Decoration: a failed read leaves the card out. */
-async function contactCount(uid: string) {
-  const counted = await countContacts({ contacts: networkStore }, uid);
-  return counted.ok ? counted.value : null;
+/** The open poll with the cadet's vote. Decoration: a failed read leaves the card out. */
+async function livePoll(uid: string) {
+  const current = await getCadetPoll(voteDeps, uid);
+  return current.ok ? current.value : null;
 }
 
 /** An attendee whose squad was retired from the catalog keeps a sensible, plain label. */

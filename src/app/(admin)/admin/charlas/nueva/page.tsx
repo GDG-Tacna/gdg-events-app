@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { talkRooms } from "@/app-shell/composition/talks.server";
+import { talkRooms, talkSpeakers } from "@/app-shell/composition/talks.server";
 import { requireRole } from "@/app-shell/guards";
 import { createTalkAction } from "@/app-shell/talks/manage.actions";
 import { TalkForm } from "@/features/talks";
@@ -13,11 +13,11 @@ export const metadata: Metadata = { title: copy.admin.talks.form.createTitle };
 export default async function AdminNewTalkPage() {
   const session = await requireRole(["admin"]);
   await requireSection(session, "talks");
-  const rooms = await talkRooms();
+  const [rooms, speakers] = await Promise.all([talkRooms(), talkSpeakers()]);
 
   return (
     <ScreenEnter>
-      <TalkForm mode="create" save={createTalkAction} rooms={rooms} listHref={ROUTES.adminTalks} />
+      <TalkForm mode="create" save={createTalkAction} rooms={rooms} speakers={speakers} speakersHref={ROUTES.adminSpeakers} listHref={ROUTES.adminTalks} />
     </ScreenEnter>
   );
 }

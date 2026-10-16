@@ -67,7 +67,7 @@ describe("QuadrantsAdminView", () => {
   it("offers to load the bundled quadrants and plan, and says how many stand QR codes were made", async () => {
     const { props } = renderView([]);
 
-    expect(screen.getByText(/ven los 5 cuadrantes y el plano por defecto/)).toBeInTheDocument();
+    expect(screen.getByText(/ven las 5 zonas y el plano por defecto/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: m.createQuadrant })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: m.seed }));
 

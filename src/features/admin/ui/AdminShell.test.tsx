@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import Link from "next/link";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
@@ -95,6 +96,53 @@ describe("AdminShell", () => {
     );
     expect(screen.getByRole("button", { name: "Guardar" })).toBeEnabled();
     expect(screen.queryByRole("note")).not.toBeInTheDocument();
+  });
+
+  it("shows the account's photo, or its initial, and a compact sign out at the top for phones", () => {
+    const { container, unmount } = render(
+      <AdminShell items={ITEMS} account="Ana Pérez" accountPhotoUrl="https://lh3.googleusercontent.com/a/ana" compactAccountActions={<button type="button">Salir arriba</button>}>
+        <p>x</p>
+      </AdminShell>,
+    );
+
+    const photos = container.querySelectorAll('img[src="https://lh3.googleusercontent.com/a/ana"]');
+    expect(photos.length).toBeGreaterThan(0);
+    photos.forEach((photo) => expect(photo).toHaveAttribute("alt", ""));
+    expect(screen.getByRole("button", { name: "Salir arriba" })).toBeInTheDocument();
+    unmount();
+
+    render(
+      <AdminShell items={ITEMS} account="Ana Pérez">
+        <p>x</p>
+      </AdminShell>,
+    );
+    expect(screen.getAllByText("A").length).toBeGreaterThan(0);
+  });
+
+  it("shows the menu in its groups, each one foldable, and a phone button that names the current area and opens it", async () => {
+    navigation.pathname = "/admin/charlas";
+    render(
+      <AdminShell
+        items={[
+          { href: "/admin", label: "Inicio", exact: true },
+          { href: "/admin/eventos", label: "Eventos", group: "Evento" },
+          { href: "/admin/charlas", label: "Charlas", group: "Programa" },
+          { href: "/admin/puestos", label: "Puestos", group: "Programa" },
+        ]}
+        account="Ana"
+      >
+        <p>x</p>
+      </AdminShell>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: copy.admin.navLabel });
+    expect(within(nav).getByText("Evento").closest("details")).toHaveAttribute("open");
+    expect(within(nav).getByText("Programa").closest("details")).toContainElement(within(nav).getByRole("link", { name: "Puestos" }));
+
+    const button = within(nav).getByRole("button", { name: "Menú · Charlas" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    await userEvent.setup().click(button);
+    expect(button).toHaveAttribute("aria-expanded", "true");
   });
 
   it("has no detectable accessibility violations", async () => {

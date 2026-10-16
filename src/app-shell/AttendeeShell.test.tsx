@@ -5,7 +5,7 @@ import { copy } from "@/shared/copy/es";
 import { AttendeeShell } from "./AttendeeShell";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard" }));
-const features = vi.hoisted(() => ({ FEATURES: { missions: true, map: true, achievements: true } }));
+const features = vi.hoisted(() => ({ FEATURES: { missions: true, map: true, achievements: true, checkins: true } }));
 vi.mock("@/shared/config/features", () => features);
 
 describe("AttendeeShell", () => {
@@ -37,5 +37,15 @@ describe("AttendeeShell", () => {
     const frame = container.firstElementChild as HTMLElement;
     expect(frame.className).toContain("pb-[calc(5.5rem+env(safe-area-inset-bottom))]");
     expect(frame.className).toContain("min-[760px]:pl-24");
+  });
+
+  it("leaves out the tab of every module switched off, and keeps the agenda as its own tab without the map", async () => {
+    Object.assign(features.FEATURES, { missions: false, map: false, achievements: false });
+    render(await AttendeeShell({ children: <p>x</p> }));
+    Object.assign(features.FEATURES, { missions: true, map: true, achievements: true });
+
+    const nav = screen.getByRole("navigation", { name: copy.nav.label });
+    expect(within(nav).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/dashboard", "/scan", "/map?vista=agenda"]);
+    expect(within(nav).getByRole("link", { name: copy.nav.agenda })).toBeInTheDocument();
   });
 });

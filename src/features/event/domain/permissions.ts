@@ -22,6 +22,7 @@ export const ADMIN_SECTIONS = [
   "squadCredits",
   "stage",
   "raffle",
+  "polls",
   "team",
   "event",
 ] as const;

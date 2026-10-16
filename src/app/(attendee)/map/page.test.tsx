@@ -62,11 +62,24 @@ describe("map page", () => {
     expect(server.getGalaxyMap).not.toHaveBeenCalled();
   });
 
-  it("is not found when the map is switched off, without reading the session", async () => {
+  it("is only the agenda when the map is switched off: no plan and no views to choose", async () => {
     features.FEATURES.map = false;
+
+    const tree = await page();
+    expect(findElement(tree, AgendaView)).not.toBeNull();
+    expect(findElement(tree, VenueMapView)).toBeNull();
+    expect(findAll(tree, Link)).toHaveLength(0);
+    features.FEATURES.map = true;
+  });
+
+  it("is not found when the map and check-ins are both off, without reading the session", async () => {
+    features.FEATURES.map = false;
+    features.FEATURES.checkins = false;
 
     await expect(page()).rejects.toBeInstanceOf(NotFound);
     expect(guards.requireAttendee).not.toHaveBeenCalled();
+    features.FEATURES.map = true;
+    features.FEATURES.checkins = true;
   });
 
   it("shows the edition's galaxy map by default, without reading the agenda", async () => {

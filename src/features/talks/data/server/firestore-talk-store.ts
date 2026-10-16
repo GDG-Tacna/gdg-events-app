@@ -25,6 +25,7 @@ export function toTalk(id: string, data: Record<string, unknown> | undefined): T
   return {
     id,
     title: text(data.name) ?? id,
+    speakerIds: Array.isArray(data.speakerIds) ? data.speakerIds.filter((value): value is string => typeof value === "string") : [],
     speaker: text(data.speaker),
     startsAt: toDate(data.startsAt),
     endsAt: toDate(data.endsAt),
@@ -38,6 +39,7 @@ export function toTalk(id: string, data: Record<string, unknown> | undefined): T
 function toFields(patch: TalkPatch): Record<string, unknown> {
   const fields: Record<string, unknown> = {};
   if (patch.title !== undefined) fields.name = patch.title;
+  if (patch.speakerIds !== undefined) fields.speakerIds = [...patch.speakerIds];
   if (patch.speaker !== undefined) fields.speaker = patch.speaker;
   if (patch.startsAt !== undefined) fields.startsAt = patch.startsAt;
   if (patch.endsAt !== undefined) fields.endsAt = patch.endsAt;

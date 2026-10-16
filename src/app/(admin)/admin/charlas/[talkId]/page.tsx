@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { talkAdminDeps, talkRooms } from "@/app-shell/composition/talks.server";
+import { talkAdminDeps, talkRooms, talkSpeakers } from "@/app-shell/composition/talks.server";
 import { requireRole } from "@/app-shell/guards";
 import { updateTalkAction } from "@/app-shell/talks/manage.actions";
 import { toTalkView } from "@/app-shell/talks/talk-view.server";
@@ -18,7 +18,7 @@ export default async function AdminEditTalkPage({ params }: PageProps<"/admin/ch
   await requireSection(session, "talks");
   const { talkId } = await params;
 
-  const [talks, rooms] = await Promise.all([listManagedTalks(talkAdminDeps, { uid: session.uid, role: session.role }), talkRooms()]);
+  const [talks, rooms, speakers] = await Promise.all([listManagedTalks(talkAdminDeps, { uid: session.uid, role: session.role }), talkRooms(), talkSpeakers()]);
   if (!talks.ok) throw new Error("Could not read the talks");
   const talk = talks.value.find((candidate) => candidate.id === talkId);
   if (!talk) notFound();
@@ -27,9 +27,11 @@ export default async function AdminEditTalkPage({ params }: PageProps<"/admin/ch
     <ScreenEnter>
       <TalkForm
         mode="edit"
-        talk={toTalkView(talk)}
+        talk={toTalkView(talk, new Map(speakers.map((speaker) => [speaker.id, speaker.name])))}
         save={updateTalkAction}
         rooms={rooms}
+        speakers={speakers}
+        speakersHref={ROUTES.adminSpeakers}
         listHref={ROUTES.adminTalks}
         // A closed talk has no code to project.
         qrHref={talk.active ? `${ROUTES.adminQr}/${talk.id}` : undefined}

@@ -72,6 +72,7 @@ function setup(initial: Mission[] = [mission("bb", 1), mission("aa", 0), mission
     store,
     quadrants: { activeIds: vi.fn(async () => ok(new Set(["ai", "cloud"]) as ReadonlySet<string>)) },
     checkpoints: { kindOf: vi.fn(async (id: string): Promise<Result<string | null, { code: string }>> => ok(id.startsWith("talk-") ? "talk" : id.startsWith("stand-") ? "stand" : null)) },
+    speakers: { activeIds: vi.fn(async (): Promise<Result<ReadonlySet<string>, { code: string }>> => ok(new Set(["ana-torres"]))) },
     minigames: { ids: ["circuits", "bug-kong"] },
     images: { ref: vi.fn((path: string, purpose: string) => (path.includes(`/${purpose}/`) ? { path, url: `https://cdn/${path}` } : null)), remove: vi.fn(async () => {}) },
     audit: { append: vi.fn(async (entry: MissionAuditEntry) => (entries.push(entry), ok(undefined))) },
@@ -196,6 +197,17 @@ describe("mission admin", () => {
       expect(await createMission(ctx.deps, ADMIN, { id: "stand-1", draft: stand })).toMatchObject({ ok: true });
       expect(await createMission(ctx.deps, ADMIN, { id: "talk-2", draft: { ...talk, config: { type: "talk", checkpointId: "stand-ai-1" } } })).toEqual(err({ code: "unknown-checkpoint" }));
       expect(await createMission(ctx.deps, ADMIN, { id: "stand-2", draft: { ...stand, config: { type: "stand", checkpointId: "ghost" } } })).toEqual(err({ code: "unknown-checkpoint" }));
+    });
+
+    it("needs an active speaker of the edition for a «Conoce al speaker» mission", async () => {
+      const meet = { ...QUIZ_DRAFT, config: { type: "speaker", speakerId: "ana-torres" } };
+
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-ana", draft: meet })).toMatchObject({ ok: true, value: { config: { type: "speaker", speakerId: "ana-torres" } } });
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-zoe", draft: { ...meet, config: { type: "speaker", speakerId: "zoe" } } })).toEqual(err({ code: "unknown-speaker" }));
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-bad", draft: { ...meet, config: { type: "speaker", speakerId: "Ana" } } })).toEqual(err({ code: "invalid-speaker" }));
+
+      ctx.deps.speakers.activeIds.mockResolvedValueOnce(err({ code: "x" }));
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-2", draft: meet })).toEqual(err({ code: "unknown" }));
     });
 
     it("never takes an id that exists", async () => {

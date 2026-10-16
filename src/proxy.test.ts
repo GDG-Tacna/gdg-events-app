@@ -11,7 +11,7 @@ const request = (path: string, withCookie = false) =>
 const redirectTarget = (response: Response) => response.headers.get("location");
 
 describe("proxy", () => {
-  it.each(["/dashboard", "/dashboard/anything", "/onboarding", "/squad", "/scan", "/pass", "/map", "/missions", "/odyssey", "/achievements", "/minigame/ai-quiz", "/red", "/escenario", "/staff", "/staff/scan", "/admin"])(
+  it.each(["/dashboard", "/dashboard/anything", "/onboarding", "/squad", "/scan", "/pass", "/map", "/missions", "/odyssey", "/achievements", "/minigame/ai-quiz", "/red", "/escenario", "/staff", "/staff/scan", "/admin", "/speaker", "/encuesta", "/avatar"])(
     "sends %s to /login when there is no session cookie",
     (path) => {
       const response = proxy(request(path));
@@ -28,7 +28,7 @@ describe("proxy", () => {
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 
-  it.each(["/login", "/", "/offline", "/dashboards-info", "/administrator"])(
+  it.each(["/login", "/", "/offline", "/dashboards-info", "/administrator", "/invite/speaker/devfest-2026.abc", "/speakers-info"])(
     "does not protect %s",
     (path) => {
       expect(redirectTarget(proxy(request(path)))).toBeNull();

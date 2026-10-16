@@ -9,7 +9,7 @@ export default function AchievementsLoading() {
       <main
         aria-busy="true"
         aria-label={copy.a11y.loadingLabel}
-        className="pt-safe px-space-4 py-space-6 mx-auto w-full max-w-[520px]"
+        className="px-space-4 pt-safe-space-6 pb-space-6 mx-auto w-full max-w-[520px]"
       >
         <div className="gap-space-4 flex flex-col">
           <Skeleton className="h-8 w-40" />

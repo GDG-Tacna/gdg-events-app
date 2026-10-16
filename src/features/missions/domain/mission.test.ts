@@ -34,6 +34,8 @@ describe("parseMission", () => {
     expect(parseMission("t", input({ config: { type: "talk", checkpointId: "talk-keynote" } }))).toBeNull(); // id too short
     expect(parseMission("talk-1", input({ config: { type: "talk", checkpointId: "talk-keynote" } }))?.config).toEqual({ type: "talk", checkpointId: "talk-keynote" });
     expect(parseMission("stand-1", input({ config: { type: "stand", checkpointId: "stand-ai-1" } }))?.config).toEqual({ type: "stand", checkpointId: "stand-ai-1" });
+    expect(parseMission("meet-ana", input({ config: { type: "speaker", speakerId: "ana-torres", extra: "x" } }))?.config).toEqual({ type: "speaker", speakerId: "ana-torres" });
+    expect(checkMission("meet-ana", input({ config: { type: "speaker", speakerId: "Ana Torres" } }))).toEqual({ ok: false, code: "invalid-speaker" });
     expect(parseMission("kw-1", input({ config: { type: "keyword", prompt: "Pide la clave", keywords: ["Fuégo  Azul", "fuego azul", "Nube"] } }))?.config).toEqual({
       type: "keyword",
       prompt: "Pide la clave",
@@ -102,6 +104,7 @@ describe("publicConfig", () => {
   it("never gives away the answer or the keywords", () => {
     expect(publicConfig({ type: "quiz", question: "¿Q?", options: ["a", "b"], answer: 1 })).toEqual({ type: "quiz", question: "¿Q?", options: ["a", "b"] });
     expect(publicConfig({ type: "keyword", prompt: "Pide", keywords: ["secreto"] })).toEqual({ type: "keyword", prompt: "Pide" });
+    expect(publicConfig({ type: "speaker", speakerId: "ana-torres" })).toEqual({ type: "speaker" });
     expect(publicConfig({ type: "talk", checkpointId: "talk-keynote" })).toEqual({ type: "talk" });
     expect(publicConfig({ type: "stand", checkpointId: "stand-ai-1" })).toEqual({ type: "stand" });
   });

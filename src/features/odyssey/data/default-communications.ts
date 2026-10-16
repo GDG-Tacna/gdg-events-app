@@ -21,7 +21,7 @@ export const DEFAULT_COMMUNICATIONS: readonly Communication[] = [
     "community",
     0,
     "Mensaje del Mando",
-    "Cadete, bienvenido a la flota del DevFest Tacna. La galaxia del código está dividida en cuadrantes y cada uno guarda señales que solo los exploradores pueden descifrar. Cumple misiones, escanea los QR y reúne las transmisiones perdidas.",
+    "Cadete, bienvenido a la flota del DevFest Tacna. La galaxia del código está dividida en zonas y cada uno guarda señales que solo los exploradores pueden descifrar. Cumple misiones, escanea los QR y reúne las transmisiones perdidas.",
     null,
   ),
   comm(
@@ -85,7 +85,7 @@ export const DEFAULT_COMMUNICATIONS: readonly Communication[] = [
     "ai",
     40,
     "Una inteligencia despierta",
-    "En el cuadrante AI una inteligencia aprende de cada transmisión. Visita su stand para conversar con ella.",
+    "En la zona AI una inteligencia aprende de cada transmisión. Visita su stand para conversar con ella.",
     null,
   ),
   comm(

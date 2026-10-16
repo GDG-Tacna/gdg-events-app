@@ -7,6 +7,7 @@ const NOW = new Date("2026-10-24T15:10:00Z"); // 10:10 in Tacna
 const talk = (id: string, start: string | null, end: string | null, overrides: Partial<Talk> = {}): Talk => ({
   id,
   title: id,
+  speakerIds: [],
   speaker: "Ana",
   startsAt: start ? new Date(start) : null,
   endsAt: end ? new Date(end) : null,
@@ -29,6 +30,7 @@ function deps(overrides: Partial<AgendaDeps> = {}): AgendaDeps {
   return {
     talks: vi.fn(async () => ok(TALKS)),
     attendedTalkIds: vi.fn(async () => ok(new Set(["past", "live"]))),
+    speakerNames: vi.fn(async () => ok(new Map([["ana-torres", "Ana Torres"], ["luis-quispe", "Luis Quispe"]]))),
     now: () => NOW,
     ...overrides,
   };
@@ -89,5 +91,19 @@ describe("getAgenda", () => {
 
   it("is empty when the edition has no open talks", async () => {
     expect(await getAgenda(deps({ talks: async () => ok([]) }), "u1")).toEqual(ok([]));
+  });
+
+  it("names a talk's speakers from the edition's catalog, and keeps the name typed before it when there are none", async () => {
+    const panel = talk("panel", "2026-10-24T17:00:00Z", "2026-10-24T17:45:00Z", { speakerIds: ["luis-quispe", "ana-torres"], speaker: "Viejo" });
+    const agenda = await getAgenda(deps({ talks: vi.fn(async () => ok([panel, talk("old", null, null)])) }), "u1");
+
+    expect(agenda.ok && agenda.value.map((item) => item.speaker)).toEqual(["Luis Quispe, Ana Torres", "Ana"]);
+  });
+
+  it("still lists the talks when the speakers cannot be read", async () => {
+    const panel = talk("panel", "2026-10-24T17:00:00Z", "2026-10-24T17:45:00Z", { speakerIds: ["luis-quispe"], speaker: null });
+    const agenda = await getAgenda(deps({ talks: vi.fn(async () => ok([panel])), speakerNames: vi.fn(async () => err({ code: "unknown" })) }), "u1");
+
+    expect(agenda.ok && agenda.value[0]).toMatchObject({ id: "panel", speaker: null });
   });
 });

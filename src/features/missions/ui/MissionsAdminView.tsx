@@ -29,6 +29,7 @@ type Notice = { kind: "success" | "error"; text: string } | null;
 const TYPE_ICON: Record<MissionType, IconName> = {
   talk: "qr",
   stand: "map-pin",
+  speaker: "person",
   quiz: "question",
   keyword: "key",
 };

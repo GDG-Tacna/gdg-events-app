@@ -14,7 +14,7 @@ export function OfflineBanner() {
       role="status"
       data-offline-banner
       aria-live="polite"
-      className="bg-surface-raised border-line-strong pt-safe px-space-4 py-space-2 fixed inset-x-0 top-0 z-50 border-b"
+      className="bg-surface-raised border-line-strong px-space-4 pt-safe-space-2 pb-space-2 fixed inset-x-0 top-0 z-50 border-b"
     >
       <div className="gap-space-3 mx-auto flex w-full max-w-[520px] items-center">
         <Icon name="wifi-off" size={20} className="text-gold" />

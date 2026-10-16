@@ -3,7 +3,7 @@ import { Icon, PixelPlanet, type IconName, type PlanetKind } from "@/shared/ui";
 import type { MissionType } from "../domain/mission";
 
 /** The line icon of each kind of mission. */
-export const MISSION_TYPE_ICON: Record<MissionType, IconName> = { talk: "qr", stand: "map-pin", quiz: "question", keyword: "key" };
+export const MISSION_TYPE_ICON: Record<MissionType, IconName> = { talk: "qr", stand: "map-pin", speaker: "person", quiz: "question", keyword: "key" };
 
 export interface MissionTagsProps {
   type: MissionType;

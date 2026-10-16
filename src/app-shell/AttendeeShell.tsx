@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { FEATURES } from "@/shared/config/features";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { BottomNav, type BottomNavItem } from "@/shared/ui";
@@ -17,7 +18,12 @@ export async function AttendeeShell({ children }: { children: ReactNode }) {
     ...((await moduleOn("missions")) ? [{ href: ROUTES.missions, label: copy.nav.missions, icon: "target" } as const] : []),
   ];
   const end: BottomNavItem[] = [
-    ...((await moduleOn("map")) ? [{ href: ROUTES.map, label: copy.nav.map, icon: "map" } as const] : []),
+    // Without the map the talks' agenda keeps its own tab (talks are part of the core).
+    ...((await moduleOn("map"))
+      ? [{ href: ROUTES.map, label: copy.nav.map, icon: "map" } as const]
+      : FEATURES.checkins
+        ? [{ href: `${ROUTES.map}?vista=agenda`, label: copy.nav.agenda, icon: "calendar" } as const]
+        : []),
     ...((await moduleOn("achievements")) ? [{ href: ROUTES.achievements, label: copy.nav.achievements, icon: "trophy" } as const] : []),
   ];
 

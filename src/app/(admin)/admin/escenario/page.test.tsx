@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/composition/leaderboard.server", () => ({ leaderboardDeps: { marker: "leaderboard" }, stageDeps: { marker: "stage" } }));
 vi.mock("@/app-shell/leaderboard/stage.actions", () => ({ updateStageAction: async () => ({ ok: true }) }));
+vi.mock("@/app-shell/media/upload.action", () => ({ uploadImageAction: async () => ({ ok: true }) }));
 vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("not-found");
@@ -14,11 +15,14 @@ const guards = { requireRole: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 const server = { getStage: vi.fn(), getFleetBoard: vi.fn() };
 vi.mock("@/features/leaderboard/server", () => server);
-const features = vi.hoisted(() => ({ FEATURES: { leaderboard: true } }));
+const polls = vi.hoisted(() => ({ pollStore: { list: vi.fn() } }));
+vi.mock("@/app-shell/composition/polls.server", () => polls);
+const features = vi.hoisted(() => ({ FEATURES: { leaderboard: true, polls: false } }));
 vi.mock("@/shared/config/features", () => features);
 
 const { StageControlView, DEFAULT_STAGE } = await import("@/features/leaderboard");
 const { updateStageAction } = await import("@/app-shell/leaderboard/stage.actions");
+const { uploadImageAction } = await import("@/app-shell/media/upload.action");
 const { default: AdminStagePage } = await import("./page");
 
 function findElement(node: ReactNode, type: unknown): { props: Record<string, unknown> } | null {
@@ -61,7 +65,7 @@ describe("admin stage page", () => {
 
     expect(server.getStage).toHaveBeenCalledWith({ marker: "stage" });
     expect(server.getFleetBoard).toHaveBeenCalledWith({ marker: "leaderboard" });
-    expect(view?.props).toEqual({ stage: DEFAULT_STAGE, live: BOARD, run: updateStageAction, screenHref: "/escenario" });
+    expect(view?.props).toMatchObject({ stage: DEFAULT_STAGE, live: BOARD, run: updateStageAction, screenHref: "/escenario", upload: uploadImageAction });
   });
 
   it("works without the live preview, and surfaces a failed stage read", async () => {
@@ -70,5 +74,26 @@ describe("admin stage page", () => {
 
     server.getStage.mockResolvedValue({ ok: false, error: { code: "unknown" } });
     await expect(AdminStagePage()).rejects.toThrow("Could not read the stage");
+  });
+
+  it("offers the polls that were opened, the open one first, only with polls on", async () => {
+    features.FEATURES.polls = true;
+    polls.pollStore.list.mockResolvedValue({
+      ok: true,
+      value: [
+        { id: "poll-closed", question: "¿Antes?", status: "closed", createdAt: new Date(2) },
+        { id: "poll-draft", question: "¿Borrador?", status: "draft", createdAt: new Date(3) },
+        { id: "poll-open", question: "¿Ahora?", status: "open", createdAt: new Date(1) },
+      ],
+    });
+
+    const view = findElement(await AdminStagePage(), StageControlView);
+    expect(view?.props.polls).toEqual([
+      { id: "poll-open", question: "¿Ahora?", status: "open" },
+      { id: "poll-closed", question: "¿Antes?", status: "closed" },
+    ]);
+
+    features.FEATURES.polls = false;
+    expect(findElement(await AdminStagePage(), StageControlView)?.props.polls).toBeUndefined();
   });
 });

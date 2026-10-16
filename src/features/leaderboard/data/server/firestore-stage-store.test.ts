@@ -47,6 +47,8 @@ describe("FirestoreStageStore", () => {
       frozen: { cadets: [{ position: 1, alias: "Nova", squad: null, xp: 500 }], squads: [], at: AT },
       champions: { cadet: { position: 1, alias: "Nova", squad: null, xp: 500 }, squad: null },
       raffle: null,
+      background: { path: "public/e1/stage-background/abcdef123456.webp", url: "/media/public/e1/stage-background/abcdef123456.webp" },
+      poll: null,
     };
     await store.save(state);
 

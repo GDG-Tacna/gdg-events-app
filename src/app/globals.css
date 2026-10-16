@@ -219,6 +219,16 @@
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }
+/*
+ * The phone's inset plus a Design System step, in one property: `pt-safe-space-6` is the notch plus 24px. Combining
+ * `pt-safe` with `py-space-6` does not add up, one of the two wins, and the header ended up under the status bar.
+ */
+@utility pt-safe-* {
+  padding-top: calc(env(safe-area-inset-top) + --value(--spacing-*));
+}
+@utility pb-safe-* {
+  padding-bottom: calc(env(safe-area-inset-bottom) + --value(--spacing-*));
+}
 
 body {
   background: var(--bg);

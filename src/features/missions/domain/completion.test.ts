@@ -89,6 +89,22 @@ describe("evaluate: keyword", () => {
   });
 });
 
+describe("evaluate: speaker", () => {
+  const MEET = mission({ type: "speaker", speakerId: "ana-torres" }, 40);
+
+  it("completes with the code of that speaker only", () => {
+    expect(evaluate(MEET, { kind: "speaker", speakerId: "ana-torres" }, null)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 40, creditsEarned: 0 });
+    expect(evaluate(MEET, { kind: "speaker", speakerId: "luis" }, null)).toEqual({ kind: "wrong-proof" });
+    // A checkpoint with the same id is not the speaker's code, and a speaker's code completes no stand.
+    expect(evaluate(MEET, { kind: "checkpoint", checkpointId: "ana-torres" }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(STAND, { kind: "speaker", speakerId: "stand-ai-1" }, null)).toEqual({ kind: "wrong-proof" });
+  });
+
+  it("changes nothing once completed", () => {
+    expect(evaluate(MEET, { kind: "speaker", speakerId: "ana-torres" }, done("completed", 0, 40))).toEqual({ kind: "closed" });
+  });
+});
+
 describe("evaluate: talk and stand", () => {
   it("completes with the scan of its own checkpoint", () => {
     expect(evaluate(STAND, { kind: "checkpoint", checkpointId: "stand-ai-1" }, null)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 30, creditsEarned: 0 });

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { AvatarLook } from "@/shared/ui";
 import { SignOutButton } from "@/features/auth";
 import { copy } from "@/shared/copy/es";
 import type { PixelSpriteData } from "@/shared/types/pixel";
@@ -20,22 +21,22 @@ export interface DashboardViewProps {
   squadHref: string;
   /** The squad's credits and prizes, built by the app shell (only for a member when squad credits are on). */
   squadCreditsSlot?: ReactNode;
-  /** Card that leads to the attendee's pass, built by the app shell. */
-  passSlot?: ReactNode;
   /** The cadet's personal QR, opened from a button on the attendee card and from the account menu (absent when check-ins are off). */
   qrHref?: string;
-  /** The Red, offered in the account menu (absent when the network is off). */
+  /** The Red, opened from a button on the attendee card and from the account menu (absent when the network is off). */
   networkHref?: string;
+  /** The look the cadet chose for their avatar (the alias gives it when absent). */
+  avatarLook?: AvatarLook | null;
+  /** The avatar editor, linked from the avatar on the cadet card. */
+  avatarHref?: string;
   /** The open missions, the terminal's first entry, built by the app shell. */
   missionsSlot?: ReactNode;
   /** The cadet's place in the fleet ranking and the top 10, built by the app shell; under the attendee card. */
   standingSlot?: ReactNode;
-  /** The cadet's tickets for the final raffle, built by the app shell. */
-  raffleSlot?: ReactNode;
-  /** Card that leads to the cadet network (Red), built by the app shell. */
-  networkSlot?: ReactNode;
   /** Extra card at the end (for example how to install the app), built by the app shell. */
   installSlot?: ReactNode;
+  /** The live poll while one is open, built by the app shell; first, since it lasts only minutes. */
+  pollSlot?: ReactNode;
 }
 
 /**
@@ -50,14 +51,14 @@ export function DashboardView({
   squadPreviews,
   squadHref,
   squadCreditsSlot,
-  passSlot,
   qrHref,
   networkHref,
+  avatarLook,
+  avatarHref,
   missionsSlot,
-  networkSlot,
-  raffleSlot,
   standingSlot,
   installSlot,
+  pollSlot,
 }: DashboardViewProps) {
   const t = copy.dashboard;
   return (
@@ -73,7 +74,8 @@ export function DashboardView({
 
       <div className="gap-space-5 grid min-[760px]:grid-cols-2 min-[760px]:items-start">
         <div className="gap-space-4 flex flex-col">
-          <PlayerCard overview={overview} squadSlot={squadCallout === "badge" ? squadBadge : undefined} qrHref={qrHref} />
+          {pollSlot}
+          <PlayerCard overview={overview} squadSlot={squadCallout === "badge" ? squadBadge : undefined} qrHref={qrHref} networkHref={networkHref} avatarLook={avatarLook} avatarHref={avatarHref} />
           {standingSlot}
           <WelcomeBanner alias={overview.alias} />
         </div>
@@ -90,9 +92,6 @@ export function DashboardView({
           </div>
           {squadCallout === "discover" ? <SquadCallout previews={squadPreviews} href={squadHref} /> : null}
           {missionsSlot}
-          {networkSlot}
-          {passSlot}
-          {raffleSlot}
           {squadCallout === "badge" ? squadCreditsSlot : null}
           {installSlot}
         </section>

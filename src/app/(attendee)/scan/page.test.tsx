@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const features = vi.hoisted(() => ({ FEATURES: { checkins: true } }));
+const features = vi.hoisted(() => ({ FEATURES: { checkins: true, achievements: true, network: true } as Record<string, boolean> }));
 vi.mock("@/shared/config/features", () => features);
 
 const { ScannerScreen } = await import("@/app-shell/ScannerScreen");
@@ -60,9 +60,16 @@ describe("scan page", () => {
     expect(guards.requireAttendee).not.toHaveBeenCalled();
   });
 
-  it("shows the scanner", async () => {
+  it("shows the scanner, telling it which modules are on", async () => {
     const tree = await ScanPage();
 
-    expect(findElement(tree, ScannerScreen)).not.toBeNull();
+    expect((findElement(tree, ScannerScreen) as { props: unknown } | null)?.props).toEqual({ achievementsOn: true, networkOn: true });
+  });
+
+  it("tells the scanner when the achievements and the network are switched off", async () => {
+    Object.assign(features.FEATURES, { achievements: false, network: false });
+
+    expect((findElement(await ScanPage(), ScannerScreen) as { props: unknown } | null)?.props).toEqual({ achievementsOn: false, networkOn: false });
+    Object.assign(features.FEATURES, { achievements: true, network: true });
   });
 });

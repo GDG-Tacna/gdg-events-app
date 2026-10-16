@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/features/auth/constants";
 
 /** Surfaces that need a signed-in user. Later phases append their prefixes here. */
-const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/squad", "/scan", "/pass", "/map", "/missions", "/odyssey", "/achievements", "/minigame", "/red", "/escenario", "/staff", "/admin", "/mis-eventos"];
+const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/squad", "/scan", "/pass", "/map", "/missions", "/odyssey", "/achievements", "/minigame", "/red", "/escenario", "/staff", "/admin", "/mis-eventos", "/speaker", "/encuesta", "/avatar"];
 
 /**
  * Optimistic check only: it looks for the session cookie, never verifies it.

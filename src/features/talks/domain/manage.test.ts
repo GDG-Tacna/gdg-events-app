@@ -5,11 +5,12 @@ import type { Talk, TalkDraft } from "./talk";
 
 const NOW = new Date("2026-10-20T15:00:00Z");
 const ADMIN = { uid: "a1", role: "admin" as const };
-const DRAFT: TalkDraft = { title: "Keynote", speaker: "Ana Torres", startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45", roomId: "auditorio", description: "" };
+const DRAFT: TalkDraft = { title: "Keynote", speakerIds: ["ana-torres"], startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45", roomId: "auditorio", description: "" };
 const STORED: Talk = {
   id: "keynote",
   title: "Keynote",
-  speaker: "Ana Torres",
+  speakerIds: ["ana-torres"],
+  speaker: null,
   startsAt: new Date("2026-10-24T14:00:00Z"),
   endsAt: new Date("2026-10-24T14:45:00Z"),
   roomId: "auditorio",
@@ -35,7 +36,10 @@ function setup({ rooms = ok(new Set(["auditorio", "sala-b"])) as Result<Readonly
         return ok({ before, after });
       }),
     },
-    directory: { roomIds: vi.fn(async () => rooms) },
+    directory: {
+      roomIds: vi.fn(async () => rooms),
+      speakerIds: vi.fn(async (): Promise<Result<ReadonlySet<string>, { code: string }>> => ok(new Set(["ana-torres", "luis-quispe"]))),
+    },
     audit: { append: vi.fn(async () => ok(undefined)) },
     now: () => NOW,
     utcOffset: "-05:00",
@@ -77,7 +81,8 @@ describe("talk administration", () => {
   it("refuses a bad draft, a room that is not in the plan and a taken id, without writing", async () => {
     const t = setup();
 
-    expect(await createTalk(t.deps, ADMIN, { id: "nueva", draft: { ...DRAFT, speaker: "" } })).toEqual(err({ code: "invalid-speaker" }));
+    expect(await createTalk(t.deps, ADMIN, { id: "nueva", draft: { ...DRAFT, speakerIds: [] } })).toEqual(err({ code: "invalid-speaker" }));
+    expect(await createTalk(t.deps, ADMIN, { id: "nueva", draft: { ...DRAFT, speakerIds: ["nadie"] } })).toEqual(err({ code: "unknown-speaker" }));
     expect(await createTalk(t.deps, ADMIN, { id: "nueva", draft: { ...DRAFT, roomId: "sotano" } })).toEqual(err({ code: "unknown-room" }));
     expect(await createTalk(t.deps, ADMIN, { id: "keynote", draft: DRAFT })).toEqual(err({ code: "already-exists" }));
     expect(t.deps.audit.append).not.toHaveBeenCalled();
@@ -97,6 +102,15 @@ describe("talk administration", () => {
 
     expect(updated).toMatchObject({ ok: true, value: { id: "keynote", endsAt: new Date("2026-10-24T15:00:00Z"), roomId: "sala-b", active: true } });
     expect(t.deps.audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "talk.updated", targetUid: "keynote", details: { changed: "endsAt,roomId" } }));
+  });
+
+  it("saves the talk's speakers in order, keeping a panel, and audits the change", async () => {
+    const t = setup();
+
+    const updated = await updateTalk(t.deps, ADMIN, { id: "keynote", draft: { ...DRAFT, speakerIds: ["luis-quispe", "ana-torres", "luis-quispe"] } });
+
+    expect(updated).toMatchObject({ ok: true, value: { speakerIds: ["luis-quispe", "ana-torres"] } });
+    expect(t.deps.audit.append).toHaveBeenCalledWith(expect.objectContaining({ details: { changed: "speakerIds" } }));
   });
 
   it("does not audit a save that changed nothing (dates compared by time)", async () => {

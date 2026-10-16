@@ -38,7 +38,7 @@ export default async function SquadPage() {
   return (
     <>
       <SpaceBackground />
-      <main className="pt-safe pb-safe px-space-4 py-space-8 mx-auto flex min-h-dvh w-full max-w-[520px] flex-col justify-center">
+      <main className="px-space-4 pt-safe-space-8 pb-safe-space-8 mx-auto flex min-h-dvh w-full max-w-[520px] flex-col justify-center">
         <ScreenEnter>
           <SquadReveal
             squads={squads.value}

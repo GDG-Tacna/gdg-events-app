@@ -58,3 +58,6 @@ firebase.indexes.json
 
 # venue:pdf output (local, generated from the venue PDF)
 /scripts/output/
+
+# graphify knowledge graph (generated, machine-specific)
+graphify-out/

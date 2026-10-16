@@ -24,12 +24,14 @@ const VIEWS = [
 ] as const;
 
 export default async function MapPage({ searchParams }: PageProps<"/map">) {
-  if (!(await moduleOn("map"))) notFound();
+  const mapOn = await moduleOn("map");
+  // Talks are part of the core: with the map switched off this screen is only the agenda.
+  if (!mapOn && !FEATURES.checkins) notFound();
   // Visitors go to /login, users without a role go to onboarding, staff and admin go to their own home.
   const session = await requireAttendee();
   const { vista } = await searchParams;
   // The agenda needs check-ins (talks are proven by scanning their code); anything else shows the plan.
-  const view = vista === "agenda" && FEATURES.checkins ? "agenda" : "plano";
+  const view = !mapOn || (vista === "agenda" && FEATURES.checkins) ? "agenda" : "plano";
 
   const [galaxy, agenda] = await Promise.all([getGalaxyMap(galaxyDeps), view === "agenda" ? getAgenda(agendaDeps, session.uid) : null]);
   // The route's error boundary shows a retry; the cause is already logged by the adapter.
@@ -39,8 +41,8 @@ export default async function MapPage({ searchParams }: PageProps<"/map">) {
   return (
     <>
       <SpaceBackground />
-      <main className="pt-safe px-space-4 py-space-6 min-[760px]:py-space-8 gap-space-5 mx-auto flex w-full max-w-[520px] flex-col min-[760px]:max-w-[880px]">
-        {FEATURES.checkins ? (
+      <main className="px-space-4 pt-safe-space-6 pb-space-6 min-[760px]:pt-safe-space-8 min-[760px]:pb-space-8 gap-space-5 mx-auto flex w-full max-w-[520px] flex-col min-[760px]:max-w-[880px]">
+        {mapOn && FEATURES.checkins ? (
           <nav aria-label={copy.map.views.label} className="bg-surface border-border p-space-1 grid grid-cols-2 rounded-md border">
             {VIEWS.map((option) => (
               <Link

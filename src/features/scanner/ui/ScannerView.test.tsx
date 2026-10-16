@@ -47,10 +47,12 @@ describe("messageFor", () => {
     [{ ok: true, kind: "talk", recorded: true, firstEntrance: false, missions: [], talkCredits: 0, achievements: [] }, copy.scanner.success.talk],
     [{ ok: true, kind: "catering", recorded: true, firstEntrance: false, missions: [], talkCredits: 0, achievements: [] }, copy.scanner.success.catering],
     [{ ok: true, kind: "stand", recorded: true, firstEntrance: false, missions: [], talkCredits: 0, achievements: [] }, copy.scanner.success.stand],
+    [{ ok: true, kind: "speaker", recorded: true, firstEntrance: false, missions: [], talkCredits: 0, achievements: [] }, copy.scanner.success.speaker],
     [{ ok: true, kind: "talk", recorded: false, firstEntrance: false, missions: [], talkCredits: 0, achievements: [] }, copy.scanner.already],
     [{ ok: true, kind: "entrance", recorded: false, firstEntrance: false, missions: [], talkCredits: 0, achievements: [] }, copy.scanner.already],
     [{ ok: false, code: "expired-code" }, copy.scanner.errors["expired-code"]],
     [{ ok: false, code: "rate-limited" }, copy.scanner.errors["rate-limited"]],
+    [{ ok: false, code: "speaker-inactive" }, copy.scanner.errors["speaker-inactive"]],
   ] as const)("%j says the right thing", (outcome, expected) => {
     expect(messageFor(outcome)).toEqual(expected);
   });

@@ -58,24 +58,42 @@ describe("admin home page", () => {
     const shortcuts = within(screen.getByRole("region", { name: copy.admin.home.shortcutsTitle }));
     const links = shortcuts.getAllByRole("link");
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
-      "/admin/puestos",
+      "/admin/eventos",
+      "/admin/team",
       "/admin/charlas",
-      "/admin/misiones",
+      "/admin/speakers",
+      "/admin/puestos",
+      "/admin/zonas",
       "/admin/mapa",
-      "/admin/rangos",
+      "/admin/misiones",
       "/admin/odisea",
-      "/admin/logros",
       "/admin/minijuegos",
-      "/admin/economia",
+      "/admin/logros",
+      "/admin/rangos",
       "/admin/escuadrones",
       "/admin/creditos-escuadron",
-      "/admin/escenario",
+      "/admin/economia",
       "/admin/sorteo",
-      "/admin/team",
-      "/admin/eventos",
+      "/admin/escenario",
+      "/admin/encuestas",
     ]);
-    expect(links[0]).toHaveAccessibleName(copy.admin.areas.checkpoints.title);
+    expect(links[0]).toHaveAccessibleName(copy.admin.areas.event.title);
     for (const link of links) expect(link.querySelector("svg")).toBeInTheDocument();
+  });
+
+  it("groups the shortcuts like the menu, each group under its name", async () => {
+    render(await AdminHomePage());
+
+    const g = copy.admin.navGroups;
+    const groups = [g.event, g.program, g.game, g.rewards, g.live];
+    for (const name of groups) expect(screen.getByRole("heading", { level: 3, name })).toBeInTheDocument();
+    expect(within(screen.getByRole("list", { name: g.program })).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
+      "/admin/charlas",
+      "/admin/speakers",
+      "/admin/puestos",
+      "/admin/zonas",
+      "/admin/mapa",
+    ]);
   });
 
   it("has no detectable accessibility violations", async () => {

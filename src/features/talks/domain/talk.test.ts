@@ -4,7 +4,7 @@ import { checkTalk, compareTalks, parseLocalDateTime, suggestTalkId, toLocalDate
 const LIMA = "-05:00";
 const DRAFT: TalkDraft = {
   title: "  Keynote:   IA en 2026 ",
-  speaker: " Ana   Torres ",
+  speakerIds: ["ana-torres", "luis-quispe", "ana-torres"],
   startsAt: "2026-10-24T09:00",
   endsAt: "2026-10-24T09:45",
   roomId: "auditorio",
@@ -34,7 +34,7 @@ describe("checkTalk", () => {
       value: {
         id: "keynote",
         title: "Keynote: IA en 2026",
-        speaker: "Ana Torres",
+        speakerIds: ["ana-torres", "luis-quispe"],
         startsAt: new Date("2026-10-24T14:00:00Z"),
         endsAt: new Date("2026-10-24T14:45:00Z"),
         roomId: "auditorio",
@@ -52,8 +52,9 @@ describe("checkTalk", () => {
     ["an id that is not a checkpoint id", "Keynote", DRAFT, "invalid-id"],
     ["a title too short", "keynote", { ...DRAFT, title: " x " }, "invalid-title"],
     ["a title too long", "keynote", { ...DRAFT, title: "x".repeat(81) }, "invalid-title"],
-    ["no speaker", "keynote", { ...DRAFT, speaker: "  " }, "invalid-speaker"],
-    ["a speaker too long", "keynote", { ...DRAFT, speaker: "x".repeat(81) }, "invalid-speaker"],
+    ["no speaker", "keynote", { ...DRAFT, speakerIds: [] }, "invalid-speaker"],
+    ["more than six speakers", "keynote", { ...DRAFT, speakerIds: ["a1", "a2", "a3", "a4", "a5", "a6", "a7"] }, "invalid-speaker"],
+    ["a speaker id that is not one", "keynote", { ...DRAFT, speakerIds: ["Ana Torres"] }, "invalid-speaker"],
     ["no start", "keynote", { ...DRAFT, startsAt: "" }, "invalid-schedule"],
     ["an end before the start", "keynote", { ...DRAFT, endsAt: "2026-10-24T08:59" }, "invalid-schedule"],
     ["an end equal to the start", "keynote", { ...DRAFT, endsAt: DRAFT.startsAt }, "invalid-schedule"],
@@ -72,6 +73,7 @@ describe("compareTalks", () => {
   const talk = (id: string, title: string, start: string | null): Talk => ({
     id,
     title,
+    speakerIds: [],
     speaker: null,
     startsAt: start ? new Date(start) : null,
     endsAt: null,

@@ -31,24 +31,40 @@ export default async function AdminHomePage() {
           <h2 id="admin-shortcuts" className="type-pixel-heading text-cyan">
             {copy.admin.home.shortcutsTitle}
           </h2>
-          <ul className="gap-space-3 grid grid-cols-2 min-[560px]:grid-cols-3 min-[1024px]:grid-cols-5">
-            {adminAreaCards((module) => modules[module], levels).map((area) => (
-              <li key={area.href}>
-                <Link
-                  href={area.href}
-                  title={area.description}
-                  className="bg-surface border-border hover:border-cyan focus-visible:ring-ring gap-space-2 p-space-4 flex h-full flex-col items-center rounded-lg border text-center transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
-                >
-                  <span aria-hidden="true" className="border-cyan/40 text-cyan bg-bg-deep grid size-12 place-items-center rounded-md border">
-                    <Icon name={area.icon} size={22} />
-                  </span>
-                  <span className="type-label text-foreground">{area.title}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {groupedCards(adminAreaCards((module) => modules[module], levels)).map((group) => (
+            <div key={group.label} className="gap-space-2 flex flex-col">
+              <h3 className="type-caption text-text-subtle tracking-wider uppercase">{group.label}</h3>
+              <ul aria-label={group.label} className="gap-space-3 grid grid-cols-2 min-[560px]:grid-cols-3 min-[1024px]:grid-cols-5">
+                {group.cards.map((area) => (
+                  <li key={area.href}>
+                    <Link
+                      href={area.href}
+                      title={area.description}
+                      className="bg-surface border-border hover:border-cyan focus-visible:ring-ring gap-space-2 p-space-4 flex h-full flex-col items-center rounded-lg border text-center transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+                    >
+                      <span aria-hidden="true" className="border-cyan/40 text-cyan bg-bg-deep grid size-12 place-items-center rounded-md border">
+                        <Icon name={area.icon} size={22} />
+                      </span>
+                      <span className="type-label text-foreground">{area.title}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </section>
       </div>
     </ScreenEnter>
   );
+}
+
+/** The shortcuts in their menu groups, in order. */
+function groupedCards<T extends { group: string }>(cards: readonly T[]): Array<{ label: string; cards: T[] }> {
+  const groups: Array<{ label: string; cards: T[] }> = [];
+  for (const card of cards) {
+    const last = groups.at(-1);
+    if (last && last.label === card.group) last.cards.push(card);
+    else groups.push({ label: card.group, cards: [card] });
+  }
+  return groups;
 }

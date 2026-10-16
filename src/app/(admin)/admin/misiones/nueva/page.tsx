@@ -24,6 +24,7 @@ export default async function AdminNewMissionPage() {
         save={createMissionAction}
         quadrants={options.quadrants}
         checkpoints={options.checkpoints}
+        speakers={options.speakers}
         listHref={ROUTES.adminMissions}
         creditDefaults={options.creditDefaults}
         minigames={options.minigames}

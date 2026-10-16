@@ -16,7 +16,7 @@ vi.mock("@/shared/config/features", () => features);
 const { createTalkAction, setTalkActiveAction, updateTalkAction } = await import("./manage.actions");
 
 const session = (role: "attendee" | "staff" | "admin" | null) => ({ uid: "a1", role, displayName: null, photoUrl: null });
-const DRAFT = { title: "Keynote", speaker: "Ana", startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45", roomId: null, description: "" };
+const DRAFT = { title: "Keynote", speakerIds: ["ana"], startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45", roomId: null, description: "" };
 
 describe("talk admin actions", () => {
   beforeEach(() => {

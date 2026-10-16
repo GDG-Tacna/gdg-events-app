@@ -109,6 +109,18 @@ describe("QrDisplay", () => {
     expect(screen.queryByRole("img", { name: /Código QR/ })).not.toBeInTheDocument();
   });
 
+  it("speaks of what the code is for when it is not a talk's (a speaker's)", async () => {
+    const texts = copy.admin.speakers.qr;
+    render(<QrDisplay checkpointId="ana-torres" name="Ana Torres" issue={async () => ({ ok: false, code: "checkpoint-inactive" })} texts={texts} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(texts.errors["checkpoint-inactive"]);
+    expect(screen.getByText(texts.scanHint)).toBeInTheDocument();
+    expect(screen.queryByText(copy.admin.qr.scanHint)).not.toBeInTheDocument();
+  });
+
   it("never shows a dead code: when it ends without a new one it says so", async () => {
     const issue = vi.fn<IssueQrAction>(async () => showing(3));
     await renderDisplay(issue);

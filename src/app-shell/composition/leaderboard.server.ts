@@ -4,6 +4,7 @@ import { FirestoreAuditLog } from "@/features/admin/server";
 import { CachedRankingSource, FirestoreRankingSource, FirestoreStageStore, type LeaderboardDeps, type StageDeps } from "@/features/leaderboard/server";
 import { err, ok } from "@/shared/lib/result";
 import { perEdition } from "./per-edition";
+import { recordImages } from "./media.server";
 
 /**
  * Composition root for the fleet ranking: participants read through a source whose shared parts (the top, the
@@ -27,6 +28,7 @@ export const stageDeps: StageDeps = {
   ranking: new FirestoreRankingSource(),
   squads: leaderboardDeps.squads,
   stage: new FirestoreStageStore(),
+  images: recordImages,
   audit: new FirestoreAuditLog(),
   now: () => new Date(),
 };

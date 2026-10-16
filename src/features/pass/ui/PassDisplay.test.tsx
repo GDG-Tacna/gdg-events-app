@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
 import type { IssuePassAction, IssuePassActionResult } from "./action";
-import { PassCard } from "./PassCard";
 import { PassDisplay } from "./PassDisplay";
 
 const CELLS = ["1110", "1010", "1110", "0001"];
@@ -98,18 +97,5 @@ describe("PassDisplay", () => {
     await screen.findByRole("img", { name: copy.pass.codeLabel });
 
     expect((await axe(container)).violations).toEqual([]);
-  });
-});
-
-describe("PassCard", () => {
-  it("leads to the pass with a real link", () => {
-    render(<PassCard href="/pass" />);
-
-    // The whole card is the link: its name says what it is and what it is for.
-    const link = screen.getByRole("link");
-    expect(link).toHaveAttribute("href", "/pass");
-    expect(link).toHaveAccessibleName(expect.stringContaining(copy.pass.card.title));
-    expect(link).toHaveTextContent(copy.pass.card.body);
-    expect(link).toHaveTextContent(copy.pass.card.badge);
   });
 });

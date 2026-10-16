@@ -13,7 +13,7 @@ import {
 } from "./settings";
 import type { XpGrantOutcome } from "./xp";
 
-const OWN: EconomySettings = { creditsEnabled: true, missionCredits: { talk: 20, stand: 15, quiz: 3, keyword: 4 }, talkCredits: 8, squadCreditsEnabled: false, squadRatio: 0.5, contactXp: 15, contactCredits: 3, contactCap: 8 };
+const OWN: EconomySettings = { creditsEnabled: true, missionCredits: { talk: 20, stand: 15, speaker: 12, quiz: 3, keyword: 4 }, talkCredits: 8, squadCreditsEnabled: false, squadRatio: 0.5, contactXp: 15, contactCredits: 3, contactCap: 8 };
 const ADMIN = { uid: "a1", role: "admin" } as const;
 
 function store(saved: EconomySettings | null = null) {
@@ -54,6 +54,13 @@ describe("economy settings", () => {
     expect(parseEconomySettings(older)).toEqual({ ...OWN, contactXp: 20, contactCredits: 5, contactCap: 10 });
   });
 
+  it("reads settings saved before speaker missions with their default credits", () => {
+    const older: Partial<EconomySettings["missionCredits"]> = { ...OWN.missionCredits };
+    delete older.speaker;
+
+    expect(parseEconomySettings({ ...OWN, missionCredits: older })).toEqual({ ...OWN, missionCredits: { ...OWN.missionCredits, speaker: 10 } });
+  });
+
   it("pays contacts their XP and, only while credits are on, their G-Credits, up to the cap", () => {
     expect(contactRewardFor(OWN)).toEqual({ xp: 15, credits: 3, cap: 8 });
     expect(contactRewardFor({ ...OWN, creditsEnabled: false })).toEqual({ xp: 15, credits: 0, cap: 8 });
@@ -86,7 +93,7 @@ describe("economy settings", () => {
       action: "economy.updated",
       actorUid: "a1",
       targetUid: "economy",
-      details: { credits: "on", missionCredits: "talk:20,stand:15,quiz:3,keyword:4", talkCredits: "8", squadCredits: "off", contacts: "xp:15,credits:3,cap:8" },
+      details: { credits: "on", missionCredits: "talk:20,stand:15,speaker:12,quiz:3,keyword:4", talkCredits: "8", squadCredits: "off", contacts: "xp:15,credits:3,cap:8" },
       at: new Date(0),
     });
 

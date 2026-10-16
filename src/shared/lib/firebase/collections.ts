@@ -45,6 +45,13 @@ export const XP_LEDGER_COLLECTION = "xpLedger";
 export const EVENT_CONFIG_COLLECTION = "config";
 export const RANKS_DOC = "ranks";
 
+/** The speakers of one edition; talks point at them by id. */
+export const SPEAKERS_COLLECTION = "speakers";
+
+/** The live polls of one edition; each keeps its votes in `votes/{uid}` (one per cadet). */
+export const POLLS_COLLECTION = "polls";
+export const POLL_VOTES_COLLECTION = "votes";
+
 /** The transmissions of the story of one edition; its title lives in `config/story`. */
 export const COMMUNICATIONS_COLLECTION = "communications";
 export const STORY_DOC = "story";
@@ -76,6 +83,8 @@ export const EDITION_TEAM_COLLECTION = "team";
 export const INVITES_COLLECTION = "invites";
 
 export type EventCollection =
+  | typeof SPEAKERS_COLLECTION
+  | typeof POLLS_COLLECTION
   | typeof RAFFLE_PRIZES_COLLECTION
   | typeof RAFFLE_DRAWS_COLLECTION
   | typeof CONTACTS_COLLECTION
@@ -118,6 +127,8 @@ export const TEAM_COLLECTION = "team";
 export const AUDIT_COLLECTION = "audit";
 /** Each person's G-Credits across every edition (`wallets/{uid}`: balance, earned, spent). Global. */
 export const WALLETS_COLLECTION = "wallets";
+/** Each person's avatar look, global like the wallet (`avatars/{uid}`): it follows them to every edition. */
+export const AVATARS_COLLECTION = "avatars";
 /** Every G-Credit in and out of the wallets, each tagged with its edition. Global. */
 export const WALLET_LEDGER_COLLECTION = "walletLedger";
 /** Uploaded images (`images/{path with / as ~}`), large ones split into an `images/{id}/chunks` subcollection. Global: the path names the edition. */

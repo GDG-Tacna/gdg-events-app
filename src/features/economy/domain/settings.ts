@@ -2,7 +2,7 @@ import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 
 /** The mission types credits are set for (the missions feature owns them; the names are the contract). */
-export const CREDIT_MISSION_TYPES = ["talk", "stand", "quiz", "keyword"] as const;
+export const CREDIT_MISSION_TYPES = ["talk", "stand", "speaker", "quiz", "keyword"] as const;
 export type CreditMissionType = (typeof CREDIT_MISSION_TYPES)[number];
 
 export const CREDITS_MAX = 1000;
@@ -30,7 +30,7 @@ export interface EconomySettings {
 
 export const DEFAULT_ECONOMY: EconomySettings = {
   creditsEnabled: true,
-  missionCredits: { talk: 10, stand: 10, quiz: 5, keyword: 5 },
+  missionCredits: { talk: 10, stand: 10, speaker: 10, quiz: 5, keyword: 5 },
   talkCredits: 10,
   squadCreditsEnabled: true,
   squadRatio: 1,
@@ -56,7 +56,8 @@ export function parseEconomySettings(input: unknown): EconomySettings | null {
   if (typeof squadRatio !== "number" || !Number.isFinite(squadRatio) || squadRatio < 0 || squadRatio > SQUAD_RATIO_MAX) return null;
   const credits = {} as Record<CreditMissionType, number>;
   for (const type of CREDIT_MISSION_TYPES) {
-    const value = missionCredits[type];
+    // A type added later (speaker) reads with its default in settings saved before it; any other must be there.
+    const value = missionCredits[type] ?? (type === "speaker" ? DEFAULT_ECONOMY.missionCredits.speaker : undefined);
     if (!isWhole(value, CREDITS_MAX)) return null;
     credits[type] = value;
   }

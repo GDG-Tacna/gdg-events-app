@@ -9,7 +9,7 @@ export default function DashboardLoading() {
       <main
         aria-busy="true"
         aria-label={copy.a11y.loadingLabel}
-        className="pt-safe pb-safe px-space-4 py-space-8 mx-auto w-full max-w-[520px] min-[760px]:max-w-[960px]"
+        className="px-space-4 pt-safe-space-8 pb-safe-space-8 mx-auto w-full max-w-[520px] min-[760px]:max-w-[960px]"
       >
         <div className="gap-space-6 flex flex-col">
           <header className="gap-space-4 flex flex-col">

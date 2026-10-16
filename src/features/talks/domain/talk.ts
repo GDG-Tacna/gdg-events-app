@@ -9,6 +9,9 @@ import { err, ok, type Result } from "@/shared/lib/result";
 export interface Talk {
   id: string;
   title: string;
+  /** The speakers who give it, from the edition's catalog, in order. */
+  speakerIds: readonly string[];
+  /** The speaker's name as typed before the catalog existed: shown only when the talk has no speakers yet. */
   speaker: string | null;
   startsAt: Date | null;
   endsAt: Date | null;
@@ -22,6 +25,8 @@ export interface Talk {
 export const TALK_TITLE_MIN = 2;
 export const TALK_TITLE_MAX = 80;
 export const TALK_SPEAKER_MAX = 80;
+/** At most this many speakers per talk (a panel). */
+export const TALK_SPEAKERS_MAX = 6;
 export const TALK_DESCRIPTION_MAX = 500;
 /** No talk lasts longer than this: a longer span is a typo in the date. */
 export const TALK_MAX_HOURS = 12;
@@ -29,7 +34,8 @@ export const TALK_MAX_HOURS = 12;
 /** What the admin edits. Times are the venue's wall clock as the form gives them (`YYYY-MM-DDTHH:mm`). */
 export interface TalkDraft {
   title: string;
-  speaker: string;
+  /** Ids of the edition's speakers, in order; at least one. */
+  speakerIds: readonly string[];
   startsAt: string;
   endsAt: string;
   roomId: string | null;
@@ -63,15 +69,17 @@ export function toLocalDateTime(date: Date, utcOffset: string): string {
 
 const collapse = (value: string) => value.trim().replace(/\s+/g, " ");
 
-/** Checks and normalizes a draft into a talk (active), with the venue's offset for its times. */
-export function checkTalk(id: string, draft: TalkDraft, utcOffset: string): Result<Omit<Talk, "active">, TalkDataErrorCode> {
+const SPEAKER_ID = /^[a-z0-9][a-z0-9-]{1,47}$/;
+
+/** Checks and normalizes a draft into a talk (active, no legacy speaker text), with the venue's offset for its times. */
+export function checkTalk(id: string, draft: TalkDraft, utcOffset: string): Result<Omit<Talk, "active" | "speaker">, TalkDataErrorCode> {
   if (!isCheckpointId(id)) return err("invalid-id");
 
   const title = collapse(draft.title);
   if (title.length < TALK_TITLE_MIN || title.length > TALK_TITLE_MAX) return err("invalid-title");
 
-  const speaker = collapse(draft.speaker);
-  if (speaker.length < 2 || speaker.length > TALK_SPEAKER_MAX) return err("invalid-speaker");
+  const speakerIds = [...new Set(draft.speakerIds)];
+  if (speakerIds.length === 0 || speakerIds.length > TALK_SPEAKERS_MAX || !speakerIds.every((value) => SPEAKER_ID.test(value))) return err("invalid-speaker");
 
   const startsAt = parseLocalDateTime(draft.startsAt, utcOffset);
   const endsAt = parseLocalDateTime(draft.endsAt, utcOffset);
@@ -82,7 +90,7 @@ export function checkTalk(id: string, draft: TalkDraft, utcOffset: string): Resu
   const description = draft.description.trim();
   if (description.length > TALK_DESCRIPTION_MAX) return err("invalid-description");
 
-  return ok({ id, title, speaker, startsAt, endsAt, roomId: draft.roomId === "" ? null : draft.roomId, description });
+  return ok({ id, title, speakerIds, startsAt, endsAt, roomId: draft.roomId === "" ? null : draft.roomId, description });
 }
 
 /** The agenda's order: by start time (talks without one last), then by title. */

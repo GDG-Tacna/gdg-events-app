@@ -174,6 +174,14 @@ describe("MissionDetailView", () => {
     expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
   });
 
+  it("sends a «Conoce al speaker» mission to the scanner (the speaker shows the code)", () => {
+    renderView({ ...STAND, id: "meet-ana", type: "speaker", config: { type: "speaker" } });
+
+    expect(screen.getByText(copy.missions.howTo.speaker)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: copy.missions.scan })).toHaveAttribute("href", "/scan");
+    expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
+  });
+
   it("sends a stand mission to the cadet's own QR (the staff scan it at the stand), never to the scanner", () => {
     const { unmount } = renderView(STAND);
 

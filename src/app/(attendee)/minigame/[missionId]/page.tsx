@@ -29,7 +29,7 @@ export default async function MinigamePage({ params }: { params: Promise<{ missi
   return (
     <>
       <SpaceBackground />
-      <main className="pt-safe pb-safe px-space-4 py-space-6 mx-auto w-full max-w-[520px]">
+      <main className="px-space-4 pt-safe-space-6 pb-safe-space-6 mx-auto w-full max-w-[520px]">
         <ScreenEnter>
           <MinigamePlayer
             missionId={missionId}

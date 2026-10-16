@@ -19,9 +19,10 @@ export interface MissionCompletion {
 /** Completion document id: one per attendee and mission, the idempotency key. */
 export const completionId = (uid: string, missionId: string) => `${uid}_${missionId}`;
 
-/** What the attendee hands in. Checkpoint proofs come from a verified scan, never from a form. */
+/** What the attendee hands in. Checkpoint and speaker proofs come from a verified scan, never from a form. */
 export type MissionProof =
   | { kind: "checkpoint"; checkpointId: string }
+  | { kind: "speaker"; speakerId: string }
   | { kind: "choice"; option: number }
   | { kind: "keyword"; value: string };
 
@@ -59,6 +60,10 @@ export function evaluate(mission: Mission, proof: MissionProof, previous: Missio
     case "talk":
     case "stand":
       if (proof.kind !== "checkpoint" || proof.checkpointId !== config.checkpointId) return { kind: "wrong-proof" };
+      return next("completed", attempts, "full");
+
+    case "speaker":
+      if (proof.kind !== "speaker" || proof.speakerId !== config.speakerId) return { kind: "wrong-proof" };
       return next("completed", attempts, "full");
 
     case "quiz": {

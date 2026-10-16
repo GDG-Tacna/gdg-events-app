@@ -7,7 +7,6 @@ import { axe } from "@/test-utils/axe";
 import { fakeQrCamera } from "@/test-utils/fake-qr-camera";
 import type { ConnectContactAction, ConnectContactActionResult, IssueContactCodeAction, SaveContactLinksAction } from "./actions";
 import { CadetCardView } from "./CadetCardView";
-import { NetworkCard } from "./NetworkCard";
 import { NetworkView, type NetworkViewProps } from "./NetworkView";
 
 const refresh = vi.fn();
@@ -237,19 +236,6 @@ describe("CadetCardView", () => {
     expect(screen.getByRole("heading", { level: 3, name: "Eva" })).toBeInTheDocument();
     expect(screen.getByText(t.card.noSquad)).toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
-  });
-});
-
-describe("NetworkCard", () => {
-  it.each([
-    [0, t.dashboard.empty],
-    [1, t.dashboard.one],
-    [7, "Tienes 7 contactos."],
-  ])("says how many contacts the cadet has (%i)", (contacts, text) => {
-    render(<NetworkCard href="/red" contacts={contacts} />);
-
-    expect(screen.getByText(text)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: t.dashboard.open })).toHaveAttribute("href", "/red");
   });
 });
 

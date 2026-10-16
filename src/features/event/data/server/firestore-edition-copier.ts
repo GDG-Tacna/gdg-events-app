@@ -11,6 +11,7 @@ import {
   QUADRANTS_COLLECTION,
   RANKS_DOC,
   SQUAD_PRIZES_COLLECTION,
+  SPEAKERS_COLLECTION,
   SQUADS_COLLECTION,
   STORY_DOC,
   VENUE_COLLECTION,
@@ -27,6 +28,8 @@ import type { CopyPart, EditionCopier, EditionDocument } from "../../domain/copy
 interface PartSource {
   collections: ReadonlyArray<{ name: EventCollection; keep?: (data: DocumentData) => boolean }>;
   documents: ReadonlyArray<{ collection: EventCollection; id: string }>;
+  /** Fields that belong to people of the source edition and never travel (a speaker's linked account and invitation). */
+  personal?: readonly string[];
 }
 
 const isTalk = (data: DocumentData) => data.kind === "talk";
@@ -37,6 +40,7 @@ export const PART_SOURCES: Readonly<Record<CopyPart, PartSource>> = {
   squads: { collections: [{ name: SQUADS_COLLECTION }], documents: [] },
   map: { collections: [{ name: QUADRANTS_COLLECTION }], documents: [{ collection: VENUE_COLLECTION, id: VENUE_MAP_DOC }] },
   checkpoints: { collections: [{ name: CHECKPOINTS_COLLECTION, keep: (data) => !isTalk(data) }], documents: [] },
+  speakers: { collections: [{ name: SPEAKERS_COLLECTION }], documents: [], personal: ["accountUid", "invite"] },
   talks: { collections: [{ name: CHECKPOINTS_COLLECTION, keep: isTalk }], documents: [] },
   missions: { collections: [{ name: MISSIONS_COLLECTION }], documents: [] },
   story: { collections: [{ name: COMMUNICATIONS_COLLECTION }], documents: [{ collection: EVENT_CONFIG_COLLECTION, id: STORY_DOC }] },
@@ -92,7 +96,8 @@ export class FirestoreEditionCopier implements EditionCopier {
   async read(eventId: string, part: CopyPart): Promise<Result<readonly EditionDocument[], { code: string }>> {
     try {
       const documents = await this.documentsOf(eventId, part);
-      return ok(documents.map(({ path, data }) => ({ path, data: Object.fromEntries(Object.entries(data).filter(([key]) => !OWN_FIELDS.has(key))) })));
+      const personal = new Set(PART_SOURCES[part].personal ?? []);
+      return ok(documents.map(({ path, data }) => ({ path, data: Object.fromEntries(Object.entries(data).filter(([key]) => !OWN_FIELDS.has(key) && !personal.has(key))) })));
     } catch (cause) {
       logServerError("event.copier.read", cause);
       return err({ code: "unknown" });

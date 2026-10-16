@@ -21,8 +21,8 @@ const pages = vi.hoisted(() => {
     "logros/[badgeId]": marker("logros/[badgeId]"),
     "escuadrones/nuevo": marker("escuadrones/nuevo"),
     "escuadrones/[squadId]": marker("escuadrones/[squadId]"),
-    "mapa/cuadrantes/nuevo": marker("mapa/cuadrantes/nuevo"),
-    "mapa/cuadrantes/[quadrantId]": marker("mapa/cuadrantes/[quadrantId]"),
+    "zonas/nueva": marker("zonas/nueva"),
+    "zonas/[quadrantId]": marker("zonas/[quadrantId]"),
   };
 });
 vi.mock("../misiones/nueva/page", () => pages["misiones/nueva"]);
@@ -36,8 +36,8 @@ vi.mock("../logros/nueva/page", () => pages["logros/nueva"]);
 vi.mock("../logros/[badgeId]/page", () => pages["logros/[badgeId]"]);
 vi.mock("../escuadrones/nuevo/page", () => pages["escuadrones/nuevo"]);
 vi.mock("../escuadrones/[squadId]/page", () => pages["escuadrones/[squadId]"]);
-vi.mock("../mapa/cuadrantes/nuevo/page", () => pages["mapa/cuadrantes/nuevo"]);
-vi.mock("../mapa/cuadrantes/[quadrantId]/page", () => pages["mapa/cuadrantes/[quadrantId]"]);
+vi.mock("../zonas/nueva/page", () => pages["zonas/nueva"]);
+vi.mock("../zonas/[quadrantId]/page", () => pages["zonas/[quadrantId]"]);
 
 const { RouteModal } = await import("@/shared/ui");
 const { copy } = await import("@/shared/copy/es");
@@ -54,8 +54,8 @@ const CASES = [
   ["logros/[badgeId]", () => import("./(.)logros/[badgeId]/page"), copy.admin.achievements.form.editTitle, { badgeId: "primer-salto" }],
   ["escuadrones/nuevo", () => import("./(.)escuadrones/nuevo/page"), copy.admin.squads.form.newTitle, null],
   ["escuadrones/[squadId]", () => import("./(.)escuadrones/[squadId]/page"), copy.admin.squads.form.editTitle, { squadId: "gemini" }],
-  ["mapa/cuadrantes/nuevo", () => import("./(.)mapa/cuadrantes/nuevo/page"), copy.admin.map.quadrantForm.createTitle, null],
-  ["mapa/cuadrantes/[quadrantId]", () => import("./(.)mapa/cuadrantes/[quadrantId]/page"), copy.admin.map.quadrantForm.editTitle, { quadrantId: "ai" }],
+  ["zonas/nueva", () => import("./(.)zonas/nueva/page"), copy.admin.map.quadrantForm.createTitle, null],
+  ["zonas/[quadrantId]", () => import("./(.)zonas/[quadrantId]/page"), copy.admin.map.quadrantForm.editTitle, { quadrantId: "ai" }],
 ] as const;
 
 describe("admin modals", () => {

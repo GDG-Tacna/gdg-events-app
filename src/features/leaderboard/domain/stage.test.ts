@@ -22,6 +22,10 @@ function setup(saved: StageState | null = null) {
       read: vi.fn(async (): Promise<Result<StageState | null, { code: string }>> => ok(stored)),
       save: vi.fn(async (state: StageState): Promise<Result<void, { code: string }>> => ((stored = state), ok(undefined))),
     },
+    images: {
+      ref: vi.fn((path: string, purpose: string) => (purpose === "stage-background" && path.startsWith("public/e1/stage-background/") ? { path, url: `/media/${path}` } : null)),
+      remove: vi.fn(async () => undefined),
+    },
     audit: { append: vi.fn(async (entry: unknown) => (entries.push(entry), ok(undefined))) },
     now: () => NOW,
   } satisfies StageDeps;
@@ -53,7 +57,7 @@ describe("stage commands", () => {
     expect(await updateStage(ctx.deps, ADMIN, { type: "show", display: "ranking" })).toMatchObject({ ok: true, value: { display: "ranking", view: "squads" } });
 
     expect(ctx.entries).toHaveLength(3);
-    expect(ctx.entries[0]).toEqual({ action: "stage.updated", actorUid: "a1", targetUid: "stage", details: { command: "show", display: "waiting", view: "both", frozen: "no" }, at: NOW });
+    expect(ctx.entries[0]).toEqual({ action: "stage.updated", actorUid: "a1", targetUid: "stage", details: { command: "show", display: "waiting", view: "both", frozen: "no", background: null, poll: null }, at: NOW });
   });
 
   it("freezes the ranking as it stands, keeps the first moment, and unfreezes", async () => {
@@ -122,6 +126,48 @@ describe("parseStageCommand", () => {
     expect(parseStageCommand({ type: "show", display: "ranking" })).toEqual({ type: "show", display: "ranking" });
     expect(parseStageCommand({ type: "view", view: "both" })).toEqual({ type: "view", view: "both" });
     expect(parseStageCommand({ type: "reveal", extra: 1 })).toEqual({ type: "reveal" });
+    expect(parseStageCommand({ type: "background", path: "public/e1/stage-background/abcdef123456.webp" })).toEqual({ type: "background", path: "public/e1/stage-background/abcdef123456.webp" });
+    expect(parseStageCommand({ type: "background", path: null })).toEqual({ type: "background", path: null });
+    expect(parseStageCommand({ type: "background", path: 7 })).toBeNull();
+  });
+});
+
+describe("stage background", () => {
+  const IMAGE = "public/e1/stage-background/abcdef123456.webp";
+  const OTHER = "public/e1/stage-background/zzzzzzzz9999.webp";
+
+  it("sets an uploaded background, replaces it deleting the old file, and goes back to none", async () => {
+    const ctx = setup();
+
+    const set = await updateStage(ctx.deps, ADMIN, { type: "background", path: IMAGE });
+    expect(set.ok && set.value.background).toEqual({ path: IMAGE, url: `/media/${IMAGE}` });
+    expect(ctx.deps.images.remove).not.toHaveBeenCalled();
+
+    await updateStage(ctx.deps, ADMIN, { type: "background", path: OTHER });
+    expect(ctx.deps.images.remove).toHaveBeenLastCalledWith(IMAGE);
+
+    const cleared = await updateStage(ctx.deps, ADMIN, { type: "background", path: null });
+    expect(cleared.ok && cleared.value.background).toBeNull();
+    expect(ctx.deps.images.remove).toHaveBeenLastCalledWith(OTHER);
+    expect(ctx.stored()?.background).toBeNull();
+  });
+
+  it("puts a poll's results on screen, and any other display takes them off", async () => {
+    const ctx = setup();
+
+    const shown = await updateStage(ctx.deps, ADMIN, { type: "poll", pollId: "poll-abc123" });
+    expect(shown).toEqual(ok({ ...DEFAULT_STAGE, display: "poll", poll: { pollId: "poll-abc123" } }));
+    expect(ctx.entries[0]).toMatchObject({ details: { command: "poll", display: "poll", poll: "poll-abc123" } });
+
+    expect(await updateStage(ctx.deps, ADMIN, { type: "show", display: "ranking" })).toEqual(ok(DEFAULT_STAGE));
+    expect(await updateStage(ctx.deps, ADMIN, { type: "poll", pollId: "Not A Poll" })).toEqual(err({ code: "invalid-command" }));
+  });
+
+  it("refuses an image that is not a stage background", async () => {
+    const ctx = setup();
+
+    expect(await updateStage(ctx.deps, ADMIN, { type: "background", path: "public/e1/badge/abcdef123456.webp" })).toEqual(err({ code: "invalid-command" }));
+    expect(ctx.deps.stage.save).not.toHaveBeenCalled();
   });
 });
 
@@ -129,9 +175,18 @@ describe("parseStageState", () => {
   const stored = { display: "ranking", view: "both", frozen: { ...BOARD, at: { toDate: () => NOW } }, champions: { cadet: BOARD.cadets[0], squad: null } };
 
   it("reads a stored stage, with dates as timestamps, dates or text", () => {
-    expect(parseStageState(stored)).toEqual({ display: "ranking", view: "both", frozen: { ...BOARD, at: NOW }, champions: { cadet: BOARD.cadets[0], squad: null }, raffle: null });
+    expect(parseStageState(stored)).toEqual({ display: "ranking", view: "both", frozen: { ...BOARD, at: NOW }, champions: { cadet: BOARD.cadets[0], squad: null }, raffle: null, background: null, poll: null });
     expect(parseStageState({ ...stored, frozen: { ...BOARD, at: NOW.toISOString() } })?.frozen?.at).toEqual(NOW);
-    expect(parseStageState({ display: "waiting", view: "cadets" })).toEqual({ display: "waiting", view: "cadets", frozen: null, champions: null, raffle: null });
+    expect(parseStageState({ display: "waiting", view: "cadets" })).toEqual({ display: "waiting", view: "cadets", frozen: null, champions: null, raffle: null, background: null, poll: null });
+    expect(parseStageState({ display: "poll", view: "both", poll: { pollId: "poll-abc123" } })?.poll).toEqual({ pollId: "poll-abc123" });
+    // A poll display without a poll it can name cannot be drawn.
+    expect(parseStageState({ display: "poll", view: "both", poll: { pollId: "Bad Id" } })).toBeNull();
+  });
+
+  it("reads a stored background, and treats a broken one as none without breaking the stage", () => {
+    const background = { path: "public/e1/stage-background/abcdef123456.webp", url: "/media/public/e1/stage-background/abcdef123456.webp" };
+    expect(parseStageState({ display: "ranking", view: "both", background })?.background).toEqual(background);
+    expect(parseStageState({ display: "ranking", view: "both", background: { path: "x", url: "javascript:alert(1)" } })).toMatchObject({ display: "ranking", background: null });
   });
 
   it.each([

@@ -31,6 +31,16 @@ const file = (bytes: number, type = "image/png", name = "x.png") => new File([ne
 const choose = (purpose: string, chosen: File) => fireEvent.change(screen.getByTestId(`image-input-${purpose}`), { target: { files: [chosen] } });
 
 describe("ImageField", () => {
+  it("does not ask to save when the change applies at once", async () => {
+    const upload = vi.fn<UploadImageAction>(async () => ({ ok: true, image: STORED }));
+    render(<ImageField label="Fondo" purpose="stage-background" value={null} upload={upload} onChange={vi.fn()} appliesAtOnce />);
+
+    choose("stage-background", file(1000));
+
+    expect(await screen.findByText(t.applied)).toBeInTheDocument();
+    expect(screen.queryByText(t.uploaded)).not.toBeInTheDocument();
+  });
+
   it("uploads the chosen file with its purpose, shows it and hands the reference to the form", async () => {
     const upload = vi.fn<UploadImageAction>(async () => ({ ok: true, image: STORED }));
     const onChange = vi.fn();

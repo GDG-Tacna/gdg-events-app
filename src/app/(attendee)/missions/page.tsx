@@ -38,7 +38,7 @@ export default async function MissionsPage() {
   return (
     <>
       <SpaceBackground />
-      <main className="pt-safe px-space-4 py-space-6 min-[760px]:py-space-8 mx-auto w-full max-w-[520px] min-[760px]:max-w-[880px]">
+      <main className="px-space-4 pt-safe-space-6 pb-space-6 min-[760px]:pt-safe-space-8 min-[760px]:pb-space-8 mx-auto w-full max-w-[520px] min-[760px]:max-w-[880px]">
         <ScreenEnter>
           <MissionBoardView board={board.value} quadrants={quadrants} missionHref={(id) => `${ROUTES.missions}/${id}`} odysseyHref={(await moduleOn("odyssey")) ? ROUTES.odyssey : undefined}
             odysseyTitle={storyTitle}

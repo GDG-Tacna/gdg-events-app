@@ -34,6 +34,7 @@ export default async function AdminEditMissionPage({ params }: PageProps<"/admin
         save={updateMissionAction}
         quadrants={options.quadrants}
         checkpoints={options.checkpoints}
+        speakers={options.speakers}
         listHref={ROUTES.adminMissions}
         creditDefaults={options.creditDefaults}
         minigames={options.minigames}

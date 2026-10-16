@@ -1,10 +1,10 @@
 import type { ImageRef } from "@/features/media/constants";
 /** Mission types: a closed set, because each one's proof is checked by code on the server. */
-export const MISSION_TYPES = ["talk", "stand", "quiz", "keyword"] as const;
+export const MISSION_TYPES = ["talk", "stand", "speaker", "quiz", "keyword"] as const;
 export type MissionType = (typeof MISSION_TYPES)[number];
 
 /** XP a new mission of each type starts with; the admin can change it per mission. */
-export const DEFAULT_XP: Record<MissionType, number> = { talk: 50, stand: 30, quiz: 40, keyword: 40 };
+export const DEFAULT_XP: Record<MissionType, number> = { talk: 50, stand: 30, speaker: 40, quiz: 40, keyword: 40 };
 
 export const MISSION_XP_MAX = 500;
 export const MISSION_CREDITS_MAX = 1000;
@@ -25,6 +25,8 @@ export type MissionConfig =
   | { type: "talk"; checkpointId: string }
   /** Completed by scanning the printed QR of this stand. */
   | { type: "stand"; checkpointId: string }
+  /** Completed by scanning the code of this speaker (shown by an admin or by the speaker on their phone). */
+  | { type: "speaker"; speakerId: string }
   /** Two attempts; a right second answer earns half the XP. `answer` is the index of the right option. */
   | { type: "quiz"; question: string; options: readonly string[]; answer: number }
   /** A word given at a stand or by a speaker. Stored normalized (`normalizeKeyword`). */
@@ -54,6 +56,7 @@ export interface Mission {
 export type PublicMissionConfig =
   | { type: "talk" }
   | { type: "stand" }
+  | { type: "speaker" }
   | { type: "quiz"; question: string; options: readonly string[] }
   | { type: "keyword"; prompt: string };
 
@@ -61,6 +64,7 @@ export function publicConfig(config: MissionConfig): PublicMissionConfig {
   switch (config.type) {
     case "talk":
     case "stand":
+    case "speaker":
       return { type: config.type };
     case "quiz":
       return { type: "quiz", question: config.question, options: config.options };
@@ -93,6 +97,7 @@ export type MissionDataErrorCode =
   | "invalid-xp"
   | "invalid-type"
   | "invalid-checkpoint"
+  | "invalid-speaker"
   | "invalid-question"
   | "invalid-options"
   | "invalid-answer"
@@ -109,6 +114,8 @@ function checkConfig(input: unknown): Checked<MissionConfig> {
     case "talk":
     case "stand":
       return isMissionId(input.checkpointId) ? { ok: true, value: { type: input.type, checkpointId: input.checkpointId } } : fail("invalid-checkpoint");
+    case "speaker":
+      return isMissionId(input.speakerId) ? { ok: true, value: { type: "speaker", speakerId: input.speakerId } } : fail("invalid-speaker");
     case "quiz": {
       const question = text(input.question, 5, 160);
       if (!question) return fail("invalid-question");

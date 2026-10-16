@@ -16,9 +16,14 @@ const ROOMS = [
   { id: "auditorio", name: "Auditorio" },
   { id: "sala-b", name: "Sala B" },
 ];
-const KEYNOTE: TalkView = { id: "keynote", title: "Keynote", speaker: "Ana Torres", startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45", roomId: "auditorio", description: "", active: true };
-const OLD: TalkView = { id: "vieja", title: "Charla vieja", speaker: null, startsAt: null, endsAt: null, roomId: null, description: "", active: false };
+const KEYNOTE: TalkView = { id: "keynote", title: "Keynote", speakerIds: ["ana-torres"], speaker: "Ana Torres", legacySpeaker: null, startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45", roomId: "auditorio", description: "", active: true };
+const OLD: TalkView = { id: "vieja", title: "Charla vieja", speakerIds: [], speaker: null, legacySpeaker: null, startsAt: null, endsAt: null, roomId: null, description: "", active: false };
 const HREFS = { create: "/admin/charlas/nueva", editBase: "/admin/charlas", projectBase: "/admin/qr" };
+const SPEAKERS = [
+  { id: "ana-torres", name: "Ana Torres", active: true },
+  { id: "luis-quispe", name: "Luis Quispe", active: true },
+  { id: "retirada", name: "Retirada", active: false },
+];
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -91,7 +96,7 @@ describe("TalksAdminView", () => {
 describe("TalkForm", () => {
   const renderForm = (props: Partial<Parameters<typeof TalkForm>[0]> = {}) => {
     const save = vi.fn<SaveTalkAction>(async () => ({ ok: true }));
-    const view = render(<TalkForm mode="create" save={save} rooms={ROOMS} listHref="/admin/charlas" {...props} />);
+    const view = render(<TalkForm mode="create" save={save} rooms={ROOMS} speakers={SPEAKERS} speakersHref="/admin/speakers" listHref="/admin/charlas" {...props} />);
     return { ...view, save: (props.save as typeof save | undefined) ?? save, user: userEvent.setup() };
   };
 
@@ -99,7 +104,8 @@ describe("TalkForm", () => {
     const { save, user } = renderForm();
 
     await user.type(screen.getByLabelText(t.form.title), "Keynote: IA");
-    await user.type(screen.getByLabelText(t.form.speaker), "Ana Torres");
+    await user.selectOptions(screen.getByLabelText(t.form.speakerAdd), "ana-torres");
+    await user.selectOptions(screen.getByLabelText(t.form.speakerAdd), "luis-quispe");
     await user.type(screen.getByLabelText(t.form.startsAt), "2026-10-24T09:00");
     await user.type(screen.getByLabelText(t.form.endsAt), "2026-10-24T09:45");
     await user.selectOptions(screen.getByLabelText(t.form.room), "sala-b");
@@ -109,9 +115,28 @@ describe("TalkForm", () => {
 
     expect(save).toHaveBeenCalledWith({
       id: "keynote-ia",
-      draft: { title: "Keynote: IA", speaker: "Ana Torres", startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45", roomId: "sala-b", description: "Resumen" },
+      draft: { title: "Keynote: IA", speakerIds: ["ana-torres", "luis-quispe"], startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45", roomId: "sala-b", description: "Resumen" },
     });
     await waitFor(() => expect(router.push).toHaveBeenCalledWith("/admin/charlas"));
+  });
+
+  it("offers only active speakers not chosen yet, lets one be removed, and points to Speakers when there are none", async () => {
+    const { user, unmount } = renderForm({ mode: "edit", talk: KEYNOTE });
+
+    const options = () => within(screen.getByLabelText(t.form.speakerAdd)).getAllByRole("option").map((option) => option.textContent);
+    expect(options()).toEqual([t.form.speakerChoose, "Luis Quispe"]);
+    await user.click(screen.getByRole("button", { name: `${t.form.speakerRemove}: Ana Torres` }));
+    expect(options()).toEqual([t.form.speakerChoose, "Ana Torres", "Luis Quispe"]);
+    unmount();
+
+    renderForm({ speakers: [] });
+    expect(screen.getByRole("link", { name: t.form.speakerManage })).toHaveAttribute("href", "/admin/speakers");
+  });
+
+  it("shows the name a talk had before the catalog until a speaker is chosen", () => {
+    renderForm({ mode: "edit", talk: { ...OLD, legacySpeaker: "Ana" } });
+
+    expect(screen.getByText("Antes decía «Ana». Elige su ficha de speaker.")).toBeInTheDocument();
   });
 
   it("sends no room when none is chosen", async () => {

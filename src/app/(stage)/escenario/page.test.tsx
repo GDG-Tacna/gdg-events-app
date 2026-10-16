@@ -15,7 +15,7 @@ const guards = { requireRole: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 const server = { getStage: vi.fn(), getFleetBoard: vi.fn(), currentEditionId: async () => "devfest-2026" };
 vi.mock("@/features/leaderboard/server", () => server);
-const features = vi.hoisted(() => ({ FEATURES: { leaderboard: true } }));
+const features = vi.hoisted(() => ({ FEATURES: { leaderboard: true, polls: false } }));
 vi.mock("@/shared/config/features", () => features);
 
 const { StageScreenBound } = await import("@/app-shell/StageScreenBound");
@@ -68,6 +68,7 @@ describe("stage page", () => {
       sprites: { firebase: { ...SPRITE, logoUrl: null } },
       initialStage: DEFAULT_STAGE,
       initialBoard: BOARD,
+      pollsOn: false,
     });
   });
 
@@ -78,5 +79,12 @@ describe("stage page", () => {
 
     server.getStage.mockResolvedValue({ ok: false, error: { code: "unknown" } });
     await expect(StagePage()).rejects.toThrow("Could not read the stage");
+  });
+
+  it("lets the screen draw polls only with polls on", async () => {
+    features.FEATURES.polls = true;
+    expect(findElement(await StagePage(), StageScreenBound)?.props.pollsOn).toBe(true);
+    features.FEATURES.polls = false;
+    expect(findElement(await StagePage(), StageScreenBound)?.props.pollsOn).toBe(false);
   });
 });

@@ -12,7 +12,7 @@ const saveSchema = z.object({
   id: z.string().max(60),
   draft: z.object({
     title: z.string().max(200),
-    speaker: z.string().max(200),
+    speakerIds: z.array(z.string().max(60)).max(12),
     startsAt: z.string().max(20),
     endsAt: z.string().max(20),
     roomId: z.string().max(60).nullable(),

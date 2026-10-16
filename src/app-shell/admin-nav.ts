@@ -4,37 +4,53 @@ import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import type { IconName } from "@/shared/ui";
 
-/** The module each admin area belongs to; an area without one is part of the core and always shows. */
-const AREA_MODULE: Partial<Record<string, EditionModule>> = {
-  [ROUTES.adminMissions]: "missions",
-  [ROUTES.adminMap]: "map",
-  [ROUTES.adminOdyssey]: "odyssey",
-  [ROUTES.adminAchievements]: "achievements",
-  [ROUTES.adminMinigames]: "minigames",
-  [ROUTES.adminSquads]: "squads",
-  [ROUTES.adminSquadCredits]: "squads",
-  [ROUTES.adminStage]: "leaderboard",
-  [ROUTES.adminRaffle]: "raffle",
-};
+/** The menu's groups, in the order the menu shows them. */
+export type AdminNavGroup = keyof typeof copy.admin.navGroups;
 
-/** The control center section each area is (what an edition's permissions give an organizer per area). */
-const AREA_SECTION: Partial<Record<string, AdminSection>> = {
-  [ROUTES.adminCheckpoints]: "checkpoints",
-  [ROUTES.adminTalks]: "talks",
-  [ROUTES.adminMissions]: "missions",
-  [ROUTES.adminMap]: "map",
-  [ROUTES.adminRanks]: "ranks",
-  [ROUTES.adminOdyssey]: "odyssey",
-  [ROUTES.adminAchievements]: "achievements",
-  [ROUTES.adminMinigames]: "minigames",
-  [ROUTES.adminEconomy]: "economy",
-  [ROUTES.adminSquads]: "squads",
-  [ROUTES.adminSquadCredits]: "squadCredits",
-  [ROUTES.adminStage]: "stage",
-  [ROUTES.adminRaffle]: "raffle",
-  [ROUTES.adminTeam]: "team",
-  [ROUTES.adminEvent]: "event",
-};
+interface Area {
+  href: string;
+  label: string;
+  icon: IconName;
+  card: { title: string; description: string };
+  group: AdminNavGroup;
+  /** The module it belongs to; an area without one is part of the core and always shows. */
+  module?: EditionModule;
+  /** The control center section it is (what an edition's permissions give an organizer per area). */
+  section: AdminSection;
+}
+
+const n = copy.admin.nav;
+const a = copy.admin.areas;
+
+/**
+ * Every area of the control center, grouped by what it is for: the event itself, its program, the game, squads and
+ * prizes, and what runs live on the day. A module adds its area here when it ships, so the menu never links to a
+ * screen that is not built yet.
+ */
+const AREAS: readonly Area[] = [
+  { href: ROUTES.adminEvent, label: n.event, icon: "calendar", card: a.event, group: "event", section: "event" },
+  { href: ROUTES.adminTeam, label: n.team, icon: "users", card: a.team, group: "event", section: "team" },
+
+  { href: ROUTES.adminTalks, label: n.talks, icon: "mic", card: a.talks, group: "program", section: "talks" },
+  { href: ROUTES.adminSpeakers, label: n.speakers, icon: "person", card: a.speakers, group: "program", section: "talks" },
+  { href: ROUTES.adminCheckpoints, label: n.checkpoints, icon: "store", card: a.checkpoints, group: "program", section: "checkpoints" },
+  { href: ROUTES.adminZones, label: n.zones, icon: "layers", card: a.zones, group: "program", module: "map", section: "map" },
+  { href: ROUTES.adminMap, label: n.map, icon: "map", card: a.map, group: "program", module: "map", section: "map" },
+
+  { href: ROUTES.adminMissions, label: n.missions, icon: "target", card: a.missions, group: "game", module: "missions", section: "missions" },
+  { href: ROUTES.adminOdyssey, label: n.odyssey, icon: "transmission", card: a.odyssey, group: "game", module: "odyssey", section: "odyssey" },
+  { href: ROUTES.adminMinigames, label: n.minigames, icon: "gamepad", card: a.minigames, group: "game", module: "minigames", section: "minigames" },
+  { href: ROUTES.adminAchievements, label: n.achievements, icon: "award", card: a.achievements, group: "game", module: "achievements", section: "achievements" },
+  { href: ROUTES.adminRanks, label: n.ranks, icon: "medal", card: a.ranks, group: "game", section: "ranks" },
+
+  { href: ROUTES.adminSquads, label: n.squads, icon: "flag", card: a.squads, group: "rewards", module: "squads", section: "squads" },
+  { href: ROUTES.adminSquadCredits, label: n.squadCredits, icon: "piggy-bank", card: a.squadCredits, group: "rewards", module: "squads", section: "squadCredits" },
+  { href: ROUTES.adminEconomy, label: n.economy, icon: "coins", card: a.economy, group: "rewards", section: "economy" },
+  { href: ROUTES.adminRaffle, label: n.raffle, icon: "gift", card: a.raffle, group: "rewards", module: "raffle", section: "raffle" },
+
+  { href: ROUTES.adminStage, label: n.stage, icon: "stage", card: a.stage, group: "live", module: "leaderboard", section: "stage" },
+  { href: ROUTES.adminPolls, label: n.polls, icon: "poll", card: a.polls, group: "live", module: "polls", section: "polls" },
+];
 
 /** Which modules the edition has on; every one when not given. */
 export type ModuleCheck = (module: EditionModule) => boolean;
@@ -42,61 +58,25 @@ const allOn: ModuleCheck = () => true;
 /** The session's level per section; edit everywhere when not given. */
 export type SectionLevels = Partial<Record<AdminSection, AccessLevel>>;
 
-const shown = (isOn: ModuleCheck, levels: SectionLevels) => (area: { href: string }) => {
-  const owner = AREA_MODULE[area.href];
-  const section = AREA_SECTION[area.href];
-  return (owner === undefined || isOn(owner)) && (section === undefined || levels[section] !== "none");
-};
+const shown = (isOn: ModuleCheck, levels: SectionLevels) => (area: Area) => (area.module === undefined || isOn(area.module)) && levels[area.section] !== "none";
 
 /** The areas the session may only look at (their screens show without controls). */
 export function readOnlyAreas(levels: SectionLevels): string[] {
-  return Object.entries(AREA_SECTION)
-    .filter(([, section]) => section !== undefined && levels[section] === "view")
-    .map(([href]) => href);
+  return AREAS.filter((area) => levels[area.section] === "view").map((area) => area.href);
 }
 
-/**
- * The areas of the admin that exist today, in order, minus those of modules the edition has switched off. A module
- * adds its entry here when it ships, so the navigation never links to a screen that is not built yet.
- */
+/** The menu: the home, then each group's areas, minus those of modules switched off or sections the session may not see. */
 export function adminNavItems(isOn: ModuleCheck = allOn, levels: SectionLevels = {}): AdminNavItem[] {
-  return ([
-    { href: ROUTES.admin, label: copy.admin.nav.home, exact: true },
-    { href: ROUTES.adminCheckpoints, label: copy.admin.nav.checkpoints },
-    { href: ROUTES.adminTalks, label: copy.admin.nav.talks },
-    { href: ROUTES.adminMissions, label: copy.admin.nav.missions },
-    { href: ROUTES.adminMap, label: copy.admin.nav.map },
-    { href: ROUTES.adminRanks, label: copy.admin.nav.ranks },
-    { href: ROUTES.adminOdyssey, label: copy.admin.nav.odyssey },
-    { href: ROUTES.adminAchievements, label: copy.admin.nav.achievements },
-    { href: ROUTES.adminMinigames, label: copy.admin.nav.minigames },
-    { href: ROUTES.adminEconomy, label: copy.admin.nav.economy },
-    { href: ROUTES.adminSquads, label: copy.admin.nav.squads },
-    { href: ROUTES.adminSquadCredits, label: copy.admin.nav.squadCredits },
-    { href: ROUTES.adminStage, label: copy.admin.nav.stage },
-    { href: ROUTES.adminRaffle, label: copy.admin.nav.raffle },
-    { href: ROUTES.adminTeam, label: copy.admin.nav.team },
-    { href: ROUTES.adminEvent, label: copy.admin.nav.event },
-  ] satisfies AdminNavItem[]).filter(shown(isOn, levels));
+  return [
+    { href: ROUTES.admin, label: n.home, exact: true },
+    ...AREAS.filter(shown(isOn, levels)).map(({ href, label, group }) => ({ href, label, group: copy.admin.navGroups[group] })),
+  ];
 }
 
-/** Home shortcuts: the same areas, minus the home itself, each with its line icon and what it is for. */
-export function adminAreaCards(isOn: ModuleCheck = allOn, levels: SectionLevels = {}): Array<{ href: string; icon: IconName; title: string; description: string }> {
-  return ([
-    { href: ROUTES.adminCheckpoints, icon: "store", ...copy.admin.areas.checkpoints },
-    { href: ROUTES.adminTalks, icon: "mic", ...copy.admin.areas.talks },
-    { href: ROUTES.adminMissions, icon: "target", ...copy.admin.areas.missions },
-    { href: ROUTES.adminMap, icon: "map", ...copy.admin.areas.map },
-    { href: ROUTES.adminRanks, icon: "medal", ...copy.admin.areas.ranks },
-    { href: ROUTES.adminOdyssey, icon: "transmission", ...copy.admin.areas.odyssey },
-    { href: ROUTES.adminAchievements, icon: "award", ...copy.admin.areas.achievements },
-    { href: ROUTES.adminMinigames, icon: "gamepad", ...copy.admin.areas.minigames },
-    { href: ROUTES.adminEconomy, icon: "coins", ...copy.admin.areas.economy },
-    { href: ROUTES.adminSquads, icon: "flag", ...copy.admin.areas.squads },
-    { href: ROUTES.adminSquadCredits, icon: "piggy-bank", ...copy.admin.areas.squadCredits },
-    { href: ROUTES.adminStage, icon: "stage", ...copy.admin.areas.stage },
-    { href: ROUTES.adminRaffle, icon: "gift", ...copy.admin.areas.raffle },
-    { href: ROUTES.adminTeam, icon: "users", ...copy.admin.areas.team },
-    { href: ROUTES.adminEvent, icon: "calendar", ...copy.admin.areas.event },
-  ] satisfies Array<{ href: string; icon: IconName; title: string; description: string }>).filter(shown(isOn, levels));
+/** Home shortcuts: the same areas, in the same groups, each with its line icon and what it is for. */
+export function adminAreaCards(
+  isOn: ModuleCheck = allOn,
+  levels: SectionLevels = {},
+): Array<{ href: string; icon: IconName; title: string; description: string; group: string }> {
+  return AREAS.filter(shown(isOn, levels)).map(({ href, icon, card, group }) => ({ href, icon, ...card, group: copy.admin.navGroups[group] }));
 }

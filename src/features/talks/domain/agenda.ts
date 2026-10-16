@@ -23,6 +23,8 @@ export interface AgendaDeps {
   talks(): Promise<Result<readonly Talk[], { code: string }>>;
   /** The ids of the talks the cadet checked in to. */
   attendedTalkIds(uid: string): Promise<Result<ReadonlySet<string>, { code: string }>>;
+  /** The edition's speakers' names by id (the speakers feature answers). */
+  speakerNames(): Promise<Result<ReadonlyMap<string, string>, { code: string }>>;
   now: () => Date;
 }
 
@@ -32,8 +34,14 @@ export interface AgendaDeps {
  * and are never "next". A closed talk is left out: its code no longer checks anyone in.
  */
 export async function getAgenda(deps: AgendaDeps, uid: string): Promise<Result<readonly AgendaItem[], { code: "unknown" }>> {
-  const [talks, attended] = await Promise.all([deps.talks(), deps.attendedTalkIds(uid)]);
+  const [talks, attended, speakers] = await Promise.all([deps.talks(), deps.attendedTalkIds(uid), deps.speakerNames()]);
   if (!talks.ok || !attended.ok) return err({ code: "unknown" });
+  // Names only label the talks: without them a talk still shows, with the name typed before the catalog if any.
+  const names = speakers.ok ? speakers.value : new Map<string, string>();
+  const speakerOf = (talk: Talk) => {
+    const named = talk.speakerIds.map((id) => names.get(id)).filter((name): name is string => Boolean(name));
+    return named.length > 0 ? named.join(", ") : talk.speaker;
+  };
 
   const now = deps.now().getTime();
   const open = talks.value.filter((talk) => talk.active).sort(compareTalks);
@@ -48,7 +56,7 @@ export async function getAgenda(deps: AgendaDeps, uid: string): Promise<Result<r
       return {
         id: talk.id,
         title: talk.title,
-        speaker: talk.speaker,
+        speaker: speakerOf(talk),
         startsAt: talk.startsAt?.toISOString() ?? null,
         endsAt: talk.endsAt?.toISOString() ?? null,
         roomId: talk.roomId,

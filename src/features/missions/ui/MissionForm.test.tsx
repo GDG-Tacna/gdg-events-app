@@ -144,6 +144,25 @@ describe("MissionForm", () => {
     expect(save.mock.calls[0][0].draft).toMatchObject({ quadrantId: "cloud", xp: 30, config: { type: "stand", checkpointId: "stand-ai-2" } });
   });
 
+  it("points a «Conoce al speaker» mission to an active speaker, and asks to add one when there is none", async () => {
+    const save = renderForm({ speakers: [{ id: "ana-torres", name: "Ana Torres" }, { id: "luis", name: "Luis Quispe" }] });
+
+    type(f.type, "speaker");
+    expect(screen.getByLabelText(f.xp)).toHaveValue("40");
+    type(f.checkpoint.speaker, "luis");
+    type(f.title, "Conoce a Luis");
+    submit();
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerId: "luis" } });
+    cleanup();
+
+    renderForm();
+    type(f.type, "speaker");
+    expect(screen.getByText(f.noCheckpoints.speaker)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: f.save })).toBeDisabled();
+  });
+
   it("offers G-Credits only when the edition gives them, with the type's default as the hint, and sends what was typed", async () => {
     const save = renderForm({ creditDefaults: { talk: 10, stand: 10, quiz: 5, keyword: 5 } });
 

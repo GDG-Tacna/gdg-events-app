@@ -11,6 +11,8 @@ export type MissionAdminErrorCode =
   | "invalid-image"
   /** A talk or stand mission points to a checkpoint that does not exist or is of another kind. */
   | "unknown-checkpoint"
+  /** A speaker mission points to someone who is not an active speaker of the edition. */
+  | "unknown-speaker"
   /** The mini-game is not one of the games built in code. */
   | "unknown-minigame"
   /** The mini-game difficulty is not easy, normal or hard. */
@@ -71,6 +73,11 @@ export interface CheckpointDirectory {
   kindOf(id: string): Promise<Result<string | null, { code: string }>>;
 }
 
+/** The edition's active speaker ids (the speakers catalog answers it). */
+export interface SpeakerDirectory {
+  activeIds(): Promise<Result<ReadonlySet<string>, { code: string }>>;
+}
+
 /** The mini-games built in code (the mini-games catalog answers it). Whether a game is enabled is checked when it is played. */
 export interface MinigameDirectory {
   ids: readonly string[];
@@ -92,6 +99,7 @@ export interface MissionAdminDeps {
   store: MissionStore;
   quadrants: QuadrantDirectory;
   checkpoints: CheckpointDirectory;
+  speakers: SpeakerDirectory;
   minigames: MinigameDirectory;
   images: RecordImages;
   audit: MissionAudit;
@@ -130,6 +138,11 @@ async function checkDraft(deps: MissionAdminDeps, id: string, draft: MissionDraf
     const kind = await deps.checkpoints.kindOf(mission.config.checkpointId);
     if (!kind.ok) return err(missionAdminError("unknown"));
     if (kind.value !== mission.config.type) return err(missionAdminError("unknown-checkpoint"));
+  }
+  if (mission.config.type === "speaker") {
+    const speakers = await deps.speakers.activeIds();
+    if (!speakers.ok) return err(missionAdminError("unknown"));
+    if (!speakers.value.has(mission.config.speakerId)) return err(missionAdminError("unknown-speaker"));
   }
 
   // Stored data drops a bad game quietly; what the admin sends is refused instead, so nothing is lost unseen.

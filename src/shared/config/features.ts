@@ -27,6 +27,8 @@ export const FEATURES = {
   leaderboard: true,
   /** Phase 6: the final swag raffle (G-Credits earned in the edition are tickets), drawn on the stage. */
   raffle: true,
+  /** Block 7: live polls (the admin opens one at a time; cadets vote, with an optional prize; results on the stage). */
+  polls: true,
 } as const;
 
 export type FeatureName = keyof typeof FEATURES;

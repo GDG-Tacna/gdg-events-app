@@ -11,14 +11,18 @@ export interface ScanReward {
 }
 
 /** What the server action answers to the scanner screen. Plain data: it crosses the client boundary. */
+/** What a scan was: a checkpoint of some kind, or a speaker's own code («Conoce al speaker»). */
+export type ScanKind = CheckpointKind | "speaker";
+
 export type RecordCheckInActionResult =
   | {
       ok: true;
+      /** The checkpoint, or the speaker for a speaker's code. */
       checkpointId: CheckpointId;
-      kind: CheckpointKind;
+      kind: ScanKind;
       recorded: boolean;
       firstEntrance: boolean;
-      /** Missions tied to this checkpoint (talks and stands). Absent or empty when there are none. */
+      /** Missions tied to this checkpoint (talks and stands) or speaker. Absent or empty when there are none. */
       missions?: readonly ScanReward[];
       /** G-Credits this scan earned for attending a talk (0 or absent when none). */
       talkCredits?: number;

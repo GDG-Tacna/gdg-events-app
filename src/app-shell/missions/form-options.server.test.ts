@@ -7,6 +7,8 @@ const economy = { currentEconomy: vi.fn() };
 vi.mock("@/app-shell/composition/economy.server", () => economy);
 const minigames = { currentMinigameSettings: vi.fn() };
 vi.mock("@/app-shell/composition/minigames.server", () => minigames);
+const speakers = vi.hoisted(() => ({ speakerStore: { list: vi.fn() } }));
+vi.mock("@/app-shell/composition/speakers.server", () => speakers);
 const features = vi.hoisted(() => ({ FEATURES: { minigames: true } }));
 vi.mock("@/shared/config/features", () => features);
 
@@ -35,12 +37,24 @@ describe("loadMissionFormOptions", () => {
       ok: true,
       value: [checkpoint("talk-1", "talk"), checkpoint("talk-off", "talk", false), checkpoint("stand-1", "stand"), checkpoint("lunch", "catering"), checkpoint("door", "entrance")],
     });
+    speakers.speakerStore.list.mockResolvedValue({
+      ok: true,
+      value: [
+        { id: "zoe", name: "Zoe", active: true },
+        { id: "off", name: "Apagado", active: false },
+        { id: "ana", name: "Ana", active: true },
+      ],
+    });
   });
 
-  it("offers the active quadrants and the open talks and stands, as plain options", async () => {
+  it("offers the active quadrants, the open talks and stands and the active speakers by name, as plain options", async () => {
     expect(await loadMissionFormOptions(ADMIN)).toEqual({
       quadrants: [{ id: "ai", name: "AI" }],
       checkpoints: { talk: [{ id: "talk-1", name: "Puesto talk-1" }], stand: [{ id: "stand-1", name: "Puesto stand-1" }] },
+      speakers: [
+        { id: "ana", name: "Ana" },
+        { id: "zoe", name: "Zoe" },
+      ],
       creditDefaults: { talk: 10, stand: 10, quiz: 5, keyword: 5 },
       minigames: [
         { id: "bug-kong", name: "Bug Kong", enabled: true, difficulty: "normal" },
@@ -72,5 +86,8 @@ describe("loadMissionFormOptions", () => {
 
     checkpointsServer.listCheckpoints.mockResolvedValueOnce({ ok: false, error: { code: "unknown" } });
     await expect(loadMissionFormOptions(ADMIN)).rejects.toThrow("Could not read the checkpoints");
+
+    speakers.speakerStore.list.mockResolvedValueOnce({ ok: false, error: { code: "unknown" } });
+    await expect(loadMissionFormOptions(ADMIN)).rejects.toThrow("Could not read the speakers");
   });
 });

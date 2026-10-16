@@ -145,7 +145,7 @@ export async function submitMissionProof(
   proof: MissionProof,
 ): Promise<Result<SubmitOutcome, MissionError>> {
   // Typed answers are limited; scans already went through the check-in limiter.
-  if (proof.kind !== "checkpoint" && !(await deps.limiter.consume(uid))) return err(missionError("rate-limited"));
+  if (proof.kind !== "checkpoint" && proof.kind !== "speaker" && !(await deps.limiter.consume(uid))) return err(missionError("rate-limited"));
 
   const missions = await offeredMissions(deps);
   if (!missions.ok) return missions;
@@ -195,13 +195,31 @@ export async function completeByCheckpoint(
   if (!missions.ok) return missions;
 
   // Only talk and stand missions carry a checkpoint; typed missions are never completed by a scan.
-  const tied = missions.value
-    .filter((mission) => mission.active && "checkpointId" in mission.config && mission.config.checkpointId === checkpointId)
-    .sort(byOrder);
+  const tied = missions.value.filter((mission) => mission.active && "checkpointId" in mission.config && mission.config.checkpointId === checkpointId);
+  return completeTied(deps, uid, tied, { kind: "checkpoint", checkpointId });
+}
 
+/**
+ * After a verified scan of a speaker's code: completes every active «Conoce al speaker» mission for that speaker. Like
+ * `completeByCheckpoint`, a failure on one mission never hides the others, and scanning again retries it.
+ */
+export async function completeBySpeaker(deps: SubmitProofDeps, uid: string, speakerId: string): Promise<Result<readonly ScanMission[], MissionError>> {
+  const missions = await offeredMissions(deps);
+  if (!missions.ok) return missions;
+  const tied = missions.value.filter((mission) => mission.active && mission.config.type === "speaker" && mission.config.speakerId === speakerId);
+  return completeTied(deps, uid, tied, { kind: "speaker", speakerId });
+}
+
+/** Hands the same scan proof to each mission it is tied to, in board order, and answers the completed ones. */
+async function completeTied(
+  deps: SubmitProofDeps,
+  uid: string,
+  tied: readonly Mission[],
+  proof: Extract<MissionProof, { kind: "checkpoint" | "speaker" }>,
+): Promise<Result<readonly ScanMission[], MissionError>> {
   const completed: ScanMission[] = [];
-  for (const mission of tied) {
-    const outcome = await submitMissionProof(deps, uid, mission.id, { kind: "checkpoint", checkpointId });
+  for (const mission of [...tied].sort(byOrder)) {
+    const outcome = await submitMissionProof(deps, uid, mission.id, proof);
     if (!outcome.ok) {
       if (outcome.error.code === "not-registered") return outcome;
       logServerError("missions.scan", new Error(`${outcome.error.code} for ${mission.id}`));

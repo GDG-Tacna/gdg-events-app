@@ -67,6 +67,12 @@ describe("FirestoreEditionCopier", () => {
     expect(await copier.read("e1", "ranks")).toEqual({ ok: true, value: [{ path: "config/ranks", data: { ranks: [] } }] });
   });
 
+  it("never copies who a speaker is linked to, nor their invitation", async () => {
+    const copier = new FirestoreEditionCopier(() => fakeFirestore({ "events/e1/speakers/ana": { name: "Ana", accountUid: "a1", invite: { hash: "h" }, active: true } }).db);
+
+    expect(await copier.read("e1", "speakers")).toEqual({ ok: true, value: [{ path: "speakers/ana", data: { name: "Ana", active: true } }] });
+  });
+
   it("knows whether an edition still has nothing of a part", async () => {
     const copier = new FirestoreEditionCopier(() => fakeFirestore(SOURCE).db);
 

@@ -6,7 +6,6 @@ import { axe } from "@/test-utils/axe";
 import type { RaffleOverview } from "../domain/raffle";
 import type { RaffleActions } from "./actions";
 import { RaffleAdminView } from "./RaffleAdminView";
-import { RaffleTicketsCard } from "./RaffleTicketsCard";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
@@ -195,30 +194,5 @@ describe("RaffleAdminView", () => {
     const { container } = render(<RaffleAdminView overview={OVERVIEW} actions={actions()} stageHref="/x" />);
 
     expect((await axe(container)).violations).toEqual([]);
-  });
-});
-
-describe("RaffleTicketsCard", () => {
-  const c = copy.raffle.card;
-
-  it.each([
-    [{ tickets: 45, minCredits: 1, eligible: true, won: [] }, "Tienes 45 boletos", null],
-    [{ tickets: 1, minCredits: 1, eligible: true, won: [] }, c.oneTicket, null],
-    [{ tickets: 3, minCredits: 10, eligible: false, won: [] }, "Tienes 3 boletos", "Necesitas 10 G-Credits para participar: te faltan 7."],
-    [{ tickets: 30, minCredits: 1, eligible: false, won: ["Polera"] }, "Tienes 30 boletos", "¡Ganaste Polera! Acércate a recogerlo."],
-    [{ tickets: 30, minCredits: 1, eligible: false, won: [] }, "Tienes 30 boletos", c.drawnOut],
-  ])("shows %j", (tickets, count, status) => {
-    render(<RaffleTicketsCard tickets={tickets} />);
-
-    const card = screen.getByRole("region", { name: c.title });
-    expect(card).toHaveTextContent(count);
-    expect(card).toHaveTextContent(c.howItWorks);
-    if (status) expect(card).toHaveTextContent(status);
-  });
-
-  it("says nothing more to a cadet with exactly the minimum: they are in", () => {
-    render(<RaffleTicketsCard tickets={{ tickets: 10, minCredits: 10, eligible: true, won: [] }} />);
-
-    expect(screen.getByRole("region", { name: c.title })).not.toHaveTextContent("Necesitas");
   });
 });

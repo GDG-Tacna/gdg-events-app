@@ -23,8 +23,14 @@ export const ROUTES = {
   network: "/red",
   /** The stage screen for the projector (phase 6). Admins only. */
   stage: "/escenario",
+  /** The live poll, to vote in it. Attendees only. */
+  poll: "/encuesta",
+  /** The avatar editor ("Mi avatar"). Attendees only. */
+  avatar: "/avatar",
   /** The attendee's badges (Logros). Attendees only. */
   achievements: "/achievements",
+  /** A speaker's own code, on their phone (the account linked through their invitation link). */
+  speaker: "/speaker",
   /** Staff area: pick a serving point and hand out rations. Staff and admin. */
   staff: "/staff",
   /** Admin area (Centro de control). Admin role only. */
@@ -36,6 +42,11 @@ export const ROUTES = {
   adminCheckpoints: "/admin/puestos",
   adminSquads: "/admin/escuadrones",
   adminMissions: "/admin/misiones",
+  /** The edition's zones (the code calls them quadrants): themes of the missions and areas of the venue. */
+  adminZones: "/admin/zonas",
+  /** The edition's speakers, whom talks name. */
+  adminSpeakers: "/admin/speakers",
+  /** The venue plan, with each zone's areas on it. */
   adminMap: "/admin/mapa",
   adminRanks: "/admin/rangos",
   adminOdyssey: "/admin/odisea",
@@ -45,6 +56,8 @@ export const ROUTES = {
   adminMinigames: "/admin/minijuegos",
   adminStage: "/admin/escenario",
   adminRaffle: "/admin/sorteo",
+  /** Live polls: prepared as drafts, opened one at a time, with their results. */
+  adminPolls: "/admin/encuestas",
   adminEvent: "/admin/eventos",
   /** Static fallback page the service worker serves when a navigation fails offline. Never protected. */
   offline: "/offline",

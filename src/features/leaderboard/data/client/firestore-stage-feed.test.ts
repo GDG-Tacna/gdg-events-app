@@ -38,7 +38,7 @@ describe("FirestoreStageFeed", () => {
     sdk.listeners[0].next(docSnapshot({ display: "waiting", view: "squads" }));
     sdk.listeners[1].next(querySnapshot([["u1", { alias: "Nova", xp: 10, squad: "firebase" }], ["broken", { xp: 3 }]]));
 
-    expect(h.stage).toHaveBeenLastCalledWith({ display: "waiting", view: "squads", frozen: null, champions: null, raffle: null });
+    expect(h.stage).toHaveBeenLastCalledWith({ display: "waiting", view: "squads", frozen: null, champions: null, raffle: null, background: null, poll: null });
     expect(h.participants).toHaveBeenLastCalledWith([{ uid: "u1", alias: "Nova", squadId: "firebase", xp: 10, reachedAt: null }]);
     expect(h.status).toHaveBeenLastCalledWith("live");
   });

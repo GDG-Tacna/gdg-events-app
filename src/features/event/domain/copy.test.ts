@@ -30,8 +30,8 @@ function setup(content: Record<string, Partial<Record<CopyPart, EditionDocument[
 
 describe("withNeeds", () => {
   it("adds what a part points at, in the canonical order", () => {
-    expect(withNeeds(["story"])).toEqual(["map", "checkpoints", "talks", "missions", "story"]);
-    expect(withNeeds(["achievements", "ranks"])).toEqual(["squads", "map", "checkpoints", "talks", "missions", "achievements", "ranks"]);
+    expect(withNeeds(["story"])).toEqual(["map", "checkpoints", "speakers", "talks", "missions", "story"]);
+    expect(withNeeds(["achievements", "ranks"])).toEqual(["squads", "map", "checkpoints", "speakers", "talks", "missions", "achievements", "ranks"]);
     expect(withNeeds(["economy"])).toEqual(["economy"]);
   });
 });
@@ -49,7 +49,7 @@ describe("copyEditionContent", () => {
 
     const copied = await copyEditionContent(t.deps, GLOBAL, { from: "devfest-2026", to: "meetup-nov", parts: ["missions", "ranks"] });
 
-    expect(copied).toEqual(ok({ parts: ["map", "checkpoints", "talks", "missions", "ranks"], documents: 3 }));
+    expect(copied).toEqual(ok({ parts: ["map", "checkpoints", "speakers", "talks", "missions", "ranks"], documents: 3 }));
     expect(t.written).toHaveLength(1);
     expect(t.written[0].from).toBe("devfest-2026");
     const byPath = Object.fromEntries(t.written[0].documents.map((document) => [document.path, document.data]));

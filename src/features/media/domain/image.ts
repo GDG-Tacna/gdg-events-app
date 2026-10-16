@@ -2,7 +2,7 @@ import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 
 /** What an image is for. A closed set: each one has its rules and its own folder. */
-export const IMAGE_PURPOSES = ["badge", "raffle-prize", "squad-prize", "squad-logo", "rank", "mission", "venue-plan"] as const;
+export const IMAGE_PURPOSES = ["badge", "raffle-prize", "squad-prize", "squad-logo", "rank", "mission", "venue-plan", "stage-background", "speaker", "poll-option"] as const;
 export type ImagePurpose = (typeof IMAGE_PURPOSES)[number];
 
 export type ImageFormat = "jpeg" | "png" | "webp" | "svg";
@@ -24,8 +24,12 @@ export const RULE_OF: Record<ImagePurpose, ImageRule> = {
   "squad-prize": "picture",
   rank: "picture",
   mission: "picture",
+  speaker: "picture",
+  "poll-option": "picture",
   "squad-logo": "logo",
   "venue-plan": "plan",
+  // A projector background is large, like the venue plan.
+  "stage-background": "plan",
 };
 
 /** The largest upload any purpose accepts, for the request body limit. */

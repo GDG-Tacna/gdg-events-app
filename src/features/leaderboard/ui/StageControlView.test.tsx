@@ -35,6 +35,27 @@ describe("StageControlView", () => {
     expect(screen.getByRole("button", { name: t.views.both })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("offers the projector's background only with an upload, and saves a removal at once", async () => {
+    const run = vi.fn<UpdateStageAction>(async () => ({ ok: true }));
+    const background = { path: "public/e1/stage-background/abcdef123456.webp", url: "/media/public/e1/stage-background/abcdef123456.webp" };
+    const { unmount } = render(<StageControlView stage={{ ...DEFAULT_STAGE, background }} live={LIVE} run={run} upload={vi.fn()} />);
+
+    expect(screen.getByRole("heading", { name: t.backgroundTitle })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: copy.common.image.remove }));
+    await waitFor(() => expect(run).toHaveBeenCalledWith({ type: "background", path: null }));
+    unmount();
+
+    render(<StageControlView stage={DEFAULT_STAGE} live={LIVE} run={vi.fn()} />);
+    expect(screen.queryByRole("heading", { name: t.backgroundTitle })).not.toBeInTheDocument();
+  });
+
+  it("offers no view to pick when the edition has squads switched off", () => {
+    render(<StageControlView stage={DEFAULT_STAGE} live={LIVE} run={vi.fn()} squadsOn={false} />);
+
+    expect(screen.queryByRole("group", { name: t.viewTitle })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: t.views.squads })).not.toBeInTheDocument();
+  });
+
   it("says since when the ranking is frozen, in the event's time, and previews the frozen one", () => {
     renderView({ ...DEFAULT_STAGE, frozen: { cadets: [{ position: 1, alias: "Congelada", squad: null, xp: 10 }], squads: [], at: FROZEN_AT } });
 
@@ -119,5 +140,30 @@ describe("StageControlView", () => {
     const { container } = renderView({ ...DEFAULT_STAGE, display: "reveal", champions: { cadet: LIVE.cadets[0], squad: LIVE.squads[0] } });
 
     expect((await axe(container)).violations).toEqual([]);
+  });
+
+  it("puts an opened poll's results on screen, marks the one shown, and says when there is none to show", async () => {
+    const run = vi.fn<UpdateStageAction>(async () => ({ ok: true }));
+    const polls = [
+      { id: "poll-open", question: "¿Qué charla te gustó más?", status: "open" as const },
+      { id: "poll-old", question: "¿Primera vez en un DevFest?", status: "closed" as const },
+    ];
+    const { unmount } = render(<StageControlView stage={{ ...DEFAULT_STAGE, display: "poll", poll: { pollId: "poll-old" } }} live={LIVE} run={run} polls={polls} />);
+
+    expect(screen.getByText(t.now.poll)).toBeInTheDocument();
+    const list = within(screen.getByRole("list", { name: t.pollListLabel }));
+    expect(list.getByRole("button", { name: t.pollShown })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(list.getByRole("button", { name: t.pollShow }));
+    await waitFor(() => expect(run).toHaveBeenCalledWith({ type: "poll", pollId: "poll-open" }));
+    unmount();
+
+    render(<StageControlView stage={DEFAULT_STAGE} live={LIVE} run={run} polls={[]} />);
+    expect(screen.getByText(t.pollNone)).toBeInTheDocument();
+  });
+
+  it("has no poll card with polls off", () => {
+    renderView();
+
+    expect(screen.queryByRole("heading", { name: t.pollTitle })).not.toBeInTheDocument();
   });
 });

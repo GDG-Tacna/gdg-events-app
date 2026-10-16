@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { copy } from "@/shared/copy/es";
 import { cn } from "@/shared/lib/utils";
 import { Icon } from "@/shared/ui";
@@ -26,6 +26,10 @@ export interface StageScreenProps {
   initialBoard: FleetBoard | null;
   /** How long each ranking shows when the view is "both". */
   alternateMs?: number;
+  /** False when the edition has squads switched off: only the cadets' ranking shows, whatever the view says. */
+  squadsOn?: boolean;
+  /** Draws a poll's live results (the polls feature, wired by the app shell); without it a poll display shows nothing. */
+  renderPoll?: (pollId: string) => ReactNode;
 }
 
 const t = copy.stage;
@@ -45,7 +49,7 @@ function StatusPill({ status }: { status: FeedStatus }) {
  * admin controls and to the edition's participants, and computes the ranking itself; it shows the live or frozen
  * ranking (cadets, squads, or both taking turns), a waiting screen, or the champions' reveal. It only reads.
  */
-export function StageScreen({ eventId, feed, squads, sprites, initialStage, initialBoard, alternateMs = 15_000 }: StageScreenProps) {
+export function StageScreen({ eventId, feed, squads, sprites, initialStage, initialBoard, alternateMs = 15_000, squadsOn = true, renderPoll }: StageScreenProps) {
   const reduce = useReducedMotion();
   const [stage, setStage] = useState(initialStage);
   const [entries, setEntries] = useState<readonly RankingEntry[] | null>(null);
@@ -55,12 +59,14 @@ export function StageScreen({ eventId, feed, squads, sprites, initialStage, init
 
   useEffect(() => feed.subscribe(eventId, { stage: setStage, participants: setEntries, status: setStatus }), [feed, eventId]);
 
+  const view = squadsOn ? stage.view : "cadets";
+
   // "Both" takes turns: cadets, then squads.
   useEffect(() => {
-    if (stage.view !== "both") return;
+    if (view !== "both") return;
     const timer = setInterval(() => setTurn((current) => (current === "cadets" ? "squads" : "cadets")), alternateMs);
     return () => clearInterval(timer);
-  }, [stage.view, alternateMs]);
+  }, [view, alternateMs]);
 
   useEffect(() => {
     const onChange = () => setFullscreen(document.fullscreenElement !== null);
@@ -70,7 +76,7 @@ export function StageScreen({ eventId, feed, squads, sprites, initialStage, init
 
   const live = useMemo(() => (entries ? computeFleetBoard(entries, squads) : initialBoard), [entries, squads, initialBoard]);
   const board = stage.frozen ?? live;
-  const shown = stage.view === "both" ? turn : stage.view;
+  const shown = view === "both" ? turn : view;
 
   if (status === "signed-out" || status === "denied") {
     return (
@@ -83,51 +89,62 @@ export function StageScreen({ eventId, feed, squads, sprites, initialStage, init
   }
 
   return (
-    // A proportional line height: the body's is fixed in pixels and would clip the big projector type.
-    <div className="flex min-h-dvh flex-col gap-[3vh] px-[4vw] py-[3vh] leading-[1.25]">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-col">
-          <p className="text-primary text-[clamp(0.9rem,2vh,1.6rem)] font-semibold tracking-widest uppercase">{t.event}</p>
-          <h1 className="font-display text-[clamp(1.75rem,5vh,4.5rem)] leading-tight font-bold">{t.title}</h1>
+    <>
+      {stage.background ? (
+        // The admin's picture behind everything, darkened so the ranking reads on any image.
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={stage.background.url} alt="" className="size-full object-cover" />
+          <div className="bg-bg-deep/70 absolute inset-0" />
         </div>
-        <div className="flex items-center gap-3">
-          {stage.frozen && stage.display === "ranking" ? (
-            <span className="type-pixel-tag border-gold text-gold rounded-full border px-4 py-1 text-[clamp(0.9rem,2vh,1.6rem)]">{t.frozen}</span>
-          ) : null}
-          <StatusPill status={status} />
-          {!fullscreen ? (
-            <button
-              type="button"
-              onClick={() => void document.documentElement.requestFullscreen?.().catch(() => undefined)}
-              className="border-line-strong text-foreground hover:bg-secondary focus-visible:ring-ring min-h-12 rounded-md border px-4 focus-visible:ring-[3px] focus-visible:outline-none"
-            >
-              {t.fullscreen}
-            </button>
-          ) : null}
-        </div>
-      </header>
+      ) : null}
+      {/* A proportional line height: the body's is fixed in pixels and would clip the big projector type. */}
+      <div className="relative z-10 flex min-h-dvh flex-col gap-[3vh] px-[4vw] py-[3vh] leading-[1.25]">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-col">
+            <p className="text-primary text-[clamp(0.9rem,2vh,1.6rem)] font-semibold tracking-widest uppercase">{t.event}</p>
+            <h1 className="font-display text-[clamp(1.75rem,5vh,4.5rem)] leading-tight font-bold">{t.title}</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            {stage.frozen && stage.display === "ranking" ? (
+              <span className="type-pixel-tag border-gold text-gold rounded-full border px-4 py-1 text-[clamp(0.9rem,2vh,1.6rem)]">{t.frozen}</span>
+            ) : null}
+            <StatusPill status={status} />
+            {!fullscreen ? (
+              <button
+                type="button"
+                onClick={() => void document.documentElement.requestFullscreen?.().catch(() => undefined)}
+                className="border-line-strong text-foreground hover:bg-secondary focus-visible:ring-ring min-h-12 rounded-md border px-4 focus-visible:ring-[3px] focus-visible:outline-none"
+              >
+                {t.fullscreen}
+              </button>
+            ) : null}
+          </div>
+        </header>
 
-      <main className="flex flex-1 flex-col">
-        {stage.display === "waiting" ? <WaitingScreen /> : null}
-        {stage.display === "reveal" ? <RevealScreen champions={stage.champions} sprites={sprites} /> : null}
-        {stage.display === "raffle" && stage.raffle ? <RaffleScreen key={stage.raffle.drawId} raffle={stage.raffle} /> : null}
-        {stage.display === "ranking" && board ? (
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.section
-              key={shown}
-              aria-label={shown === "cadets" ? t.cadetsTitle : t.squadsTitle}
-              initial={reduce ? false : { opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={reduce ? undefined : { opacity: 0, x: -40 }}
-              transition={{ duration: 0.4 }}
-              className="flex flex-1 flex-col gap-[2.5vh]"
-            >
-              <h2 className="text-muted-foreground text-[clamp(1rem,2.6vh,2.25rem)] font-semibold tracking-wide uppercase">{shown === "cadets" ? t.cadetsTitle : t.squadsTitle}</h2>
-              {shown === "cadets" ? <CadetBoard cadets={board.cadets} /> : <SquadBoard squads={board.squads} sprites={sprites} />}
-            </motion.section>
-          </AnimatePresence>
-        ) : null}
-      </main>
-    </div>
+        <main className="flex flex-1 flex-col">
+          {stage.display === "waiting" ? <WaitingScreen /> : null}
+          {stage.display === "reveal" ? <RevealScreen champions={stage.champions} sprites={sprites} /> : null}
+          {stage.display === "raffle" && stage.raffle ? <RaffleScreen key={stage.raffle.drawId} raffle={stage.raffle} /> : null}
+          {stage.display === "poll" && stage.poll && renderPoll ? <div key={stage.poll.pollId} className="flex flex-1 flex-col">{renderPoll(stage.poll.pollId)}</div> : null}
+          {stage.display === "ranking" && board ? (
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.section
+                key={shown}
+                aria-label={shown === "cadets" ? t.cadetsTitle : t.squadsTitle}
+                initial={reduce ? false : { opacity: 0, x: 40 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={reduce ? undefined : { opacity: 0, x: -40 }}
+                transition={{ duration: 0.4 }}
+                className="flex flex-1 flex-col gap-[2.5vh]"
+              >
+                <h2 className="text-muted-foreground text-[clamp(1rem,2.6vh,2.25rem)] font-semibold tracking-wide uppercase">{shown === "cadets" ? t.cadetsTitle : t.squadsTitle}</h2>
+                {shown === "cadets" ? <CadetBoard cadets={board.cadets} /> : <SquadBoard squads={board.squads} sprites={sprites} />}
+              </motion.section>
+            </AnimatePresence>
+          ) : null}
+        </main>
+      </div>
+    </>
   );
 }

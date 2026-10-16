@@ -138,6 +138,29 @@ describe("StageScreen", () => {
     expect(screen.getByRole("region", { name: t.cadetsTitle })).toBeInTheDocument();
   });
 
+  it("draws the admin's background behind everything, darkened, and none without one", () => {
+    const background = { path: "public/e1/stage-background/abcdef123456.webp", url: "/media/public/e1/stage-background/abcdef123456.webp" };
+    const { container, unmount } = renderScreen({ ...DEFAULT_STAGE, background });
+
+    const image = container.querySelector(`img[src="${background.url}"]`);
+    expect(image).toHaveAttribute("alt", "");
+    expect(image?.closest('[aria-hidden="true"]')).not.toBeNull();
+    unmount();
+
+    expect(renderScreen().container.querySelector('img[src^="/media/"]')).toBeNull();
+  });
+
+  it("shows only the cadets when the edition has squads switched off, whatever the view says", async () => {
+    const fake = fakeFeed();
+    render(<StageScreen eventId="e1" feed={fake.feed} squads={SQUADS} sprites={SPRITES} initialStage={{ ...DEFAULT_STAGE, view: "squads" }} initialBoard={INITIAL_BOARD} alternateMs={1000} squadsOn={false} />);
+
+    expect(screen.getByRole("region", { name: t.cadetsTitle })).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(screen.queryByRole("region", { name: t.squadsTitle })).not.toBeInTheDocument();
+  });
+
   it("says when it is reconnecting, and explains a missing or refused session instead of the ranking", async () => {
     const { push } = renderScreen();
 
@@ -174,5 +197,15 @@ describe("StageScreen", () => {
     const { container } = renderScreen();
 
     expect((await axe(container)).violations).toEqual([]);
+  });
+
+  it("hands a poll display to whoever draws polls, and follows the stage when it changes", () => {
+    const renderPoll = vi.fn((pollId: string) => <p>Encuesta {pollId}</p>);
+    const fake = fakeFeed();
+    render(<StageScreen eventId="e1" feed={fake.feed} squads={SQUADS} sprites={SPRITES} initialStage={{ ...DEFAULT_STAGE, display: "poll", poll: { pollId: "poll-1" } }} initialBoard={INITIAL_BOARD} renderPoll={renderPoll} />);
+
+    expect(screen.getByText("Encuesta poll-1")).toBeInTheDocument();
+    fake.push((h) => h.stage({ ...DEFAULT_STAGE }));
+    expect(screen.queryByText("Encuesta poll-1")).not.toBeInTheDocument();
   });
 });

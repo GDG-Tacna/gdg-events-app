@@ -56,8 +56,10 @@ export function decideSquadCallout(input: {
   squadId: SquadId | null;
   availableSquads: number;
 }): SquadCalloutKind {
-  // An attendee keeps showing their squad even if the feature is later switched off or the squad retired.
+  // With squads switched off for the edition nothing about squads shows, not even a squad the attendee already has.
+  if (!input.featureEnabled) return "none";
+  // A member keeps showing their squad even if it was later retired.
   if (input.squadId !== null) return "badge";
-  if (!input.featureEnabled || input.availableSquads === 0) return "none";
+  if (input.availableSquads === 0) return "none";
   return "discover";
 }

@@ -24,7 +24,7 @@ export default async function MyEditionsPage() {
   return (
     <>
       <SpaceBackground />
-      <main className="pt-safe pb-safe px-space-4 py-space-8 gap-space-6 mx-auto flex min-h-dvh w-full max-w-[520px] flex-col justify-center">
+      <main className="px-space-4 pt-safe-space-8 pb-safe-space-8 gap-space-6 mx-auto flex min-h-dvh w-full max-w-[520px] flex-col justify-center">
         <ScreenEnter>
           <MyEditionsView
             entries={choices.value.map((edition) => ({ edition, role: roles.get(edition.id) ?? "staff" }))}

@@ -46,6 +46,8 @@ export class FirestoreStageStore implements StageStore {
         frozen: state.frozen ? { cadets: plain(state.frozen.cadets), squads: plain(state.frozen.squads), at: state.frozen.at } : null,
         champions: state.champions ? plain(state.champions) : null,
         raffle: state.raffle ? { ...plain({ ...state.raffle, at: null }), at: state.raffle.at } : null,
+        background: state.background ? { path: state.background.path, url: state.background.url } : null,
+        poll: state.poll ? { pollId: state.poll.pollId } : null,
         updatedAt: new Date(),
       });
       return ok(undefined);

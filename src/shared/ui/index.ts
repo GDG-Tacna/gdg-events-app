@@ -20,6 +20,23 @@ export { UnlockedBadges, type UnlockedBadgesProps } from "./UnlockedBadges";
 export { GoogleMark } from "./brand/GoogleMark";
 export { ArtTile } from "./pixel/ArtTile";
 export { PixelAvatar, type PixelAvatarProps } from "./pixel/PixelAvatar";
+export {
+  BEARDS,
+  GLASSES,
+  HAIR_COLORS,
+  HAIR_STYLES,
+  HELMET_COLORS,
+  SKIN_TONES,
+  SUIT_COLORS,
+  lookFromSeed,
+  parseLook,
+  randomLook,
+  sameLook,
+  type AvatarLook,
+  type Beard,
+  type Glasses,
+  type HairStyle,
+} from "./pixel/avatar-look";
 export { PixelGdgLogo, gdgLogoSprite, type PixelGdgLogoProps } from "./pixel/PixelGdgLogo";
 export { PixelCoin, type PixelCoinProps } from "./pixel/PixelCoin";
 export { PixelMedal, type MedalTone, type PixelMedalProps } from "./pixel/PixelMedal";

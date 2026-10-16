@@ -93,23 +93,29 @@ describe("admin layout", () => {
     expect(shell.props.account).toBe("Ana");
     expect((shell.props.items as Array<{ href: string }>).map((item) => item.href)).toEqual([
       "/admin",
-      "/admin/puestos",
+      "/admin/eventos",
+      "/admin/team",
       "/admin/charlas",
-      "/admin/misiones",
+      "/admin/speakers",
+      "/admin/puestos",
+      "/admin/zonas",
       "/admin/mapa",
-      "/admin/rangos",
+      "/admin/misiones",
       "/admin/odisea",
-      "/admin/logros",
       "/admin/minijuegos",
-      "/admin/economia",
+      "/admin/logros",
+      "/admin/rangos",
       "/admin/escuadrones",
       "/admin/creditos-escuadron",
-      "/admin/escenario",
+      "/admin/economia",
       "/admin/sorteo",
-      "/admin/team",
-      "/admin/eventos",
+      "/admin/escenario",
     ]);
     expect((shell.props.accountActions as { type: unknown }).type).toBe(SignOutButton);
+    const compact = shell.props.compactAccountActions as { type: unknown; props: { variant?: string } };
+    expect(compact.type).toBe(SignOutButton);
+    expect(compact.props.variant).toBe("icon");
+    expect(shell.props.accountPhotoUrl).toBeNull();
     expect((shell.props.children as ReactNode[])[0]).toBe(child);
   });
 

@@ -52,7 +52,7 @@ const SYSTEM = [
 function prompt(request: SuggestionRequest): string {
   const types = request.types.map((type) => (type === "quiz" ? '"quiz"' : '"keyword"')).join(" y ");
   return [
-    `Propón ${request.count} misiones de tipo ${types} para el cuadrante "${request.quadrantName}".`,
+    `Propón ${request.count} misiones de tipo ${types} para la zona "${request.quadrantName}".`,
     "<descripcion>",
     request.topic,
     "</descripcion>",

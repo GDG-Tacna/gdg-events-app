@@ -83,6 +83,15 @@ describe("missions page", () => {
     expect(view?.props.odysseyTitle).toBe("Odisea de Código");
   });
 
+  it("leaves out the story link and its title with the story switched off", async () => {
+    features.FEATURES.odyssey = false;
+
+    const view = findElement(await MissionsPage(), MissionBoardView);
+    expect(view?.props.odysseyHref).toBeUndefined();
+    expect(view?.props.odysseyTitle).toBeNull();
+    features.FEATURES.odyssey = true;
+  });
+
   it("still lists the missions when the quadrants cannot be read", async () => {
     quadrantsServer.getGalaxyMap.mockResolvedValue({ ok: false, error: { code: "unknown" } });
 

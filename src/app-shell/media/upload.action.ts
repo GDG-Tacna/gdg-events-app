@@ -8,7 +8,7 @@ import { FEATURES } from "@/shared/config/features";
 import { mayEdit } from "@/app-shell/permissions.server";
 
 /** Images belong to records of these sections: editing any of them is enough to upload one. */
-const UPLOAD_SECTIONS = ["achievements", "raffle", "squadCredits", "squads", "ranks", "missions", "map"] as const;
+const UPLOAD_SECTIONS = ["achievements", "raffle", "squadCredits", "squads", "ranks", "missions", "map", "stage", "talks", "polls"] as const;
 
 /**
  * Uploads one image for an admin screen and answers where it is stored. A public endpoint: the flag, the session,

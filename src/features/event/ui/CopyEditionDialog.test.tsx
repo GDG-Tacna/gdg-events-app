@@ -30,7 +30,7 @@ describe("CopyEditionDialog", () => {
     expect(map).toHaveAccessibleDescription("Se incluye porque lo usan: Misiones.");
 
     await user.click(within(dialog).getByRole("button", { name: t.submit }));
-    expect(copyContent).toHaveBeenCalledWith({ from: "devfest-2026", to: "meetup-nov", parts: ["map", "checkpoints", "talks", "missions"] });
+    expect(copyContent).toHaveBeenCalledWith({ from: "devfest-2026", to: "meetup-nov", parts: ["map", "checkpoints", "speakers", "talks", "missions"] });
     expect(onCopied).toHaveBeenCalledWith("Listo: se copiaron 4 elementos de «DevFest Tacna 2026».");
   });
 

@@ -2,7 +2,7 @@ import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { checkTalk, compareTalks, type Talk, type TalkDataErrorCode, type TalkDraft } from "./talk";
 
-export type TalkAdminErrorCode = TalkDataErrorCode | "unknown-room" | "already-exists" | "not-found" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
+export type TalkAdminErrorCode = TalkDataErrorCode | "unknown-room" | "unknown-speaker" | "already-exists" | "not-found" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
 
 export interface TalkAdminError {
   code: TalkAdminErrorCode;
@@ -21,9 +21,10 @@ export interface TalkStore {
   update(id: string, patch: TalkPatch): Promise<Result<{ before: Talk; after: Talk } | null, { code: string }>>;
 }
 
-/** The edition's active quadrants: the rooms a talk can be in (the quadrants feature answers). */
+/** The edition's active zones (the rooms a talk can be in) and its speakers (the quadrants and speakers features answer). */
 export interface TalkDirectory {
   roomIds(): Promise<Result<ReadonlySet<string>, { code: string }>>;
+  speakerIds(): Promise<Result<ReadonlySet<string>, { code: string }>>;
 }
 
 export interface TalkAuditEntry {
@@ -55,10 +56,13 @@ async function audit(deps: Pick<TalkAdminDeps, "audit" | "now">, entry: Omit<Tal
   if (!written.ok) logServerError("talks.audit.append", new Error(`audit entry missing for ${entry.targetUid}`));
 }
 
-/** Checks a draft and that its room is an active quadrant of the edition. */
-async function checkDraft(deps: TalkAdminDeps, id: string, draft: TalkDraft): Promise<Result<Omit<Talk, "active">, TalkAdminError>> {
+/** Checks a draft, that its room is an active zone of the edition and that its speakers are the edition's. */
+async function checkDraft(deps: TalkAdminDeps, id: string, draft: TalkDraft): Promise<Result<Omit<Talk, "active" | "speaker">, TalkAdminError>> {
   const checked = checkTalk(id, draft, deps.utcOffset);
   if (!checked.ok) return err(adminError(checked.error));
+  const speakers = await deps.directory.speakerIds();
+  if (!speakers.ok) return err(adminError("unknown"));
+  if (!checked.value.speakerIds.every((speakerId) => speakers.value.has(speakerId))) return err(adminError("unknown-speaker"));
   if (checked.value.roomId !== null) {
     const rooms = await deps.directory.roomIds();
     if (!rooms.ok) return err(adminError("unknown"));
@@ -80,15 +84,16 @@ export async function createTalk(deps: TalkAdminDeps, actor: TalkAdminActor, inp
   const checked = await checkDraft(deps, input.id, input.draft);
   if (!checked.ok) return checked;
 
-  const talk: Talk = { ...checked.value, active: true };
+  const talk: Talk = { ...checked.value, speaker: null, active: true };
   const saved = await deps.store.create(talk);
   if (!saved.ok) return err(adminError(saved.error.code === "already-exists" ? "already-exists" : "unknown"));
   await audit(deps, { action: "talk.created", actorUid: actor.uid, targetUid: talk.id, details: { title: talk.title } });
   return ok(talk);
 }
 
-const FIELDS = ["title", "speaker", "startsAt", "endsAt", "roomId", "description"] as const;
-const same = (a: unknown, b: unknown) => (a instanceof Date && b instanceof Date ? a.getTime() === b.getTime() : a === b);
+const FIELDS = ["title", "speakerIds", "startsAt", "endsAt", "roomId", "description"] as const;
+const same = (a: unknown, b: unknown) =>
+  a instanceof Date && b instanceof Date ? a.getTime() === b.getTime() : Array.isArray(a) && Array.isArray(b) ? a.join(",") === b.join(",") : a === b;
 
 /** Changes everything but the id (which other records point to). Audited only when something changed. */
 export async function updateTalk(deps: TalkAdminDeps, actor: TalkAdminActor, input: { id: string; draft: TalkDraft }): Promise<Result<Talk, TalkAdminError>> {
@@ -96,8 +101,8 @@ export async function updateTalk(deps: TalkAdminDeps, actor: TalkAdminActor, inp
   const checked = await checkDraft(deps, input.id, input.draft);
   if (!checked.ok) return checked.error.code === "invalid-id" ? err(adminError("not-found")) : checked;
 
-  const { title, speaker, startsAt, endsAt, roomId, description } = checked.value;
-  const updated = await deps.store.update(input.id, { title, speaker, startsAt, endsAt, roomId, description });
+  const { title, speakerIds, startsAt, endsAt, roomId, description } = checked.value;
+  const updated = await deps.store.update(input.id, { title, speakerIds, startsAt, endsAt, roomId, description });
   if (!updated.ok) return err(adminError("unknown"));
   if (updated.value === null) return err(adminError("not-found"));
 

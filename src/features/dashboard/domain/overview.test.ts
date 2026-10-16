@@ -71,8 +71,12 @@ describe("decideSquadCallout", () => {
     expect(decideSquadCallout({ featureEnabled: true, squadId: "gemini", availableSquads: 3 })).toBe("badge");
   });
 
-  it("keeps showing the badge if the feature is switched off or the squad was retired", () => {
-    expect(decideSquadCallout({ featureEnabled: false, squadId: "gemini", availableSquads: 0 })).toBe("badge");
+  it("shows nothing about squads when the edition has them switched off, even to a member", () => {
+    expect(decideSquadCallout({ featureEnabled: false, squadId: "gemini", availableSquads: 3 })).toBe("none");
+  });
+
+  it("keeps showing the badge of a member, even if the squad was retired", () => {
+    expect(decideSquadCallout({ featureEnabled: true, squadId: "gemini", availableSquads: 0 })).toBe("badge");
     expect(decideSquadCallout({ featureEnabled: true, squadId: "cloud", availableSquads: 3 })).toBe("badge");
   });
 

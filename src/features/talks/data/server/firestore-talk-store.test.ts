@@ -16,7 +16,7 @@ const { FirestoreTalkStore, toTalk } = await import("./firestore-talk-store");
 type Doc = Record<string, unknown>;
 const START = new Date("2026-10-24T14:00:00Z");
 const END = new Date("2026-10-24T14:45:00Z");
-const TALK: Talk = { id: "keynote", title: "Keynote", speaker: "Ana", startsAt: START, endsAt: END, roomId: "auditorio", description: "Resumen", active: true };
+const TALK: Talk = { id: "keynote", title: "Keynote", speakerIds: ["ana-torres"], speaker: "Ana", startsAt: START, endsAt: END, roomId: "auditorio", description: "Resumen", active: true };
 
 /** A slice of Firestore: documents, an equality query, create that fails on an existing id, and transactions. */
 function fakeFirestore(initial: Record<string, Doc> = {}) {
@@ -54,12 +54,12 @@ function fakeFirestore(initial: Record<string, Doc> = {}) {
 describe("toTalk", () => {
   it("reads a talk checkpoint, with Firestore timestamps", () => {
     expect(
-      toTalk("keynote", { kind: "talk", name: " Keynote ", speaker: "Ana", startsAt: { toDate: () => START }, endsAt: END, roomId: "auditorio", description: "Resumen", active: true }),
+      toTalk("keynote", { kind: "talk", name: " Keynote ", speakerIds: ["ana-torres", 7], speaker: "Ana", startsAt: { toDate: () => START }, endsAt: END, roomId: "auditorio", description: "Resumen", active: true }),
     ).toEqual(TALK);
   });
 
   it("reads a talk made in Puestos (only a name) with the rest missing, and the id when it has no name", () => {
-    expect(toTalk("vieja", { kind: "talk", active: false })).toEqual({ id: "vieja", title: "vieja", speaker: null, startsAt: null, endsAt: null, roomId: null, description: "", active: false });
+    expect(toTalk("vieja", { kind: "talk", active: false })).toEqual({ id: "vieja", title: "vieja", speakerIds: [], speaker: null, startsAt: null, endsAt: null, roomId: null, description: "", active: false });
   });
 
   it("is not a talk when the kind is another or the id is not a checkpoint id", () => {
@@ -83,6 +83,7 @@ describe("FirestoreTalkStore", () => {
     expect(fake.store.get("events/e1/checkpoints/keynote")).toMatchObject({
       kind: "talk",
       name: "Keynote",
+      speakerIds: ["ana-torres"],
       speaker: "Ana",
       startsAt: START,
       endsAt: END,

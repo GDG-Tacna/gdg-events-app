@@ -55,6 +55,17 @@ const renderView = (props: Partial<Parameters<typeof DashboardView>[0]> = {}) =>
   );
 
 describe("PlayerCard", () => {
+  it("links the avatar to the editor and draws the chosen look, or keeps a plain avatar without the editor", () => {
+    const look = { skin: 5, hairStyle: "buzz" as const, hairColor: 6, beard: "beard" as const, glasses: "shades" as const, helmet: 1, suit: 3 };
+    const { unmount } = render(<PlayerCard overview={overview(120)} avatarLook={look} avatarHref="/avatar" />);
+
+    expect(screen.getByRole("link", { name: copy.avatar.edit })).toHaveAttribute("href", "/avatar");
+    unmount();
+
+    render(<PlayerCard overview={overview(120)} />);
+    expect(screen.queryByRole("link", { name: copy.avatar.edit })).not.toBeInTheDocument();
+  });
+
   it("offers the cadet's QR from a button on the card, only when given where it is", () => {
     const { unmount } = render(<PlayerCard overview={overview(120)} qrHref="/pass" />);
 
@@ -65,6 +76,18 @@ describe("PlayerCard", () => {
 
     render(<PlayerCard overview={overview(120)} />);
     expect(screen.queryByRole("link", { name: copy.pass.open })).not.toBeInTheDocument();
+  });
+
+  it("offers the Red from a button next to the QR, only when given where it is", () => {
+    const { unmount } = render(<PlayerCard overview={overview(120)} qrHref="/pass" networkHref="/red" />);
+
+    const red = screen.getByRole("link", { name: copy.dashboard.account.network });
+    expect(red).toHaveAttribute("href", "/red");
+    expect(screen.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/red", "/pass"]);
+    unmount();
+
+    render(<PlayerCard overview={overview(120)} qrHref="/pass" />);
+    expect(screen.queryByRole("link", { name: copy.dashboard.account.network })).not.toBeInTheDocument();
   });
 
   it("shows the alias, the rank with its level and the labelled region", () => {
@@ -224,18 +247,15 @@ describe("DashboardView", () => {
     expect(terminal()).not.toContainElement(screen.getByText(copy.dashboard.welcomeBody.community));
   });
 
-  it("lists the terminal's entries in order: missions, Red, QR, raffle, squad credits (members only), install", () => {
+  it("lists the terminal's entries in order: missions, squad credits (members only), install", () => {
     renderView({
       squadCallout: "badge",
       missionsSlot: <section aria-label="Misiones">+500 XP</section>,
-      networkSlot: <section aria-label="Red">Tus contactos</section>,
-      passSlot: <section aria-label="Pase">Tu QR</section>,
-      raffleSlot: <section aria-label="Sorteo">Boletos</section>,
       squadCreditsSlot: <section aria-label="Créditos del escuadrón">40</section>,
       installSlot: <section aria-label="Instalar">Cómo instalar</section>,
     });
 
-    const entries = order("Misiones", "Red", "Pase", "Sorteo", "Créditos del escuadrón", "Instalar");
+    const entries = order("Misiones", "Créditos del escuadrón", "Instalar");
     for (const entry of entries) expect(terminal()).toContainElement(entry);
     for (let i = 1; i < entries.length; i += 1) expect(follows(entries[i - 1], entries[i])).toBe(true);
   });

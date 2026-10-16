@@ -6,6 +6,7 @@ import { EDITION } from "@/shared/config/edition";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
+import { ImageField, type UploadImageAction } from "@/features/media";
 import { Button, ButtonLink, Card, InlineAlert } from "@/shared/ui";
 import type { FleetBoard } from "../domain/ranking";
 import { STAGE_VIEWS, type StageCommand, type StageState } from "../domain/stage";
@@ -18,6 +19,12 @@ export interface StageControlViewProps {
   run: UpdateStageAction;
   /** The stage screen for the projector, opened in a new tab. */
   screenHref?: string;
+  /** False when the edition has squads switched off: the screen only shows cadets, so there is no view to pick. */
+  squadsOn?: boolean;
+  /** Uploads the projector's background; without it the background cannot be changed here. */
+  upload?: UploadImageAction;
+  /** The polls that were opened, to put one's results on screen; absent when the edition has polls off. */
+  polls?: ReadonlyArray<{ id: string; question: string; status: "open" | "closed" }>;
 }
 
 const PREVIEW_SIZE = 5;
@@ -82,7 +89,7 @@ function BoardPreview({ board, label }: { board: FleetBoard; label: string }) {
  * The "Escenario" screen: what the big screen shows now and the admin's controls (ranking or waiting screen, the
  * view, freezing, and the champions' reveal behind a confirmation). Every change is a server command.
  */
-export function StageControlView({ stage, live, run, screenHref }: StageControlViewProps) {
+export function StageControlView({ stage, live, run, screenHref, squadsOn = true, upload, polls }: StageControlViewProps) {
   const t = copy.admin.stage;
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -116,6 +123,8 @@ export function StageControlView({ stage, live, run, screenHref }: StageControlV
         ? t.now.reveal
         : stage.display === "raffle" && stage.raffle
           ? interpolate(t.now.raffle, { prize: stage.raffle.prizeName })
+          : stage.display === "poll"
+          ? t.now.poll
           : stage.frozen
           ? interpolate(t.now.frozen, { time: formatTime(stage.frozen.at) })
           : t.now.live;
@@ -162,16 +171,64 @@ export function StageControlView({ stage, live, run, screenHref }: StageControlV
         </div>
       </Card>
 
-      <Card className="gap-space-3 flex flex-col">
-        <h2 className="type-heading text-foreground">{t.viewTitle}</h2>
-        <div role="group" aria-label={t.viewTitle} className="gap-space-2 flex flex-wrap">
-          {STAGE_VIEWS.map((view) => (
-            <Choice key={view} pressed={stage.view === view} disabled={pending} onClick={() => void send({ type: "view", view })}>
-              {t.views[view]}
-            </Choice>
-          ))}
-        </div>
-      </Card>
+      {polls ? (
+        <Card className="gap-space-3 flex flex-col">
+          <h2 className="type-heading text-foreground">{t.pollTitle}</h2>
+          <p className="type-body-sm text-muted-foreground">{t.pollHelp}</p>
+          {polls.length === 0 ? (
+            <p className="type-body-sm text-text-subtle">{t.pollNone}</p>
+          ) : (
+            <ul aria-label={t.pollListLabel} className="divide-border flex flex-col divide-y">
+              {polls.map((poll) => {
+                const shown = stage.display === "poll" && stage.poll?.pollId === poll.id;
+                return (
+                  <li key={poll.id} className="gap-space-3 py-space-3 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <p className="type-label text-foreground">{poll.question}</p>
+                      <p className="type-caption text-text-subtle">{t.pollStatus[poll.status]}</p>
+                    </div>
+                    <div className="flex w-32 shrink-0">
+                      <Choice pressed={shown} disabled={pending || shown} onClick={() => void send({ type: "poll", pollId: poll.id })}>
+                        {shown ? t.pollShown : t.pollShow}
+                      </Choice>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      ) : null}
+
+      {squadsOn ? (
+        <Card className="gap-space-3 flex flex-col">
+          <h2 className="type-heading text-foreground">{t.viewTitle}</h2>
+          <div role="group" aria-label={t.viewTitle} className="gap-space-2 flex flex-wrap">
+            {STAGE_VIEWS.map((view) => (
+              <Choice key={view} pressed={stage.view === view} disabled={pending} onClick={() => void send({ type: "view", view })}>
+                {t.views[view]}
+              </Choice>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
+      {upload ? (
+        <Card className="gap-space-3 flex flex-col">
+          <h2 className="type-heading text-foreground">{t.backgroundTitle}</h2>
+          <p className="type-body-sm text-muted-foreground">{t.backgroundHelp}</p>
+          {/* Saved as soon as it is uploaded or removed: the projector changes at once. */}
+          <ImageField
+            label={t.backgroundLabel}
+            purpose="stage-background"
+            value={stage.background}
+            upload={upload}
+            disabled={pending}
+            appliesAtOnce
+            onChange={(image) => void send({ type: "background", path: image?.path ?? null })}
+          />
+        </Card>
+      ) : null}
 
       <Card className="gap-space-3 flex flex-col">
         <h2 className="type-heading text-foreground">{t.freezeTitle}</h2>

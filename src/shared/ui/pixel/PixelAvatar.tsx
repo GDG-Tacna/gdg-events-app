@@ -1,51 +1,17 @@
 import type { PixelSpriteData } from "@/shared/types/pixel";
+import { HAIR_COLORS, HELMET_COLORS, SKIN_TONES, SUIT_COLORS, lookFromSeed, type AvatarLook } from "./avatar-look";
 import { PixelSprite } from "./PixelSprite";
 
 /**
  * A young astronaut in 16-bit "HD" pixel art: a big round helmet shaded in four tones, a white visor rim, the face
- * seen through the open visor (fringe, eyebrows, shiny eyes, blush and a smile) and a white suit with a chest panel,
- * a zipper, a shoulder patch and seams. Dark outline with a faint luminous rim on the lit side. 32x32.
+ * seen through the open visor (hair, eyebrows, shiny eyes, blush and a smile, and optionally a beard and glasses) and
+ * a suit with a chest panel, a zipper, a shoulder patch and seams. Dark outline with a faint luminous rim on the lit
+ * side. 32x32.
  */
 const SIZE = 32;
 /** Helmet and visor ellipses: center and radii, in pixels. */
 const HELMET = { x: 16, y: 13, rx: 13.2, ry: 11.6 };
 const VISOR = { x: 16, y: 14.2, rx: 9.2, ry: 8.4 };
-
-/** Each hair color: light, base, shadow. */
-const HAIR = [
-  ["#5a3a2e", "#3b241c", "#24140f"],
-  ["#a8683c", "#7a4526", "#4f2a16"],
-  ["#f2c45a", "#d49a2e", "#9c6a1a"],
-  ["#3d3d52", "#22222f", "#121219"],
-  ["#c75a3a", "#9a3b24", "#6a2414"],
-] as const;
-/** Each skin tone: light, base, shadow. */
-const SKIN = [
-  ["#ffe2c8", "#f5c9a3", "#d9a37c"],
-  ["#f3c193", "#e0a26f", "#bd7f52"],
-  ["#d99a62", "#bf7e45", "#965a2c"],
-  ["#a8693c", "#8a5228", "#663a1a"],
-  ["#7a4a2a", "#5e3820", "#3f2414"],
-] as const;
-/** Helmet colors (the Design System's accents and the classic blue): highlight, light, base, shadow. */
-const HELMETS = [
-  ["#9ad0ff", "#4f9bff", "#2d6df6", "#1a3fa8"],
-  ["#d8ccff", "#a98bff", "#7c4dff", "#4b2bb0"],
-  ["#ffd6fb", "#f29cf5", "#d65ce0", "#8f2a9a"],
-  ["#e6ffb0", "#bff060", "#8fcc2a", "#4f7d12"],
-  ["#fff1b8", "#ffd45c", "#f2a81d", "#a8650b"],
-  ["#c8fbff", "#6fe6f5", "#1fc3dd", "#0b7488"],
-] as const;
-
-/** FNV-1a: a small, stable string hash. The same name always gives the same number. */
-function hash(text: string): number {
-  let value = 0x811c9dc5;
-  for (const char of text) {
-    value ^= char.codePointAt(0) ?? 0;
-    value = Math.imul(value, 0x01000193) >>> 0;
-  }
-  return value;
-}
 
 export interface AvatarTraits {
   hair: readonly [string, string, string];
@@ -59,23 +25,38 @@ export interface AvatarTraits {
 
 /** The name picks hair, skin, helmet color, fringe side and hair length, so every cadet keeps the same avatar. Case does not matter. */
 export function avatarTraits(seed: string): AvatarTraits {
-  const value = hash(seed.normalize("NFC").trim().toLowerCase());
-  return {
-    hair: HAIR[value % HAIR.length],
-    skin: SKIN[Math.floor(value / 5) % SKIN.length],
-    helmet: HELMETS[Math.floor(value / 25) % HELMETS.length],
-    fringe: Math.floor(value / 150) % 2 === 0 ? "left" : "right",
-    style: Math.floor(value / 300) % 2 === 0 ? "short" : "long",
-  };
+  const look = lookFromSeed(seed);
+  const [style, fringe] = look.hairStyle.split("-") as ["short" | "long", "left" | "right"];
+  return { hair: HAIR_COLORS[look.hairColor], skin: SKIN_TONES[look.skin], helmet: HELMET_COLORS[look.helmet], fringe, style };
+}
+
+/** Whether a cell of the face (offset from the visor's center) is hair, for each hairstyle. */
+function hairOf(style: AvatarLook["hairStyle"]): (dx: number, dy: number) => boolean {
+  switch (style) {
+    case "curly":
+      // A full crown with curls along its edge and volume at the sides.
+      return (dx, dy) => dy <= -3.2 || (dy <= -1.8 && Math.round(dx + 0.5) % 3 !== 0 && Math.abs(dx) < 7.6) || (Math.abs(dx) > 5.2 && dy < 2.6);
+    case "buzz":
+      // Close-cropped: only a thin cap at the top of the visor.
+      return (_dx, dy) => dy <= -4.6;
+    default: {
+      const [length, side] = style.split("-");
+      return (dx, dy) => {
+        const fringeSide = side === "left" ? dx <= 1.2 : dx >= -1.2;
+        const sideLimit = length === "long" ? 4.2 : 1.2;
+        return dy <= -3.2 || (dy <= -1.2 && fringeSide && Math.abs(dx) < 7.2) || (Math.abs(dx) > 5.6 && dy < sideLimit);
+      };
+    }
+  }
 }
 
 /**
  * Palette keys: 1-4 helmet highlight/light/base/shadow, h helmet shine, A/a side module, C/c collar, i cyan light,
  * W/w/x visor rim light/mid/shadow, s/S/z skin, k/K/j hair, E eye, e eye shine, n eye sparkle, m mouth, p blush,
- * r glass reflection, U/u/y suit light/mid/shadow, P/Q chest panel, Z zipper, T/t shoulder patch, O outline,
- * L luminous rim. "." is transparent.
+ * r glass reflection, G/g glasses frame/lens, U/u/y suit light/mid/shadow, P/Q chest panel, Z zipper, T/t shoulder
+ * patch, O outline, L luminous rim. "." is transparent.
  */
-function drawRows(traits: Pick<AvatarTraits, "fringe" | "style">): string[] {
+function drawRows(look: Pick<AvatarLook, "hairStyle" | "beard" | "glasses">): string[] {
   const grid: string[][] = Array.from({ length: SIZE }, () => Array<string>(SIZE).fill("."));
   const set = (x: number, y: number, cell: string) => {
     if (x >= 0 && x < SIZE && y >= 0 && y < SIZE) grid[y][x] = cell;
@@ -113,11 +94,8 @@ function drawRows(traits: Pick<AvatarTraits, "fringe" | "style">): string[] {
   }
 
   // The visor rim and the face inside it.
-  const hairAt = (dx: number, dy: number) => {
-    const fringeSide = traits.fringe === "left" ? dx <= 1.2 : dx >= -1.2;
-    const sideLimit = traits.style === "long" ? 4.2 : 1.2;
-    return dy <= -3.2 || (dy <= -1.2 && fringeSide && Math.abs(dx) < 7.2) || (Math.abs(dx) > 5.6 && dy < sideLimit);
-  };
+  const hairAt = hairOf(look.hairStyle);
+  const face: Array<[number, number]> = [];
   for (let y = 0; y < SIZE; y += 1) {
     for (let x = 0; x < SIZE; x += 1) {
       const dx = x + 0.5 - VISOR.x;
@@ -137,6 +115,7 @@ function drawRows(traits: Pick<AvatarTraits, "fringe" | "style">): string[] {
       } else {
         const shade = nx * 0.6 + ny * 0.5;
         set(x, y, shade > 0.42 ? "z" : shade < -0.35 ? "s" : "S");
+        face.push([x, y]);
       }
     }
   }
@@ -154,6 +133,37 @@ function drawRows(traits: Pick<AvatarTraits, "fringe" | "style">): string[] {
   set(14, 19, "m");
   set(18, 19, "m");
   for (const x of [9, 10, 21, 22]) set(x, 19, "p");
+
+  // Facial hair, in the hair's colors, drawn over the lower face (never over the visor rim).
+  const onFace = (x: number, y: number, cell: string) => {
+    if (face.some(([fx, fy]) => fx === x && fy === y) || "mp".includes(grid[y]?.[x] ?? "")) set(x, y, cell);
+  };
+  if (look.beard === "mustache") {
+    for (let x = 14; x <= 18; x += 1) onFace(x, 19, x === 14 || x === 18 ? "j" : "K");
+  } else if (look.beard === "stubble") {
+    for (const [x, y] of face) if (y >= 20 && (x + y) % 2 === 0 && !(y === 20 && x >= 15 && x <= 17)) onFace(x, y, "z");
+  } else if (look.beard === "beard") {
+    for (const [x, y] of face) if (y >= 19 && !(y === 20 && x >= 15 && x <= 17)) onFace(x, y, y >= 21 ? "j" : "K");
+    for (let x = 14; x <= 18; x += 1) onFace(x, 19, "K");
+  }
+
+  // Glasses over the eyes: thin round frames, or dark shades with a shine.
+  if (look.glasses === "round") {
+    for (const eyeX of [11, 19]) {
+      for (let x = eyeX - 1; x <= eyeX + 2; x += 1) {
+        set(x, 14, "G");
+        set(x, 18, "G");
+      }
+      for (let y = 15; y <= 17; y += 1) {
+        set(eyeX - 1, y, "G");
+        set(eyeX + 2, y, "G");
+      }
+    }
+    for (let x = 14; x <= 17; x += 1) set(x, 15, "G");
+  } else if (look.glasses === "shades") {
+    for (const eyeX of [11, 19]) for (let y = 15; y <= 17; y += 1) for (let x = eyeX - 1; x <= eyeX + 2; x += 1) set(x, y, y === 15 && x === eyeX - 1 ? "e" : "g");
+    for (let x = 14; x <= 17; x += 1) set(x, 15, "G");
+  }
 
   // Reflections on the visor glass and a shine on the shell (only recoloring the shell, never widening it).
   for (const [x, y] of [[9, 9], [10, 8], [11, 8], [9, 10], [22, 20]] as const) set(x, y, "r");
@@ -197,11 +207,15 @@ function drawRows(traits: Pick<AvatarTraits, "fringe" | "style">): string[] {
   return rows.map((row) => row.join(""));
 }
 
-export function avatarSprite(seed: string): PixelSpriteData {
-  const traits = avatarTraits(seed);
-  const [h1, h2, h3, h4] = traits.helmet;
+/** The sprite of a look, or of the look an alias gives. */
+export function avatarSprite(seedOrLook: string | AvatarLook): PixelSpriteData {
+  const look = typeof seedOrLook === "string" ? lookFromSeed(seedOrLook) : seedOrLook;
+  const [h1, h2, h3, h4] = HELMET_COLORS[look.helmet];
+  const skin = SKIN_TONES[look.skin];
+  const hair = HAIR_COLORS[look.hairColor];
+  const suit = SUIT_COLORS[look.suit];
   return {
-    rows: drawRows(traits),
+    rows: drawRows(look),
     palette: {
       O: "#0a1030",
       L: "rgba(140,220,255,0.45)",
@@ -218,21 +232,23 @@ export function avatarSprite(seed: string): PixelSpriteData {
       W: "#ffffff",
       w: "#d4dcf2",
       x: "#97a3c7",
-      s: traits.skin[0],
-      S: traits.skin[1],
-      z: traits.skin[2],
-      k: traits.hair[0],
-      K: traits.hair[1],
-      j: traits.hair[2],
+      s: skin[0],
+      S: skin[1],
+      z: skin[2],
+      k: hair[0],
+      K: hair[1],
+      j: hair[2],
       E: "#16163a",
       e: "#ffffff",
       n: "#6b7cc9",
       m: "#a8434a",
       p: "#f29a9a",
       r: "rgba(255,255,255,0.85)",
-      U: "#f6f8ff",
-      u: "#cfd7ef",
-      y: "#98a4c8",
+      G: "#16163a",
+      g: "#1e2a5a",
+      U: suit[0],
+      u: suit[1],
+      y: suit[2],
       P: h2,
       Q: h3,
       Z: "#7a86ad",
@@ -243,8 +259,10 @@ export function avatarSprite(seed: string): PixelSpriteData {
 }
 
 export interface PixelAvatarProps {
-  /** Usually the cadet's alias. */
+  /** Usually the cadet's alias: it gives the look when the cadet has not chosen one. */
   seed: string;
+  /** The look the cadet chose in the avatar editor; without it the seed's look is drawn. */
+  look?: AvatarLook | null;
   /** Integer scale: 32 pixels of art times this. */
   scale?: number;
   /** Accessible name. Without it the avatar is decorative. */
@@ -252,7 +270,7 @@ export interface PixelAvatarProps {
   className?: string;
 }
 
-export function PixelAvatar({ seed, scale = 3, title, className }: PixelAvatarProps) {
-  const sprite = avatarSprite(seed);
+export function PixelAvatar({ seed, look, scale = 3, title, className }: PixelAvatarProps) {
+  const sprite = avatarSprite(look ?? seed);
   return <PixelSprite rows={sprite.rows} palette={sprite.palette} scale={scale} title={title} className={className} />;
 }

@@ -11,7 +11,7 @@ export function StaffShell({ account, children }: { account: string | null; chil
   return (
     <>
       <SpaceBackground />
-      <div className="pt-safe pb-safe px-space-4 py-space-4 mx-auto w-full max-w-[760px]">
+      <div className="px-space-4 pt-safe-space-4 pb-safe-space-4 mx-auto w-full max-w-[760px]">
         <header className="gap-space-4 mb-space-6 flex flex-wrap items-center justify-between">
           <div className="min-w-0">
             <BrandMark />

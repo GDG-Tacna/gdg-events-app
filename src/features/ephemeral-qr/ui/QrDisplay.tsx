@@ -4,6 +4,7 @@ import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { Button, Card, InlineAlert, ProgressBar, Skeleton } from "@/shared/ui";
 import { QR_LIFETIME_SECONDS } from "../domain/qr-code";
+import type { EphemeralQrErrorCode } from "../domain/qr-error";
 import type { IssueQrAction } from "./action";
 import { QrCodeSvg } from "./QrCodeSvg";
 import { useEphemeralQr } from "./use-ephemeral-qr";
@@ -13,6 +14,8 @@ export interface QrDisplayProps {
   /** Shown above the code. Known to the page, so it is there before the first code arrives. */
   name: string;
   issue: IssueQrAction;
+  /** Words for a code that is not a talk's (a speaker's): what scanning it does, and its errors. */
+  texts?: { scanHint: string; errors: Record<EphemeralQrErrorCode, string> };
 }
 
 /** `1:42` for 102 seconds. Rounds up, so the last second still says 0:01 rather than 0:00. */
@@ -27,8 +30,9 @@ export function formatCountdown(remainingMs: number): string {
  * The projector screen: the talk's name, a big code, and how long it has left. The code renews itself
  * before it ends. Everything about the code comes from the server; this only draws it.
  */
-export function QrDisplay({ checkpointId, name, issue }: QrDisplayProps) {
+export function QrDisplay({ checkpointId, name, issue, texts }: QrDisplayProps) {
   const { state, retry } = useEphemeralQr(issue, checkpointId);
+  const words = texts ?? copy.admin.qr;
 
   async function goFullscreen() {
     try {
@@ -80,7 +84,7 @@ export function QrDisplay({ checkpointId, name, issue }: QrDisplayProps) {
 
         {state.status === "error" ? (
           <div className="gap-space-4 flex w-full flex-col">
-            <InlineAlert>{copy.admin.qr.errors[state.code]}</InlineAlert>
+            <InlineAlert>{words.errors[state.code]}</InlineAlert>
             <Button variant="secondary" onClick={retry}>
               {copy.admin.qr.retry}
             </Button>
@@ -88,7 +92,7 @@ export function QrDisplay({ checkpointId, name, issue }: QrDisplayProps) {
         ) : null}
       </Card>
 
-      <p className="type-body text-muted-foreground">{copy.admin.qr.scanHint}</p>
+      <p className="type-body text-muted-foreground">{words.scanHint}</p>
 
       <Button variant="ghost" size="sm" onClick={goFullscreen}>
         {copy.admin.qr.fullscreen}

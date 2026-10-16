@@ -4,6 +4,8 @@ export type CheckInErrorCode =
   /** A genuine ephemeral code whose two minutes are over: the attendee should scan the one on screen now. */
   | "expired-code"
   | "checkpoint-inactive"
+  /** A genuine speaker's code for someone no longer offered as a speaker of the edition. */
+  | "speaker-inactive"
   | "not-registered"
   | "rate-limited"
   /** A cadet's contact code (phase 5): it belongs in the Red, not at a checkpoint. */

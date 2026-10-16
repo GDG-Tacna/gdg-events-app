@@ -9,7 +9,7 @@ export default function SquadLoading() {
       <main
         aria-busy="true"
         aria-label={copy.a11y.loadingLabel}
-        className="pt-safe pb-safe px-space-4 py-space-8 mx-auto flex min-h-dvh w-full max-w-[520px] flex-col justify-center"
+        className="px-space-4 pt-safe-space-8 pb-safe-space-8 mx-auto flex min-h-dvh w-full max-w-[520px] flex-col justify-center"
       >
         <Card className="gap-space-6 flex flex-col">
           <div className="gap-space-3 flex items-center">

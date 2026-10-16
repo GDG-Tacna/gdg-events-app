@@ -24,7 +24,7 @@ export default async function AdminMissionsPage() {
   ]);
   // A failed read goes to the route error boundary instead of showing an empty list that is not real.
   if (!missions.ok) throw new Error("Could not read the missions");
-  // Quadrant names only label the rows: without them each row says "Cuadrante inactivo".
+  // Quadrant names only label the rows: without them each row says "Zona inactiva".
   const quadrants = galaxy.ok ? galaxy.value.quadrants.map(({ id, name }) => ({ id, name })) : [];
 
   return (

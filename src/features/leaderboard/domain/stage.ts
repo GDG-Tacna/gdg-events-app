@@ -1,13 +1,14 @@
+import { chooseImage, dropReplacedImage, type ImageRef, type RecordImages } from "@/features/media/constants";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { getFleetBoard, type BoardCadet, type FleetBoard, type LeaderboardDeps, type SquadStanding } from "./ranking";
 
 /**
  * What the stage screen shows, set by the admin from "Escenario": the ranking (live or frozen at a moment), a
- * waiting screen, or the champions' reveal; and which ranking (cadets, squads or both alternating). One document
+ * waiting screen, the champions' reveal, a raffle draw or a live poll's results; and which ranking (cadets, squads or both alternating). One document
  * per edition, which the stage screen listens to.
  */
-export const STAGE_DISPLAYS = ["ranking", "waiting", "reveal", "raffle"] as const;
+export const STAGE_DISPLAYS = ["ranking", "waiting", "reveal", "raffle", "poll"] as const;
 export type StageDisplay = (typeof STAGE_DISPLAYS)[number];
 export const STAGE_VIEWS = ["cadets", "squads", "both"] as const;
 export type StageView = (typeof STAGE_VIEWS)[number];
@@ -40,9 +41,13 @@ export interface StageState {
   champions: StageChampions | null;
   /** The raffle draw on screen; kept until the stage goes back to the ranking. */
   raffle: StageRaffle | null;
+  /** The picture behind everything on the projector; the space background when there is none. */
+  background: ImageRef | null;
+  /** The poll whose results are on screen (the polls feature draws them); kept until the stage shows something else. */
+  poll: { pollId: string } | null;
 }
 
-export const DEFAULT_STAGE: StageState = { display: "ranking", view: "both", frozen: null, champions: null, raffle: null };
+export const DEFAULT_STAGE: StageState = { display: "ranking", view: "both", frozen: null, champions: null, raffle: null, background: null, poll: null };
 
 /** What the admin can do from "Escenario". */
 export type StageCommand =
@@ -50,7 +55,11 @@ export type StageCommand =
   | { type: "view"; view: StageView }
   | { type: "freeze" }
   | { type: "unfreeze" }
-  | { type: "reveal" };
+  | { type: "reveal" }
+  /** An uploaded image's path for the background, or `null` to go back to the space background. */
+  | { type: "background"; path: string | null }
+  /** A poll's results on screen (the app shell checks the poll exists and was opened). */
+  | { type: "poll"; pollId: string };
 
 export interface StageStore {
   /** `null` while the edition has none saved. */
@@ -60,15 +69,19 @@ export interface StageStore {
 
 export interface StageDeps extends LeaderboardDeps {
   stage: StageStore;
+  images: RecordImages;
   audit: {
     append(entry: { action: "stage.updated"; actorUid: string; targetUid: string; details: Record<string, string | null>; at: Date }): Promise<Result<void, { code: string }>>;
   };
   now: () => Date;
 }
 
-export type StageErrorCode = "invalid-command" | "not-frozen" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
+export type StageErrorCode = "invalid-command" | "not-frozen" | "unknown-poll" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
+const POLL_ID = /^[a-z0-9][a-z0-9-]{3,47}$/;
+const isPollRef = (value: unknown): value is string => typeof value === "string" && POLL_ID.test(value);
 
 /** A command from the admin's request, or `null` when it is not one. */
 export function parseStageCommand(input: unknown): StageCommand | null {
@@ -82,6 +95,10 @@ export function parseStageCommand(input: unknown): StageCommand | null {
     case "unfreeze":
     case "reveal":
       return { type: input.type };
+    case "background":
+      return input.path === null || (typeof input.path === "string" && input.path.length <= 200) ? { type: "background", path: input.path } : null;
+    case "poll":
+      return isPollRef(input.pollId) ? { type: "poll", pollId: input.pollId } : null;
     default:
       return null;
   }
@@ -104,8 +121,8 @@ export async function getStage(deps: Pick<StageDeps, "stage">): Promise<Result<S
 async function apply(deps: StageDeps, state: StageState, command: StageCommand): Promise<Result<StageState, { code: StageErrorCode }>> {
   switch (command.type) {
     case "show":
-      // Leaving the reveal puts the ranking back; the champions stay only while revealed.
-      return ok({ ...state, display: command.display, champions: null, raffle: null });
+      // Leaving the reveal puts the ranking back; the champions, a draw or a poll stay only while shown.
+      return ok({ ...state, display: command.display, champions: null, raffle: null, poll: null });
     case "view":
       return ok({ ...state, view: command.view });
     case "freeze": {
@@ -120,11 +137,19 @@ async function apply(deps: StageDeps, state: StageState, command: StageCommand):
       return ok({ ...state, frozen: null });
     case "reveal": {
       // Champions come from the frozen ranking when there is one, so the reveal matches what was on screen.
-      if (state.frozen) return ok({ ...state, display: "reveal", champions: championsOf(state.frozen), raffle: null });
+      if (state.frozen) return ok({ ...state, display: "reveal", champions: championsOf(state.frozen), raffle: null, poll: null });
       const board = await getFleetBoard(deps);
       if (!board.ok) return err({ code: "unknown" });
-      return ok({ ...state, display: "reveal", champions: championsOf(board.value), raffle: null });
+      return ok({ ...state, display: "reveal", champions: championsOf(board.value), raffle: null, poll: null });
     }
+    case "background": {
+      // Only an image uploaded for a stage background (or none) is accepted.
+      const choice = chooseImage(deps.images, "stage-background", command.path);
+      if (!choice) return err({ code: "invalid-command" });
+      return choice.keep ? ok(state) : ok({ ...state, background: choice.image });
+    }
+    case "poll":
+      return ok({ ...state, display: "poll", poll: { pollId: command.pollId }, champions: null, raffle: null });
   }
 }
 
@@ -142,11 +167,13 @@ export async function updateStage(deps: StageDeps, actor: { uid: string; role: s
 
   const saved = await deps.stage.save(next.value);
   if (!saved.ok) return err({ code: "unknown" });
+  // A replaced or removed background's file goes away.
+  await dropReplacedImage(deps.images, current.value.background, next.value.background);
   const written = await deps.audit.append({
     action: "stage.updated",
     actorUid: actor.uid,
     targetUid: "stage",
-    details: { command: command.type, display: next.value.display, view: next.value.view, frozen: next.value.frozen ? "yes" : "no" },
+    details: { command: command.type, display: next.value.display, view: next.value.view, frozen: next.value.frozen ? "yes" : "no", background: next.value.background?.path ?? null, poll: next.value.poll?.pollId ?? null },
     at: deps.now(),
   });
   if (!written.ok) logServerError("stage.audit.append", new Error("audit entry missing for stage.updated"));
@@ -208,7 +235,17 @@ export function parseStageState(input: unknown): StageState | null {
     raffle = parseRaffle(input.raffle);
     if (!raffle) return null;
   }
-  return { display: input.display as StageDisplay, view: input.view as StageView, frozen, champions, raffle };
+  const poll = isRecord(input.poll) && isPollRef(input.poll.pollId) ? { pollId: input.poll.pollId } : null;
+  // A poll display without its poll cannot be drawn.
+  if (input.display === "poll" && !poll) return null;
+  return { display: input.display as StageDisplay, view: input.view as StageView, frozen, champions, raffle, background: parseBackground(input.background), poll };
+}
+
+/** A stored background: its path and the app's own address for it. Anything else reads as no background (never a broken state). */
+function parseBackground(input: unknown): ImageRef | null {
+  if (!isRecord(input) || typeof input.path !== "string" || !input.path.startsWith("public/")) return null;
+  const url = imageUrl(input.url);
+  return url ? { path: input.path, url } : null;
 }
 
 /** Only the app's own images (`/media/…`) or a web address are shown on the projector; anything else leaves the prize without a photo. */
@@ -258,6 +295,7 @@ export async function presentRaffle(deps: Pick<StageDeps, "stage" | "squads">, s
     ...current.value,
     display: "raffle",
     champions: null,
+    poll: null,
     raffle: {
       drawId: showing.drawId,
       prizeName: showing.prizeName,

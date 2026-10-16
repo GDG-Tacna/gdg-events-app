@@ -7,7 +7,7 @@ import type { EditionsActor, EditionsAuditEntry } from "./editions";
  * feature flags stay the ceiling: a module the code has off is off everywhere. Check-ins, the staff checkpoints and
  * the control center are the core and cannot be switched off; G-Credits are switched in Economía.
  */
-export const EDITION_MODULES = ["squads", "map", "missions", "odyssey", "achievements", "minigames", "network", "leaderboard", "raffle"] as const;
+export const EDITION_MODULES = ["squads", "map", "missions", "odyssey", "achievements", "minigames", "network", "leaderboard", "raffle", "polls"] as const;
 export type EditionModule = (typeof EDITION_MODULES)[number];
 
 export const isEditionModule = (value: unknown): value is EditionModule => typeof value === "string" && (EDITION_MODULES as readonly string[]).includes(value);
@@ -23,6 +23,7 @@ export const MODULE_NEEDS: Readonly<Record<EditionModule, readonly EditionModule
   network: [],
   leaderboard: [],
   raffle: [],
+  polls: [],
 };
 
 export type ModuleSwitches = Readonly<Record<EditionModule, boolean>>;

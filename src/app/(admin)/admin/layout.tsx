@@ -31,6 +31,8 @@ export default async function AdminLayout({ children, modal }: LayoutProps<"/adm
       readOnly={readOnlyAreas(levels)}
       account={session.displayName ?? copy.admin.accountLabel}
       accountActions={<SignOutButton />}
+      accountPhotoUrl={session.photoUrl}
+      compactAccountActions={<SignOutButton variant="icon" />}
       edition={editions?.current ? <EditionSwitcher choices={editions.choices} current={editions.current} choose={chooseWorkingEditionAction} /> : null}
       notice={editions?.current ? <WorkingEditionNotice current={editions.current} live={live} choose={chooseWorkingEditionAction} /> : null}
     >

@@ -3,14 +3,17 @@
 import { z } from "zod";
 import { unlockAchievements } from "@/app-shell/composition/achievements.server";
 import { checkInDeps } from "@/app-shell/composition/checkins.server";
+import { speakerCodeDeps } from "@/app-shell/composition/speakers.server";
 import { currentEconomy, rewardLedger } from "@/app-shell/composition/economy.server";
 import { missionDeps } from "@/app-shell/composition/missions.server";
 import { getSession } from "@/app-shell/guards";
 import type { RecordCheckInActionResult, ScanReward } from "@/features/checkins";
 import { recordCheckIn } from "@/features/checkins/server";
 import { rewardTalk } from "@/features/economy/server";
-import { completeByCheckpoint } from "@/features/missions/server";
+import { completeByCheckpoint, completeBySpeaker } from "@/features/missions/server";
 import { isContactCode } from "@/features/network";
+import { isSpeakerCode } from "@/features/speakers";
+import { verifySpeakerCode } from "@/features/speakers/server";
 import { FEATURES } from "@/shared/config/features";
 import { moduleOn } from "@/app-shell/modules.server";
 
@@ -40,6 +43,7 @@ export async function recordCheckInAction(payload: string): Promise<RecordCheckI
   if (!parsed.success) return { ok: false, code: "invalid-code" };
   // Another cadet's contact code: say where it is scanned instead of calling it invalid.
   if ((await moduleOn("network")) && isContactCode(parsed.data)) return { ok: false, code: "contact-code" };
+  if (isSpeakerCode(parsed.data)) return meetSpeaker(session.uid, parsed.data);
 
   const result = await recordCheckIn(checkInDeps, { uid: session.uid, payload: parsed.data });
   if (!result.ok) return { ok: false, code: result.error.code };
@@ -59,4 +63,28 @@ export async function recordCheckInAction(payload: string): Promise<RecordCheckI
   // Whatever this scan earned (a talk, a stand, its missions) may unlock badges; never fails the check-in.
   const achievements = await unlockAchievements(session.uid);
   return { ok: true, ...result.value, missions, talkCredits, achievements };
+}
+
+/**
+ * A speaker's code («Conoce al speaker»): not a check-in, so nothing is recorded but the missions it completes. It
+ * goes through the same per-cadet limiter as check-ins, then the signature and expiry, then whether the speaker is
+ * still offered. Scanning it again is safe: a completed mission is never paid twice.
+ */
+async function meetSpeaker(uid: string, payload: string): Promise<RecordCheckInActionResult> {
+  if (!(await checkInDeps.limiter.consume(uid))) return { ok: false, code: "rate-limited" };
+  const verified = verifySpeakerCode(speakerCodeDeps, payload);
+  if (!verified.ok) return { ok: false, code: verified.code };
+  const found = await speakerCodeDeps.speakers.find(verified.speakerId);
+  if (!found.ok) return { ok: false, code: "unknown" };
+  if (!found.value) return { ok: false, code: "invalid-code" };
+  if (!found.value.active) return { ok: false, code: "speaker-inactive" };
+
+  let missions: ScanReward[] = [];
+  if (await moduleOn("missions")) {
+    const completed = await completeBySpeaker(missionDeps, uid, verified.speakerId);
+    if (!completed.ok && completed.error.code === "not-registered") return { ok: false, code: "not-registered" };
+    if (completed.ok) missions = completed.value.map(({ title, xpEarned, creditsEarned, justCompleted }) => ({ title, xpEarned, creditsEarned, justCompleted }));
+  }
+  const achievements = await unlockAchievements(uid);
+  return { ok: true, checkpointId: verified.speakerId, kind: "speaker", recorded: true, firstEntrance: false, missions, talkCredits: 0, achievements };
 }

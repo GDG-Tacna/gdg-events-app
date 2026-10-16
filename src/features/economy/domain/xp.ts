@@ -3,9 +3,10 @@ import type { Result } from "@/shared/lib/result";
 /**
  * What a reward is for. Each source pays an attendee once per edition: `mission:{id}` for a mission,
  * `minigame:{id}` for the bonus of the mini-game on that mission (phase 5), `talk:{checkpointId}` for
- * attending a talk, `contact:{otherUid}` for a new contact in the cadet network (phase 5).
+ * attending a talk, `contact:{otherUid}` for a new contact in the cadet network (phase 5), `poll:{pollId}` for voting
+ * in a live poll that gives a prize.
  */
-export type XpSource = `mission:${string}` | `minigame:${string}` | `talk:${string}` | `contact:${string}`;
+export type XpSource = `mission:${string}` | `minigame:${string}` | `talk:${string}` | `contact:${string}` | `poll:${string}`;
 
 export const missionSource = (missionId: string): XpSource => `mission:${missionId}`;
 export const minigameSource = (missionId: string): XpSource => `minigame:${missionId}`;

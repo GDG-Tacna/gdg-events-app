@@ -3,7 +3,7 @@ import { err, ok, type Result } from "@/shared/lib/result";
 import type { Evaluation, MissionCompletion } from "./completion";
 import type { Mission, MissionConfig } from "./mission";
 import type { CompletionStore } from "./ports";
-import { completeByCheckpoint, getMissionBoard, submitMissionProof, type SubmitProofDeps } from "./use-cases";
+import { completeByCheckpoint, completeBySpeaker, getMissionBoard, submitMissionProof, type SubmitProofDeps } from "./use-cases";
 
 const mission = (id: string, config: MissionConfig, extra: Partial<Mission> = {}): Mission => ({
   id,
@@ -323,5 +323,33 @@ describe("completeByCheckpoint", () => {
     deps.source.list.mockResolvedValue(err({ code: "x" }));
 
     expect(await completeByCheckpoint(deps, "u1", "talk-keynote")).toEqual(err({ code: "unknown" }));
+  });
+});
+describe("completeBySpeaker", () => {
+  const MEET_A = mission("meet-a", { type: "speaker", speakerId: "ana-torres" }, { order: 2, title: "Conoce a Ana" });
+  const MEET_B = mission("meet-b", { type: "speaker", speakerId: "ana-torres" }, { order: 1, title: "Pregúntale a Ana", xp: 60 });
+  const MEET_OFF = mission("meet-off", { type: "speaker", speakerId: "ana-torres" }, { active: false });
+  const OTHER = mission("meet-luis", { type: "speaker", speakerId: "luis" });
+  // A stand whose checkpoint id equals the speaker id is not completed by the speaker's code.
+  const LOOKALIKE = mission("stand-ana", { type: "stand", checkpointId: "ana-torres" });
+
+  it("completes every active mission of that speaker, in order, without spending the typed-answer limiter", async () => {
+    const { deps, xp } = setup({ stored: [MEET_A, MEET_B, MEET_OFF, OTHER, LOOKALIKE] });
+
+    expect(await completeBySpeaker(deps, "u1", "ana-torres")).toEqual(
+      ok([
+        { id: "meet-b", title: "Pregúntale a Ana", xpEarned: 60, creditsEarned: 0, justCompleted: true },
+        { id: "meet-a", title: "Conoce a Ana", xpEarned: 40, creditsEarned: 0, justCompleted: true },
+      ]),
+    );
+    expect(xp.grant).toHaveBeenCalledTimes(2);
+    expect(deps.limiter.consume).not.toHaveBeenCalled();
+  });
+
+  it("reports a mission done before as already completed, and nothing for a speaker without missions", async () => {
+    const { deps } = setup({ stored: [MEET_A], completions: [row("meet-a", "completed", 0, 40)] });
+
+    expect(await completeBySpeaker(deps, "u1", "ana-torres")).toEqual(ok([{ id: "meet-a", title: "Conoce a Ana", xpEarned: 40, creditsEarned: 0, justCompleted: false }]));
+    expect(await completeBySpeaker(deps, "u1", "zoe")).toEqual(ok([]));
   });
 });

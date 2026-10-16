@@ -9,7 +9,12 @@ export type SetTalkActiveAction = (input: { id: string; active: boolean }) => Pr
 export interface TalkView {
   id: string;
   title: string;
+  /** The talk's speakers, in order. */
+  speakerIds: readonly string[];
+  /** What to show as its speaker: the chosen speakers' names, or the name typed before the catalog existed. */
   speaker: string | null;
+  /** The name typed before the catalog existed, while no speaker is chosen yet (a hint in the form). */
+  legacySpeaker: string | null;
   startsAt: string | null;
   endsAt: string | null;
   roomId: string | null;
