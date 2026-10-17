@@ -68,8 +68,8 @@ export function readOnlyAreas(levels: SectionLevels): string[] {
 /** The menu: the home, then each group's areas, minus those of modules switched off or sections the session may not see. */
 export function adminNavItems(isOn: ModuleCheck = allOn, levels: SectionLevels = {}): AdminNavItem[] {
   return [
-    { href: ROUTES.admin, label: n.home, exact: true },
-    ...AREAS.filter(shown(isOn, levels)).map(({ href, label, group }) => ({ href, label, group: copy.admin.navGroups[group] })),
+    { href: ROUTES.admin, label: n.home, exact: true, icon: "home" },
+    ...AREAS.filter(shown(isOn, levels)).map(({ href, label, icon, group }) => ({ href, label, icon, group: copy.admin.navGroups[group] })),
   ];
 }
 

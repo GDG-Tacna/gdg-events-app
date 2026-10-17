@@ -80,3 +80,27 @@ describe("FirebaseIdentityProvider.signOut", () => {
     await expect(new FirebaseIdentityProvider().signOut()).resolves.toBeUndefined();
   });
 });
+
+describe("FirebaseIdentityProvider.refreshCredential", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("waits for the restored user before asking for a fresh token (a new role reaches the session)", async () => {
+    const auth: { currentUser: { getIdToken: (force: boolean) => Promise<string> } | null; authStateReady: () => Promise<void> } = {
+      currentUser: null,
+      // The user shows up only once the restored state is ready, as after a page load.
+      authStateReady: vi.fn(async () => {
+        auth.currentUser = { getIdToken: vi.fn(async (force: boolean) => (force ? "fresh-token" : "old-token")) };
+      }),
+    };
+    mocks.getFirebaseAuth.mockImplementation(() => auth);
+
+    expect(await new FirebaseIdentityProvider().refreshCredential()).toEqual({ ok: true, value: "fresh-token" });
+    expect(auth.authStateReady).toHaveBeenCalled();
+  });
+
+  it("answers unauthenticated when nobody is signed in on this browser", async () => {
+    mocks.getFirebaseAuth.mockImplementation(() => ({ currentUser: null, authStateReady: async () => undefined }));
+
+    expect(await new FirebaseIdentityProvider().refreshCredential()).toEqual({ ok: false, error: expect.objectContaining({ code: "unauthenticated" }) });
+  });
+});

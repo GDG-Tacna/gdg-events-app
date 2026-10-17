@@ -2244,6 +2244,8 @@ export const copy = {
     accept: "Aceptar invitación",
     accepting: "Aceptando…",
     done: "¡Listo! Ya eres parte del equipo. Entrando…",
+    reSignIn: "¡Listo! Tu rol ya quedó activo, pero esta sesión todavía tiene el anterior. Vuelve a entrar con Google para usarlo.",
+    reSignInButton: "Volver a entrar con Google",
     errors: {
       "not-found": "Este enlace no existe. Pide una nueva invitación.",
       expired: "Esta invitación venció. Pide una nueva.",

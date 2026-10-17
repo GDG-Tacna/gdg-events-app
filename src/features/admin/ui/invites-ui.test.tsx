@@ -128,6 +128,20 @@ describe("InviteAcceptPanel", () => {
     expect(auth.signInWithGoogle).not.toHaveBeenCalled();
   });
 
+  it("never lands on the new home with the old role: when the session cannot be renewed it asks to sign in again", async () => {
+    const auth = actions();
+    auth.refreshSession.mockResolvedValue({ ok: false, error: { code: "unauthenticated" } });
+    renderPanel({ signedIn: true, role: "admin", accept: vi.fn(async () => ({ ok: true as const, role: "admin" as const })) }, auth);
+
+    fireEvent.click(screen.getByRole("button", { name: i.accept }));
+
+    expect(await screen.findByText(i.reSignIn)).toHaveAttribute("role", "status");
+    expect(router.replace).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: i.reSignInButton }));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/admin"));
+    expect(auth.signInWithGoogle).toHaveBeenCalled();
+  });
+
   it("explains another account and offers to change it", async () => {
     renderPanel({ signedIn: true, accept: vi.fn(async () => ({ ok: false as const, code: "wrong-account" as const })) });
 

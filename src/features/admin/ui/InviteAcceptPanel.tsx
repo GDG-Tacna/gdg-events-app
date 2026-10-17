@@ -35,6 +35,8 @@ export function InviteAcceptPanel({ secret, role, maskedEmail, state, signedIn, 
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<Problem | null>(state === "pending" ? null : state === "accepted" ? "used" : state);
   const [done, setDone] = useState(false);
+  // The role was granted but this session could not take it: a fresh sign-in brings it.
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   // Signed in on this page counts too: a retry does not ask Google again, and another account can be chosen.
   const [hasSession, setHasSession] = useState(signedIn);
   const closed = state !== "pending";
@@ -60,9 +62,28 @@ export function InviteAcceptPanel({ secret, role, maskedEmail, state, signedIn, 
       setProblem(result.code);
       return;
     }
+    const refreshed = await refreshSession();
+    if (!refreshed.ok) {
+      // Going on would land on the new home with the old role (a 404): ask for a fresh sign-in instead.
+      setPending(false);
+      setNeedsSignIn(true);
+      return;
+    }
     setDone(true);
-    await refreshSession();
     router.replace(homeFor(result.role));
+    router.refresh();
+  }
+
+  /** A new Google sign-in opens a session that already carries the granted role. */
+  async function signInAgain() {
+    setPending(true);
+    if (!(await signIn.run())) {
+      setPending(false);
+      return;
+    }
+    setNeedsSignIn(false);
+    setDone(true);
+    router.replace(homeFor(role));
     router.refresh();
   }
 
@@ -79,7 +100,17 @@ export function InviteAcceptPanel({ secret, role, maskedEmail, state, signedIn, 
           {t.done}
         </p>
       ) : null}
-      {closed || done ? null : (
+      {needsSignIn ? (
+        <div className="gap-space-3 flex flex-col">
+          <p role="status" className="type-body-sm border-accent/60 bg-accent/10 text-foreground p-space-3 rounded-md border">
+            {t.reSignIn}
+          </p>
+          <Button size="lg" block icon="login" loading={pending} onClick={() => void signInAgain()}>
+            {t.reSignInButton}
+          </Button>
+        </div>
+      ) : null}
+      {closed || done || needsSignIn ? null : (
         <Button size="lg" block icon="login" loading={pending} onClick={() => void run()}>
           {pending ? t.accepting : hasSession ? t.accept : t.signInAndAccept}
         </Button>

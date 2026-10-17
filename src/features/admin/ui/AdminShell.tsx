@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { BrandMark, Icon, SpaceBackground } from "@/shared/ui";
+import { BrandMark, Icon, SpaceBackground, type IconName } from "@/shared/ui";
 
 export interface AdminNavItem {
   href: string;
@@ -15,6 +15,8 @@ export interface AdminNavItem {
   exact?: boolean;
   /** The menu group it belongs to (consecutive items of a group show together under its name); none for the home. */
   group?: string;
+  /** Its line icon, the same as on the home shortcuts. */
+  icon?: IconName;
 }
 
 export interface AdminShellProps {
@@ -87,11 +89,12 @@ export function AdminShell({ items, account, accountActions, accountPhotoUrl, co
           onClick={() => setMenuOpen(false)}
           className={cn(
             // 48px touch targets on phones; the desktop rail is denser so the whole menu fits.
-            "type-label px-space-4 focus-visible:ring-ring flex h-12 items-center rounded-md border transition-colors focus-visible:ring-[3px] focus-visible:outline-none min-[760px]:h-10",
+            "type-label gap-space-3 px-space-3 focus-visible:ring-ring flex h-12 items-center rounded-md border transition-colors focus-visible:ring-[3px] focus-visible:outline-none min-[760px]:h-10",
             active ? "border-primary bg-surface-raised text-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground border-transparent",
           )}
         >
-          {item.label}
+          {item.icon ? <Icon name={item.icon} size={18} className={cn("shrink-0", active ? "text-primary" : "text-text-subtle")} /> : null}
+          <span className="min-w-0 truncate">{item.label}</span>
         </Link>
       </li>
     );
@@ -133,11 +136,12 @@ export function AdminShell({ items, account, accountActions, accountPhotoUrl, co
                     </ul>
                   ) : (
                     <details key={group.label} open className="group/menu">
-                      <summary className="type-caption text-text-subtle hover:text-foreground focus-visible:ring-ring px-space-4 flex h-9 cursor-pointer list-none items-center justify-between rounded-md tracking-wider uppercase focus-visible:ring-[3px] focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+                      <summary className="type-caption text-text-subtle hover:text-foreground focus-visible:ring-ring gap-space-2 px-space-3 flex h-10 cursor-pointer list-none items-center rounded-md font-semibold tracking-wider uppercase focus-visible:ring-[3px] focus-visible:outline-none min-[760px]:h-9 [&::-webkit-details-marker]:hidden">
+                        <Icon name="right" size={14} className="shrink-0 transition-transform group-open/menu:rotate-90" />
                         {group.label}
-                        <Icon name="down" size={16} className="transition-transform group-open/menu:rotate-180" />
                       </summary>
-                      <ul className="gap-space-1 mt-space-1 flex flex-col min-[760px]:gap-0">{group.items.map(link)}</ul>
+                      {/* The group's areas hang from a guide line under its name, so they read as inside it. */}
+                      <ul className="gap-space-1 border-line-strong/60 ml-[19px] pl-space-2 flex flex-col border-l min-[760px]:gap-0.5">{group.items.map(link)}</ul>
                     </details>
                   ),
                 )}

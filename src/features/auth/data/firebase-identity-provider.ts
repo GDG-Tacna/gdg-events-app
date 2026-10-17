@@ -43,7 +43,11 @@ export class FirebaseIdentityProvider implements IdentityProvider {
 
   async refreshCredential(): Promise<Result<string, AuthError>> {
     try {
-      const user = getFirebaseAuth().currentUser;
+      const auth = getFirebaseAuth();
+      // After a page load the signed-in user is restored asynchronously: reading it at once finds nobody, and a
+      // newly granted role would never reach the session.
+      await auth.authStateReady();
+      const user = auth.currentUser;
       if (!user) return err(authError("unauthenticated"));
       return ok(await user.getIdToken(true));
     } catch (cause) {
