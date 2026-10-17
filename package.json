@@ -67,6 +67,6 @@
     "vitest-axe": "^0.1.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": "22.x"
   }
 }
