@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 const nextConfig: NextConfig = {
   // `npm run dev` uses `.next`. Verification builds (tests, CI, scripts) set NEXT_DIST_DIR to their own
@@ -38,4 +39,17 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Sentry wraps the build: with SENTRY_AUTH_TOKEN (only in Vercel) it uploads the source maps, so errors show the real
+ * code; without it the build is the same and nothing is uploaded. Events travel through the app's own /monitoring
+ * route, so ad blockers on phones do not drop them.
+ */
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG || "gdg-tacna",
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  tunnelRoute: "/monitoring",
+  telemetry: false,
+});

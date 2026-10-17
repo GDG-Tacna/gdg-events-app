@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { logServerError } from "./log";
 
@@ -5,6 +6,7 @@ describe("logServerError", () => {
   let spy: MockInstance<typeof console.error>;
 
   beforeEach(() => {
+    vi.mocked(Sentry.captureException).mockClear();
     spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
   });
   afterEach(() => {
@@ -36,6 +38,20 @@ describe("logServerError", () => {
     logServerError("x", new Error("a".repeat(1000)));
 
     expect((lastLine().message as string).length).toBe(300);
+  });
+
+  it("reports to Sentry with the scope and code as tags, never the rest of the message, keeping the stack frames", () => {
+    const cause = Object.assign(new TypeError("first line\nsecond line with a secret-token-123"), { code: "permission-denied" });
+
+    logServerError("polls.store.cast", cause);
+
+    const [reported, context] = vi.mocked(Sentry.captureException).mock.calls[0] as [Error, { tags: Record<string, string> }];
+    expect(context.tags).toEqual({ scope: "polls.store.cast", code: "permission-denied" });
+    expect(reported).toBeInstanceOf(Error);
+    expect(reported.name).toBe("TypeError");
+    expect(reported.message).toBe("first line");
+    expect(reported.stack).not.toContain("secret-token-123");
+    expect(reported.stack).toMatch(/\n\s+at /);
   });
 
   it("copes with values that are not errors", () => {

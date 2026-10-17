@@ -1,10 +1,16 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
+import { useEffect } from "react";
 import { copy } from "@/shared/copy/es";
 import { Button, Card, SpaceBackground } from "@/shared/ui";
 
-/** Route-level error boundary: a calm message and a retry, never a stack trace. */
-export default function RouteError({ reset }: { reset: () => void }) {
+/** Route-level error boundary: a calm message and a retry, never a stack trace. The error goes to Sentry. */
+export default function RouteError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
   return (
     <>
       <SpaceBackground />

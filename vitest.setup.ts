@@ -6,6 +6,14 @@ afterEach(() => {
   cleanup();
 });
 
+// Error monitoring is a side channel: tests never load the Sentry SDK, and the few that check a report assert on these.
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+  captureRequestError: vi.fn(),
+  captureRouterTransitionStart: vi.fn(),
+  init: vi.fn(),
+}));
+
 // Screens and actions ask `moduleOn` whether a module is on. In tests it follows the code's flags (which each test
 // may mock); the edition's own switches are tested in modules.server.test.ts, which unmocks it.
 vi.mock("@/app-shell/modules.server", async () => {
