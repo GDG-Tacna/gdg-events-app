@@ -61,3 +61,6 @@ firebase.indexes.json
 
 # graphify knowledge graph (generated, machine-specific)
 graphify-out/
+
+# Sentry Config File
+.env.sentry-build-plugin

@@ -23,5 +23,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\..*).*)"],
+  // `monitoring` is Sentry's tunnel: browser error reports must reach it untouched.
+  matcher: ["/((?!api|monitoring|_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\..*).*)"],
 };

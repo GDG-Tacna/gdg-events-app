@@ -46,10 +46,11 @@ const nextConfig: NextConfig = {
  */
 export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG || "gdg-tacna",
-  project: process.env.SENTRY_PROJECT,
+  project: process.env.SENTRY_PROJECT || "gdg-event-app",
   authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: !process.env.CI,
   widenClientFileUpload: true,
+  // Kept out of the proxy's matcher (src/proxy.ts), so reports are never redirected to the login.
   tunnelRoute: "/monitoring",
   telemetry: false,
 });

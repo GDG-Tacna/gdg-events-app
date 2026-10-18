@@ -48,7 +48,7 @@ describe("proxy matcher", () => {
     expect(regex.test(path)).toBe(true);
   });
 
-  it.each(["/api/auth/session", "/_next/static/chunk.js", "/favicon.ico", "/manifest.webmanifest", "/logo.png"])(
+  it.each(["/api/auth/session", "/monitoring", "/monitoring?o=1&p=2", "/_next/static/chunk.js", "/favicon.ico", "/manifest.webmanifest", "/logo.png"])(
     "skips %s",
     (path) => {
       expect(regex.test(path)).toBe(false);
