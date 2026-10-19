@@ -362,6 +362,7 @@ export const copy = {
       "expired-code": { title: "El código venció", body: "Escanea el que está en pantalla ahora." },
       "checkpoint-inactive": { title: "Puesto cerrado", body: "Este puesto ya no está registrando asistencia." },
       "speaker-inactive": { title: "Speaker no disponible", body: "Este speaker ya no tiene misiones en esta edición." },
+      "own-speaker-code": { title: "Es tu propio código", body: "Muéstralo a los cadetes para que te conozcan." },
       "not-registered": { title: "Falta tu registro", body: "Completa tu perfil para registrar tu asistencia." },
       "rate-limited": { title: "Vas muy rápido", body: "Espera un momento antes de escanear otra vez." },
       unauthenticated: { title: "Tu sesión terminó", body: "Vuelve a entrar con Google." },

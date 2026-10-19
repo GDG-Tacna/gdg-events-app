@@ -18,7 +18,7 @@ export const mediaDeps: MediaDeps = {
 /** What record use cases (badges, prizes, squads…) use to point at an uploaded image and drop a replaced one. */
 export const recordImages: RecordImages = {
   ref: imageRefOf,
-  remove: (path) => removeImage({ store: imageStore }, path),
+  remove: (path) => removeImage({ store: imageStore, eventId: currentImageEventId }, path),
 };
 
 /** What the /media route reads: the same cached store. */

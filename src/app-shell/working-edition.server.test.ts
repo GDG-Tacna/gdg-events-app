@@ -32,6 +32,7 @@ describe("working edition cookie", () => {
 
   it("has no key without a QR secret, and no working edition outside a request", async () => {
     expect(workingEditionKey("")).toBeNull();
+    expect(workingEditionKey("too-short-for-the-qr-codes")).toBeNull();
     expect(await readWorkingEdition("u1")).toBeNull();
   });
 });

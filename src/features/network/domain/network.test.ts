@@ -36,6 +36,7 @@ function setup() {
     ["uid-carla", { alias: "Carla", squad: "Angular" }],
   ]);
   const paid = new Map<string, { xp: number; credits: number }>();
+  const slots = new Map<string, string[]>();
   let clock = NOW;
   const deps = {
     contacts: {
@@ -47,6 +48,13 @@ function setup() {
       }),
       listFor: vi.fn(async (uid: string): Promise<Result<readonly Contact[], { code: string }>> => ok([...contacts.values()].filter((contact) => contact.uids.includes(uid)))),
       countFor: vi.fn(async (uid: string): Promise<Result<number, { code: string }>> => ok([...contacts.values()].filter((contact) => contact.uids.includes(uid)).length)),
+      reserveRewardSlot: vi.fn(async (uid: string, other: string, cap: number): Promise<Result<boolean, { code: string }>> => {
+        const taken = slots.get(uid) ?? [];
+        if (taken.includes(other)) return ok(true);
+        if (taken.length >= cap) return ok(false);
+        slots.set(uid, [...taken, other]);
+        return ok(true);
+      }),
     },
     cards: {
       linksOf: vi.fn(async (uids: readonly string[]): Promise<Result<ReadonlyMap<string, ContactLinks>, { code: string }>> => ok(new Map(uids.map((uid) => [uid, links.get(uid) ?? NO_LINKS])))),
@@ -166,20 +174,16 @@ describe("connectCadets", () => {
     expect(ctx.paid.has("uid-ana_contact:uid-dora")).toBe(false);
   });
 
-  it("counts the cap by when contacts were made, whatever order the store lists them in", async () => {
-    ctx.profiles.set("uid-dora", { alias: "Dora", squad: null });
-    await connectCadets(ctx.deps, ANA, codeOf(BRUNO));
-    ctx.tick(1000);
-    await connectCadets(ctx.deps, ANA, codeOf("uid-carla"));
-    ctx.tick(1000);
-    const listFor = ctx.deps.contacts.listFor.getMockImplementation()!;
-    ctx.deps.contacts.listFor.mockImplementation(async (uid) => {
-      const listed = await listFor(uid);
-      return listed.ok ? ok([...listed.value].reverse()) : listed;
-    });
+  it("never pays a cadet past the cap when many cadets scan their code at the same moment", async () => {
+    for (const uid of ["uid-dora", "uid-eli", "uid-fito"]) ctx.profiles.set(uid, { alias: uid, squad: null });
+    const scanners = [BRUNO, "uid-carla", "uid-dora", "uid-eli", "uid-fito"];
 
-    // Listed newest first, the third contact must still be the one past the cap.
-    expect(await connectCadets(ctx.deps, ANA, codeOf("uid-dora"))).toMatchObject({ ok: true, value: { capReached: true, xpEarned: 0 } });
+    await Promise.all(scanners.map((uid) => connectCadets(ctx.deps, { uid, role: "attendee" as const }, codeOf("uid-ana"))));
+
+    expect(scanners.filter((uid) => ctx.paid.has(`uid-ana_contact:${uid}`))).toHaveLength(2);
+    // Every scanner's own first contact still pays them.
+    expect(scanners.every((uid) => ctx.paid.has(`${uid}_contact:uid-ana`))).toBe(true);
+    expect(ctx.deps.contacts.reserveRewardSlot).toHaveBeenCalledWith("uid-ana", BRUNO, 2);
   });
 
   it("pays nothing, and asks nothing of the ledger, when contacts give no reward", async () => {
@@ -190,7 +194,7 @@ describe("connectCadets", () => {
   });
 
   it("keeps the contact when the reward cannot be checked", async () => {
-    ctx.deps.contacts.listFor.mockResolvedValue(err({ code: "unknown" }));
+    ctx.deps.contacts.reserveRewardSlot.mockResolvedValue(err({ code: "unknown" }));
 
     expect(await connectCadets(ctx.deps, ANA, codeOf(BRUNO))).toMatchObject({ ok: true, value: { created: true, xpEarned: 0, capReached: false } });
     expect(ctx.deps.ledger.grant).not.toHaveBeenCalled();

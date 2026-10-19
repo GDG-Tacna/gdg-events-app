@@ -6,12 +6,12 @@ vi.mock("@/shared/lib/firebase/admin", () => ({ getAdminAuth: () => { throw new 
 
 const { FirebaseRoleDirectory } = await import("./firebase-role-directory");
 
-function fakeAuth(claims: Record<string, unknown> | undefined = {}) {
+function fakeAuth(claims: Record<string, unknown> | undefined = {}, current: Record<string, unknown> | undefined = undefined) {
   const auth = {
     getUserByEmail: vi.fn(async (email: string) => {
       if (email === "ghost@example.com") throw Object.assign(new Error("no user"), { code: "auth/user-not-found" });
       if (email === "down@example.com") throw Object.assign(new Error("network"), { code: "app/network-error" });
-      return { uid: "u1", email: "Ana@Example.com", displayName: "Ana" };
+      return { uid: "u1", email: "Ana@Example.com", displayName: "Ana", customClaims: current };
     }),
     getUser: vi.fn(async () => ({ customClaims: claims })),
     setCustomUserClaims: vi.fn(async () => undefined),
@@ -30,8 +30,13 @@ describe("FirebaseRoleDirectory.findByEmail", () => {
 
     expect(await directory.findByEmail("ana@example.com")).toEqual({
       ok: true,
-      value: { uid: "u1", email: "ana@example.com", displayName: "Ana" },
+      value: { uid: "u1", email: "ana@example.com", displayName: "Ana", claim: null },
     });
+  });
+
+  it("reads the role claim the account holds now", async () => {
+    expect(await fakeAuth({}, { role: "organizer" }).directory.findByEmail("ana@example.com")).toMatchObject({ value: { claim: "organizer" } });
+    expect(await fakeAuth({}, { role: 7 }).directory.findByEmail("ana@example.com")).toMatchObject({ value: { claim: null } });
   });
 
   it("returns null when nobody signed in with that email", async () => {

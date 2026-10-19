@@ -1,5 +1,6 @@
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
+import { claimAfterChange } from "./claim";
 import type { AuditLog, RoleDirectory, TeamRepository } from "./ports";
 import { normalizeEmail, type ManagedRole } from "./team";
 import type { Actor } from "./use-cases";
@@ -219,7 +220,9 @@ export async function acceptInvite(
 
   const account = { uid: session.uid, email: invite.email, displayName: session.displayName };
   const filed = await deps.team.change(account, invite.role);
-  const set = filed.ok ? await deps.directory.setRole(session.uid, invite.role, { keepSession: true }) : filed;
+  // Their strongest role in any edition: a staff link here never demotes an organizer of another edition.
+  const claim = filed.ok ? await claimAfterChange(deps.team, session.uid, invite.role) : filed;
+  const set = claim.ok ? await deps.directory.setRole(session.uid, claim.value, { keepSession: true }) : claim;
   if (!filed.ok || !set.ok) {
     if (filed.ok) await deps.team.change(account, filed.value.previous);
     const undone = await deps.invites.undoAccept(id);

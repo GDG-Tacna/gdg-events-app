@@ -25,6 +25,8 @@ export interface Account {
   uid: string;
   email: string;
   displayName: string | null;
+  /** The role claim it holds now, when the directory read it (a change that leaves it as is signs nobody out). */
+  claim?: string | null;
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

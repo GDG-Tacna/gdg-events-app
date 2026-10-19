@@ -1,5 +1,6 @@
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
+import { claimAfterChange } from "./claim";
 import type { AuditLog, RoleDirectory, TeamRepository } from "./ports";
 import { normalizeEmail, type ManagedRole, type TeamMember } from "./team";
 import { teamError, type TeamError } from "./team-error";
@@ -33,8 +34,10 @@ export async function listTeam(deps: TeamDeps, actor: Actor): Promise<Result<rea
 /**
  * Applies a role change to the account with that email. The order protects the invariants: the team
  * record is changed first, in a transaction that refuses to remove the last admin; then the role claim
- * (what actually grants access) is set, and if that fails the team record is put back. The audit entry
- * is written last; a failure there is logged loudly but does not undo a change that already happened.
+ * (what actually grants access) is set, and if that fails the team record is put back. The claim is the
+ * person's strongest role in any edition, so a change here never demotes their place in another edition
+ * (an organizer's limits are checked only against its own edition). The audit entry is written last; a
+ * failure there is logged loudly but does not undo a change that already happened.
  */
 async function changeRole(
   deps: TeamDeps,
@@ -68,7 +71,9 @@ async function changeRole(
   // Nothing to change (for example revoking a plain attendee): leave their claim and the audit trail alone.
   if (changed.value.previous === role) return ok(member);
 
-  const claim = await deps.directory.setRole(account.uid, role);
+  const target = await claimAfterChange(deps.team, account.uid, role);
+  // The same claim (they keep a stronger role in another edition): their session stays valid, nobody is signed out.
+  const claim = !target.ok ? target : target.value === account.claim ? ok(undefined) : await deps.directory.setRole(account.uid, target.value);
   if (!claim.ok) {
     // Put the team record back so the list does not claim a role the account does not have.
     const restored = await deps.team.change(account, changed.value.previous);

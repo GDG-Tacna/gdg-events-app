@@ -258,6 +258,13 @@ describe("recordCheckInAction with a speaker's code", () => {
     expect(missionsServer.completeBySpeaker).not.toHaveBeenCalled();
   });
 
+  it("does not let the speaker complete the mission of meeting themselves", async () => {
+    speakers.speakerCodeDeps.speakers.find.mockResolvedValueOnce({ ok: true, value: { ...ANA, uid: "u1" } });
+
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "own-speaker-code" });
+    expect(missionsServer.completeBySpeaker).not.toHaveBeenCalled();
+  });
+
   it("still answers the meeting when missions are off for the edition, and asks for a profile when there is none", async () => {
     features.FEATURES.missions = false;
     expect(await recordCheckInAction(CODE)).toMatchObject({ ok: true, kind: "speaker", missions: [] });

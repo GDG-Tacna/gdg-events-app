@@ -6,6 +6,8 @@ export type CheckInErrorCode =
   | "checkpoint-inactive"
   /** A genuine speaker's code for someone no longer offered as a speaker of the edition. */
   | "speaker-inactive"
+  /** A speaker scanning their own code: meeting them is for the cadets in the room, not for themselves. */
+  | "own-speaker-code"
   | "not-registered"
   | "rate-limited"
   /** A cadet's contact code (phase 5): it belongs in the Red, not at a checkpoint. */

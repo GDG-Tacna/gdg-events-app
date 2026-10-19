@@ -12,5 +12,5 @@ export {
   type TalkOption,
 } from "./domain/use-cases";
 export { EphemeralQrPayloadVerifier } from "./data/ephemeral-qr-payload-verifier";
-export { HmacTokenSigner } from "./data/hmac-token-signer";
+export { HmacTokenSigner, MIN_SECRET_LENGTH } from "./data/hmac-token-signer";
 export { QrCodeEncoder } from "./data/qrcode-encoder";

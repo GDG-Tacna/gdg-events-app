@@ -159,6 +159,15 @@ describe("acceptInvite", () => {
     expect(await acceptInvite(ctx.deps, SESSION, "../../x")).toEqual(err({ code: "not-found" }));
   });
 
+  it("keeps an organizer of another edition an organizer when they accept a staff link here", async () => {
+    const staffLink = setup([invite({ role: "staff" })]);
+    vi.mocked(staffLink.deps.team.editionRolesOf).mockResolvedValueOnce(ok([{ eventId: "devfest-2027", role: "organizer" }]));
+
+    expect(await acceptInvite(staffLink.deps, SESSION, SECRET)).toEqual(ok({ role: "staff" }));
+    expect(staffLink.deps.team.change).toHaveBeenCalledWith(expect.objectContaining({ uid: "u-ana" }), "staff");
+    expect(staffLink.deps.directory.setRole).toHaveBeenCalledWith("u-ana", "organizer", { keepSession: true });
+  });
+
   it("puts everything back when the role cannot be set: the team record and the link work again", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(ctx.deps.directory.setRole).mockResolvedValueOnce(err({ code: "unknown" }));

@@ -42,6 +42,12 @@ export interface ContactStore {
   listFor(uid: string): Promise<Result<readonly Contact[], { code: string }>>;
   /** How many contacts a cadet has in this edition, without reading them (one aggregation read). */
   countFor(uid: string): Promise<Result<number, { code: string }>>;
+  /**
+   * Holds one of the cadet's `cap` paid slots for their contact with `other`, in one transaction over the cadet's
+   * slots (so parallel scans can never pay past the cap): true when the pair has a slot, now or from an earlier scan,
+   * false when every slot is taken by other contacts.
+   */
+  reserveRewardSlot(uid: string, other: string, cap: number): Promise<Result<boolean, { code: string }>>;
 }
 
 export interface CardStore {
@@ -147,20 +153,19 @@ export function verifyContactCode(deps: Pick<NetworkDeps, "signer" | "now">, pay
 const byAge = (a: Contact, b: Contact) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
 
 /**
- * Pays one cadet for one contact if it is among their first `cap` contacts (by when each was made, so the same
- * contacts are paid whatever order the payments run in). Once per pair and cadet: the ledger source is the other
- * cadet. Answers what this call paid; a failure is logged and pays nothing (the next scan of the pair retries).
+ * Pays one cadet for one contact if the pair holds one of their `cap` paid slots (taken in a transaction, so scans
+ * made at the same moment cannot all pay). Once per pair and cadet: the ledger source is the other cadet. Answers
+ * what this call paid; a failure is logged and pays nothing (the slot stays, so the next scan of the pair retries).
  */
-async function payContact(deps: NetworkDeps, uid: string, other: string, contact: Contact, reward: ContactReward): Promise<{ xp: number; credits: number; capped: boolean }> {
+async function payContact(deps: NetworkDeps, uid: string, other: string, reward: ContactReward): Promise<{ xp: number; credits: number; capped: boolean }> {
   const none = { xp: 0, credits: 0, capped: false };
   if (reward.xp + reward.credits === 0) return none;
-  const listed = await deps.contacts.listFor(uid);
-  if (!listed.ok) {
-    logServerError("network.reward.list", new Error(listed.error.code));
+  const slot = await deps.contacts.reserveRewardSlot(uid, other, reward.cap);
+  if (!slot.ok) {
+    logServerError("network.reward.slot", new Error(slot.error.code));
     return none;
   }
-  const position = [...listed.value].sort(byAge).findIndex((candidate) => candidate.id === contact.id) + 1;
-  if (position === 0 || position > reward.cap) return { ...none, capped: true };
+  if (!slot.value) return { ...none, capped: true };
 
   const granted = await deps.ledger.grant({ uid, source: `contact:${other}`, xp: reward.xp, credits: reward.credits });
   if (!granted.ok) {
@@ -204,8 +209,8 @@ export async function connectCadets(deps: NetworkDeps, actor: NetworkActor, payl
 
   const reward = await deps.reward();
   const [mine] = await Promise.all([
-    payContact(deps, actor.uid, other, connected.value.contact, reward),
-    payContact(deps, other, actor.uid, connected.value.contact, reward),
+    payContact(deps, actor.uid, other, reward),
+    payContact(deps, other, actor.uid, reward),
   ]);
   return ok({
     card: { alias: profile.alias, squad: profile.squad, links: links.value.get(other) ?? { linkedin: null, github: null, web: null } },

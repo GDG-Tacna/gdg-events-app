@@ -140,6 +140,14 @@ describe("removeImage", () => {
 
     expect(deps.store.remove).toHaveBeenCalledTimes(1);
   });
+
+  it("never deletes an image of another edition, even when a record points at it", async () => {
+    const deps = setup({ eventId: async () => "meetup-nov" });
+
+    await removeImage(deps, "public/devfest-2026/poll-option/0f8e2c1a-1111-4222-8333-944455556666.webp");
+
+    expect(deps.store.remove).not.toHaveBeenCalled();
+  });
 });
 
 describe("chooseImage and dropReplacedImage", () => {

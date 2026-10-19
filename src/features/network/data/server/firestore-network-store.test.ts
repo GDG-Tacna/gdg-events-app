@@ -53,6 +53,7 @@ function fakeFirestore(initial: Record<string, Doc> = {}) {
           return snapshot(ref.path);
         },
         create: (ref: { path: string }, data: Doc) => pending.push(() => store.set(ref.path, data)),
+        set: (ref: { path: string }, data: Doc) => pending.push(() => store.set(ref.path, data)),
       });
       pending.forEach((commit) => commit());
       return result;
@@ -76,6 +77,15 @@ describe("FirestoreNetworkStore", () => {
 
     const later = { ...CONTACT, scannedBy: "uid-ana", createdAt: new Date(T0.getTime() + 60_000) };
     expect(await store.connect(later)).toEqual(ok({ contact: CONTACT, created: false }));
+  });
+
+  it("gives a cadet's paid slots to the first contacts up to the cap, and keeps a pair's slot on later scans", async () => {
+    expect(await store.reserveRewardSlot("uid-ana", "uid-bruno", 2)).toEqual(ok(true));
+    expect(await store.reserveRewardSlot("uid-ana", "uid-carla", 2)).toEqual(ok(true));
+    expect(await store.reserveRewardSlot("uid-ana", "uid-dora", 2)).toEqual(ok(false));
+    expect(await store.reserveRewardSlot("uid-ana", "uid-bruno", 2)).toEqual(ok(true));
+
+    expect(fake.store.get("events/e1/contactRewards/uid-ana")).toEqual({ paid: ["uid-bruno", "uid-carla"] });
   });
 
   it("lists a cadet's contacts from either side, skipping broken ones", async () => {

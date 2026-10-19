@@ -17,6 +17,9 @@ interface Setup {
   claimError?: TeamError;
   auditError?: TeamError;
   members?: readonly TeamMember[];
+  /** The person's records in the team of every edition, as they stand after the change. */
+  elsewhere?: ReadonlyArray<{ eventId: string; role: "staff" | "organizer" }>;
+  rolesError?: TeamError;
 }
 
 function setup({
@@ -27,6 +30,8 @@ function setup({
   claimError,
   auditError,
   members = [],
+  elsewhere = [],
+  rolesError,
 }: Setup = {}) {
   const directory: RoleDirectory = {
     findByEmail: vi.fn(async (): Promise<Result<Account | null, TeamError>> => (findError ? err(findError) : ok(account))),
@@ -36,7 +41,7 @@ function setup({
     list: vi.fn(async () => ok(members)),
     roleOf: vi.fn(async () => ok(previous)),
     editionRoleOf: vi.fn(async () => ok(null)),
-    editionRolesOf: vi.fn(async () => ok([])),
+    editionRolesOf: vi.fn(async () => (rolesError ? err(rolesError) : ok(elsewhere))),
     change: vi.fn(async () => (changeError ? err(changeError) : ok({ previous }))),
   };
   const audit: AuditLog = { append: vi.fn(async () => (auditError ? err(auditError) : ok(undefined))) };
@@ -238,6 +243,55 @@ describe("an organizer (admin of one edition)", () => {
 
   it("lets a global admin name organizers", async () => {
     expect((await grantRole(setup().deps, { ...ADMIN, adminScope: "global" }, { email: "ana@example.com", role: "organizer" })).ok).toBe(true);
+  });
+
+  it("never demotes an organizer of another edition when adding them as staff here: their claim and session stay", async () => {
+    const t = setup({ account: { ...ana, claim: "organizer" }, elsewhere: [{ eventId: "devfest-2027", role: "organizer" }] });
+
+    const result = await grantRole(t.deps, ORGANIZER, { email: "ana@example.com", role: "staff" });
+
+    expect(result.ok).toBe(true);
+    expect(t.team.change).toHaveBeenCalledWith({ ...ana, claim: "organizer" }, "staff");
+    expect(t.directory.setRole).not.toHaveBeenCalled();
+  });
+
+  it("never strips the claim of someone who is still staff or organizer in another edition when removing them here", async () => {
+    const staffElsewhere = setup({ previous: "staff", account: { ...ana, claim: "staff" }, elsewhere: [{ eventId: "devfest-2027", role: "staff" }] });
+    const organizerElsewhere = setup({ previous: "staff", account: { ...ana, claim: "organizer" }, elsewhere: [{ eventId: "devfest-2027", role: "organizer" }] });
+
+    expect((await revokeRole(staffElsewhere.deps, ORGANIZER, { email: "ana@example.com" })).ok).toBe(true);
+    expect((await revokeRole(organizerElsewhere.deps, ORGANIZER, { email: "ana@example.com" })).ok).toBe(true);
+
+    expect(staffElsewhere.directory.setRole).not.toHaveBeenCalled();
+    expect(organizerElsewhere.directory.setRole).not.toHaveBeenCalled();
+  });
+});
+
+describe("the role claim", () => {
+  it("is the strongest role the person keeps in any edition", async () => {
+    const t = setup({ previous: "organizer", account: { ...ana, claim: "organizer" }, elsewhere: [{ eventId: "devfest-2025", role: "staff" }] });
+
+    await revokeRole(t.deps, ADMIN, { email: "ana@example.com" });
+
+    expect(t.directory.setRole).toHaveBeenCalledWith("u-ana", "staff");
+  });
+
+  it("is cleared only when no edition keeps them", async () => {
+    const t = setup({ previous: "staff", account: { ...ana, claim: "staff" } });
+
+    await revokeRole(t.deps, ADMIN, { email: "ana@example.com" });
+
+    expect(t.directory.setRole).toHaveBeenCalledWith("u-ana", null);
+  });
+
+  it("puts the team record back when the other editions cannot be read", async () => {
+    const t = setup({ rolesError: teamError("unknown") });
+
+    const result = await grantRole(t.deps, ADMIN, { email: "ana@example.com", role: "staff" });
+
+    expect(result).toEqual(err(teamError("unknown")));
+    expect(t.directory.setRole).not.toHaveBeenCalled();
+    expect(t.team.change).toHaveBeenLastCalledWith(ana, null);
   });
 });
 

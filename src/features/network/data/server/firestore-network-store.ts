@@ -2,7 +2,7 @@ import "server-only";
 import type { Firestore } from "firebase-admin/firestore";
 import { getActiveEventId, type ActiveEventResolver } from "@/shared/lib/firebase/active-event";
 import { getAdminFirestore } from "@/shared/lib/firebase/admin";
-import { CONTACT_CARDS_COLLECTION, CONTACTS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
+import { CONTACT_CARDS_COLLECTION, CONTACT_REWARDS_COLLECTION, CONTACTS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { NO_LINKS, parseStoredLinks, type ContactLinks } from "../../domain/links";
@@ -26,7 +26,8 @@ function toContact(id: string, data: Record<string, unknown> | undefined): Conta
 /**
  * Firestore adapter (Admin SDK) over `events/{eventId}/contacts/{uidA}_{uidB}` (the sorted pair is the id, so a
  * pair is one contact however many times or in whichever direction it is scanned) and
- * `events/{eventId}/contactCards/{uid}` (the links each cadet chose to show).
+ * `events/{eventId}/contactCards/{uid}` (the links each cadet chose to show) and `events/{eventId}/contactRewards/{uid}`
+ * (the other cadets of their paid slots).
  */
 export class FirestoreNetworkStore implements ContactStore, CardStore {
   constructor(
@@ -34,7 +35,7 @@ export class FirestoreNetworkStore implements ContactStore, CardStore {
     private readonly getEventId: ActiveEventResolver = getActiveEventId,
   ) {}
 
-  private async collection(name: typeof CONTACTS_COLLECTION | typeof CONTACT_CARDS_COLLECTION) {
+  private async collection(name: typeof CONTACTS_COLLECTION | typeof CONTACT_CARDS_COLLECTION | typeof CONTACT_REWARDS_COLLECTION) {
     const db = this.getDb();
     return { db, collection: eventCollection(db, await this.getEventId(), name) };
   }
@@ -58,6 +59,24 @@ export class FirestoreNetworkStore implements ContactStore, CardStore {
       });
     } catch (cause) {
       logServerError("network.contacts.connect", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async reserveRewardSlot(uid: string, other: string, cap: number): Promise<Result<boolean, { code: string }>> {
+    try {
+      const { db, collection } = await this.collection(CONTACT_REWARDS_COLLECTION);
+      const ref = collection.doc(uid);
+      return await db.runTransaction(async (tx): Promise<Result<boolean, { code: string }>> => {
+        const stored: unknown = (await tx.get(ref)).data()?.paid;
+        const paid = Array.isArray(stored) ? stored.filter((entry): entry is string => typeof entry === "string") : [];
+        if (paid.includes(other)) return ok(true);
+        if (paid.length >= cap) return ok(false);
+        tx.set(ref, { paid: [...paid, other] });
+        return ok(true);
+      });
+    } catch (cause) {
+      logServerError("network.contacts.reserve", cause);
       return err({ code: "unknown" });
     }
   }

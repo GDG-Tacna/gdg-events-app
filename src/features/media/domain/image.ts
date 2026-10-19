@@ -197,9 +197,13 @@ export async function storeImage(deps: MediaDeps, actor: MediaActor, input: { pu
   return ok({ path, url: put.value.url, width: processed.value.width, height: processed.value.height, format: stored });
 }
 
-/** Deletes an image the app no longer uses. Paths outside the app's images are ignored. */
-export async function removeImage(deps: Pick<MediaDeps, "store">, path: string): Promise<void> {
-  if (!IMAGE_PATH.test(path)) return;
+/**
+ * Deletes an image the app no longer uses. Paths outside the app's images are ignored, and so are images of another
+ * edition: a record's path comes from a form, and an organizer must never be able to delete another edition's images
+ * by saving one of their (public) paths in a record and then deleting it.
+ */
+export async function removeImage(deps: Pick<MediaDeps, "store" | "eventId">, path: string): Promise<void> {
+  if (!IMAGE_PATH.test(path) || path.split("/")[1] !== (await deps.eventId())) return;
   const removed = await deps.store.remove(path);
   if (!removed.ok) logServerError("media.remove", removed.error);
 }

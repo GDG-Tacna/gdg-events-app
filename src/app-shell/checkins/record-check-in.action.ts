@@ -78,6 +78,7 @@ async function meetSpeaker(uid: string, payload: string): Promise<RecordCheckInA
   if (!found.ok) return { ok: false, code: "unknown" };
   if (!found.value) return { ok: false, code: "invalid-code" };
   if (!found.value.active) return { ok: false, code: "speaker-inactive" };
+  if (found.value.uid === uid) return { ok: false, code: "own-speaker-code" };
 
   let missions: ScanReward[] = [];
   if (await moduleOn("missions")) {

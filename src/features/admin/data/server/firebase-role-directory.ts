@@ -22,7 +22,8 @@ export class FirebaseRoleDirectory implements RoleDirectory {
   async findByEmail(email: string): Promise<Result<Account | null, TeamError>> {
     try {
       const user = await this.getAuth().getUserByEmail(email);
-      return ok({ uid: user.uid, email: (user.email ?? email).toLowerCase(), displayName: user.displayName ?? null });
+      const claim: unknown = user.customClaims?.role;
+      return ok({ uid: user.uid, email: (user.email ?? email).toLowerCase(), displayName: user.displayName ?? null, claim: typeof claim === "string" ? claim : null });
     } catch (cause) {
       if (isNotFound(cause)) return ok(null);
       logServerError("admin.directory.findByEmail", cause);

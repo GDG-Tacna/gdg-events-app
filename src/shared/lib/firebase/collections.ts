@@ -72,6 +72,8 @@ export const MINIGAME_PLAYS_COLLECTION = "minigamePlays";
 /** The cadet network of one edition: one contact per pair of cadets (`{uidA}_{uidB}`, sorted) and each cadet's opt-in links (`{uid}`). */
 export const CONTACTS_COLLECTION = "contacts";
 export const CONTACT_CARDS_COLLECTION = "contactCards";
+/** The contacts each cadet is paid for (`{uid}`: the other cadets of their paid slots, at most the edition's cap). */
+export const CONTACT_REWARDS_COLLECTION = "contactRewards";
 
 /** The final raffle of one edition: its prizes and every draw (`{prizeId}-{number}`). Settings live in `config/raffle`. */
 export const RAFFLE_PRIZES_COLLECTION = "rafflePrizes";
@@ -89,6 +91,7 @@ export type EventCollection =
   | typeof RAFFLE_DRAWS_COLLECTION
   | typeof CONTACTS_COLLECTION
   | typeof CONTACT_CARDS_COLLECTION
+  | typeof CONTACT_REWARDS_COLLECTION
   | typeof MINIGAME_PLAYS_COLLECTION
   | typeof ACHIEVEMENTS_COLLECTION
   | typeof ACHIEVEMENT_AWARDS_COLLECTION

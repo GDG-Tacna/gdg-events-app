@@ -13,7 +13,7 @@ import { mayEdit } from "@/app-shell/permissions.server";
 /** Shape only; ranges are checked again by the use case. */
 const settingsSchema = z.object({
   creditsEnabled: z.boolean(),
-  missionCredits: z.object({ talk: z.number(), stand: z.number(), quiz: z.number(), keyword: z.number() }),
+  missionCredits: z.object({ talk: z.number(), stand: z.number(), quiz: z.number(), keyword: z.number(), speaker: z.number() }),
   talkCredits: z.number(),
   squadCreditsEnabled: z.boolean(),
   squadRatio: z.number(),

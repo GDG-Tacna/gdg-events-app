@@ -32,7 +32,8 @@ async function signIn(i) {
   });
   if (!exchange.ok) throw new Error(`sign-in ${exchange.status}`);
   const { idToken } = await exchange.json();
-  const session = await fetch(`${baseUrl}/api/auth/session`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ credential: idToken }) });
+  // The route only accepts its own origin (what a browser sends): a script has to say it.
+  const session = await fetch(`${baseUrl}/api/auth/session`, { method: "POST", headers: { "content-type": "application/json", origin: new URL(baseUrl).origin }, body: JSON.stringify({ credential: idToken }) });
   if (!session.ok) throw new Error(`session ${session.status}`);
   const cookie = session.headers.get("set-cookie")?.split(";")[0];
   if (!cookie) throw new Error("no session cookie");

@@ -13,6 +13,7 @@ export type {
 export type { Checkpoint } from "./domain/checkpoint";
 export { recordCheckIn, type RecordCheckInDeps, type RecordCheckInResult } from "./domain/use-cases";
 export { InMemoryAttemptLimiter } from "./data/in-memory-attempt-limiter";
+export { FirestoreAttemptLimiter } from "./data/server/firestore-attempt-limiter";
 export { StaticQrPayloadVerifier, staticPayloadFor } from "./data/static-qr-payload-verifier";
 export { FirstMatchQrPayloadVerifier } from "./data/first-match-qr-payload-verifier";
 export { FirestoreCheckInRepository } from "./data/server/firestore-check-in-repository";

@@ -15,10 +15,12 @@ vi.mock("@/features/auth/server", () => server);
 
 const { DELETE, POST, PUT } = await import("./route");
 
-const post = (body: unknown) =>
+const SAME_ORIGIN = { Origin: "http://localhost" };
+
+const post = (body: unknown, headers: Record<string, string> = { ...SAME_ORIGIN, "Content-Type": "application/json" }) =>
   new Request("http://localhost/api/auth/session", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 
@@ -66,11 +68,39 @@ describe("POST /api/auth/session", () => {
   });
 });
 
+describe("requests from another site (login CSRF)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it.each([
+    ["another origin", { Origin: "https://evil.example", "Content-Type": "application/json" }],
+    ["no origin", { "Content-Type": "application/json" }],
+    ["a form body", { ...SAME_ORIGIN, "Content-Type": "text/plain" }],
+  ])("refuses to open a session from %s", async (_label, headers) => {
+    const response = await POST(post({ credential: "cred" }, headers));
+
+    expect(response.status).toBe(403);
+    expect(server.openSession).not.toHaveBeenCalled();
+    expect(server.writeSessionCookie).not.toHaveBeenCalled();
+  });
+
+  it("refuses to refresh or close a session for another origin", async () => {
+    const elsewhere = { Origin: "https://evil.example", "Content-Type": "application/json" };
+
+    expect((await PUT(new Request("http://localhost/api/auth/session", { method: "PUT", headers: elsewhere, body: "{}" }))).status).toBe(403);
+    expect((await DELETE(new Request("http://localhost/api/auth/session", { method: "DELETE", headers: elsewhere }))).status).toBe(403);
+    expect(server.refreshSessionCookie).not.toHaveBeenCalled();
+    expect(server.closeSession).not.toHaveBeenCalled();
+    expect(server.clearSessionCookie).not.toHaveBeenCalled();
+  });
+});
+
 describe("PUT /api/auth/session", () => {
   const put = (body: unknown) =>
     new Request("http://localhost/api/auth/session", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { ...SAME_ORIGIN, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
@@ -117,7 +147,7 @@ describe("DELETE /api/auth/session", () => {
     server.readSessionCookie.mockResolvedValue("cookie");
     server.closeSession.mockResolvedValue({ ok: true, value: undefined });
 
-    const response = await DELETE();
+    const response = await DELETE(new Request("http://localhost/api/auth/session", { method: "DELETE", headers: SAME_ORIGIN }));
 
     expect(response.status).toBe(200);
     expect(server.closeSession).toHaveBeenCalledWith(expect.anything(), "cookie");
@@ -128,7 +158,7 @@ describe("DELETE /api/auth/session", () => {
     server.readSessionCookie.mockResolvedValue("cookie");
     server.closeSession.mockResolvedValue({ ok: false, error: { code: "unknown" } });
 
-    const response = await DELETE();
+    const response = await DELETE(new Request("http://localhost/api/auth/session", { method: "DELETE", headers: SAME_ORIGIN }));
 
     expect(response.status).toBe(500);
     expect(server.clearSessionCookie).toHaveBeenCalledOnce();

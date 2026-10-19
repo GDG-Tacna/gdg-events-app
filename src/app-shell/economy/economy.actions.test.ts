@@ -17,7 +17,7 @@ vi.mock("@/shared/config/features", () => features);
 const { saveEconomyAction } = await import("./economy.actions");
 
 const session = (role: "attendee" | "staff" | "admin" | null) => ({ uid: "a1", role, displayName: null, photoUrl: null });
-const SETTINGS = { creditsEnabled: true, missionCredits: { talk: 10, stand: 10, quiz: 5, keyword: 5 }, talkCredits: 10, squadCreditsEnabled: true, squadRatio: 1, contactXp: 20, contactCredits: 5, contactCap: 10 };
+const SETTINGS = { creditsEnabled: true, missionCredits: { talk: 10, stand: 10, quiz: 5, keyword: 5, speaker: 12 }, talkCredits: 10, squadCreditsEnabled: true, squadRatio: 1, contactXp: 20, contactCredits: 5, contactCap: 10 };
 
 describe("saveEconomyAction", () => {
   beforeEach(() => {
@@ -38,6 +38,7 @@ describe("saveEconomyAction", () => {
     expect(server.saveEconomySettings).not.toHaveBeenCalled();
   });
 
+  // The speaker's credits reach the use case too (the schema once dropped them, and the admin could never change them).
   it("saves with the actor of the session and refreshes the screens that show credits", async () => {
     expect(await saveEconomyAction(SETTINGS)).toEqual({ ok: true });
     expect(server.saveEconomySettings).toHaveBeenCalledWith({ marker: "economy" }, { uid: "a1", role: "admin" }, SETTINGS);

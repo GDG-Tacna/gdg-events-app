@@ -1,6 +1,7 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import { MIN_SECRET_LENGTH } from "@/features/ephemeral-qr/server";
 import { getServerEnv } from "@/shared/config/env.server";
 import { isEventId } from "@/shared/types/event";
 
@@ -14,9 +15,12 @@ export const WORKING_EDITION_COOKIE = "admin_edition";
 export const WORKING_EDITION_PATH = "/admin";
 export const WORKING_EDITION_TTL_MS = 12 * 60 * 60 * 1000;
 
-/** The signing key, or `null` without a QR secret (then nobody can pick another edition: everything stays public). */
+/**
+ * The signing key, or `null` without a usable QR secret (then nobody can pick another edition: everything stays
+ * public). A secret too short for the QR codes is too short here as well.
+ */
 export function workingEditionKey(secret: string | undefined = getServerEnv().qrSigningSecret): Buffer | null {
-  return secret ? createHmac("sha256", secret).update("admin-edition").digest() : null;
+  return secret && secret.length >= MIN_SECRET_LENGTH ? createHmac("sha256", secret).update("admin-edition").digest() : null;
 }
 
 const mac = (key: Buffer, uid: string, eventId: string, expires: number) => createHmac("sha256", key).update(`${uid}\n${eventId}\n${expires}`).digest("base64url");

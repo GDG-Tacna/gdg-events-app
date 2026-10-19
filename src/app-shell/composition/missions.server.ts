@@ -7,7 +7,7 @@ import {
   FirestoreMissionSource,
   type SubmitProofDeps,
 } from "@/features/missions/server";
-import { InMemoryAttemptLimiter } from "@/features/checkins/server";
+import { FirestoreAttemptLimiter } from "@/features/checkins/server";
 import { currentEconomy, rewardLedger } from "./economy.server";
 import { perEdition } from "./per-edition";
 
@@ -17,7 +17,8 @@ export const missionSource = perEdition(() => new CachedMissionSource(new Firest
 /**
  * Composition root for missions: stored missions (or the bundled set until the edition has its own),
  * completions, the reward ledger (XP and G-Credits), the edition's economy for each mission's credits,
- * and a limiter of 20 typed answers a minute per attendee.
+ * and a limiter of 20 typed answers a minute per attendee, shared by every server instance (it is what stops a
+ * script from guessing keywords; one kept in memory would allow 20 per instance).
  */
 export const missionDeps: SubmitProofDeps = {
   source: missionSource,
@@ -25,5 +26,5 @@ export const missionDeps: SubmitProofDeps = {
   defaults: DEFAULT_MISSIONS,
   xp: rewardLedger,
   credits: { creditsFor: async (type, own) => missionCreditsFor(await currentEconomy(), type, own) },
-  limiter: new InMemoryAttemptLimiter({ maxAttempts: 20, windowMs: 60_000 }),
+  limiter: new FirestoreAttemptLimiter({ scope: "mission-answer", maxAttempts: 20, windowMs: 60_000 }),
 };

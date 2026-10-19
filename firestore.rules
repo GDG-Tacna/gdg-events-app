@@ -94,6 +94,10 @@ service cloud.firestore {
       match /contactCards/{uid} {
         allow read, write: if false;
       }
+      // Each cadet's paid contact slots (the cap is taken in a transaction): server only.
+      match /contactRewards/{uid} {
+        allow read, write: if false;
+      }
 
       // Squad credits: balances, contributions, prizes and redemptions. Written and read by the server only.
       match /squadWallets/{squad} {
@@ -140,6 +144,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /walletLedger/{entry} {
+      allow read, write: if false;
+    }
+
+    // Shared attempt limits (typed mission answers): counted by the server only.
+    match /rateLimits/{limit} {
       allow read, write: if false;
     }
 
