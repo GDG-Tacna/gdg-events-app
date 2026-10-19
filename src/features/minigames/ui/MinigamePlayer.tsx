@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type ComponentType 
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { Button, ButtonLink, Card, InlineAlert, Skeleton, UnlockedBadges } from "@/shared/ui";
+import { track } from "@/shared/lib/analytics";
 import type { CodeLanguage, Difficulty, MinigameId } from "../domain/catalog";
 import type { MinigameErrorCode, MinigameOffer } from "../domain/plays";
 import { GAMES } from "./games/registry";
@@ -99,9 +100,10 @@ export function MinigamePlayer({ missionId, offer, start, finish, backHref, achi
         setError(result.code);
         return;
       }
+      track({ name: "minigame_play", params: { game: offer.gameId, result: result.status === "won" ? "win" : "loss" } });
       setPhase({ name: "result", won: result.status === "won", xp: result.status === "won" ? result.xpBonus : offer.xpBonus, badges: result.achievements });
     },
-    [finish, missionId, offer.xpBonus],
+    [finish, missionId, offer.xpBonus, offer.gameId],
   );
 
   const xp = formatNumber(offer.xpBonus);

@@ -8,7 +8,7 @@ import { getClientEnv } from "@/shared/config/env.client";
 let emulatorConnected = false;
 let firestoreEmulatorConnected = false;
 
-function getFirebaseApp(): FirebaseApp {
+export function getFirebaseApp(): FirebaseApp {
   if (getApps().length > 0) return getApp();
   const env = getClientEnv();
   return initializeApp({
@@ -16,6 +16,7 @@ function getFirebaseApp(): FirebaseApp {
     authDomain: env.authDomain,
     projectId: env.projectId,
     appId: env.appId,
+    ...(env.measurementId ? { measurementId: env.measurementId } : {}),
   });
 }
 

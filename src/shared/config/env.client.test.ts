@@ -31,6 +31,13 @@ describe("getClientEnv", () => {
     expect(getClientEnv()).toMatchObject({ useEmulator: true, firestoreEmulatorHost: "localhost:8181" });
   });
 
+  it("takes the Analytics measurement id when there is one, and treats an empty one as none", async () => {
+    expect((await loadEnv({ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-AB12CD34" }))()).toMatchObject({ measurementId: "G-AB12CD34" });
+    expect((await loadEnv({ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "" }))().measurementId).toBeUndefined();
+    const legacy = await loadEnv({ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "UA-123" });
+    expect(() => legacy()).toThrow();
+  });
+
   it("refuses an emulator host without a numeric port", async () => {
     for (const host of ["localhost", "localhost:", "localhost:dd", "localhost:80a"]) {
       const getClientEnv = await loadEnv({ NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST: host });

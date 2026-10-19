@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ScanReticle, useScanSession, type QrCamera } from "@/features/scanner";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { Button, Card, Icon, UnlockedBadges } from "@/shared/ui";
+import { track } from "@/shared/lib/analytics";
 import type { ConnectContactAction, ConnectContactActionResult } from "./actions";
 import { CadetCardView } from "./CadetCardView";
 
@@ -27,7 +28,15 @@ const FAILURE: ConnectContactActionResult = { ok: false, code: "unknown" };
  */
 export function ContactScanner({ camera: Camera, connect, onConnected, onShowContacts, achievementsHref }: ContactScannerProps) {
   const t = copy.network.scan;
-  const { state, camera, cameraKey, start, scanAgain } = useScanSession(connect, FAILURE);
+  const connectAndTrack = useCallback(
+    async (payload: string) => {
+      const result = await connect(payload);
+      if (result.ok && result.created) track({ name: "contact_made" });
+      return result;
+    },
+    [connect],
+  );
+  const { state, camera, cameraKey, start, scanAgain } = useScanSession(connectAndTrack, FAILURE);
   const resultRef = useRef<HTMLHeadingElement>(null);
   const result = state.status === "done" ? state.result : null;
 

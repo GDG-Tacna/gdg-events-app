@@ -6,6 +6,7 @@ import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
 import { Button, ButtonLink, Card, InlineAlert, Thumbnail } from "@/shared/ui";
+import { track } from "@/shared/lib/analytics";
 import type { CadetPoll, VoteErrorCode } from "../domain/vote";
 import type { VoteAction } from "./actions";
 
@@ -90,6 +91,7 @@ export function PollVoteView({ current, vote, homeHref }: PollVoteViewProps) {
     }
     setPending(false);
     if (!result.ok) return setError(result.code);
+    if (!voted) track({ name: "poll_vote" });
     setVoted(choice);
     setMessage(result.xp > 0 ? interpolate(t.earnedXp, { n: String(result.xp) }) : result.credits > 0 ? interpolate(t.earnedCredits, { n: String(result.credits) }) : t.voted);
     router.refresh();

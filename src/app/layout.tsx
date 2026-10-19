@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk, Tiny5 } from "next/font/google";
 import { PwaChrome } from "@/app-shell/PwaChrome";
+import { AnalyticsBoot } from "@/features/analytics";
 import { AuthProvider } from "@/app-shell/providers/auth-provider";
 import { PwaProvider } from "@/app-shell/providers/pwa-provider";
 import { ThemeProvider } from "@/app-shell/providers/theme-provider";
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <PwaProvider>
               {children}
               <PwaChrome />
+              <AnalyticsBoot />
             </PwaProvider>
           </AuthProvider>
         </ThemeProvider>

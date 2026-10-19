@@ -7,6 +7,7 @@ import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
 import { Button, ButtonLink, Card, Icon, InlineAlert, TextField, UnlockedBadges, type PlanetKind } from "@/shared/ui";
+import { track } from "@/shared/lib/analytics";
 import type { CompletionStatus } from "../domain/completion";
 import type { MissionType } from "../domain/mission";
 import type { BoardMission, MissionErrorCode } from "../domain/use-cases";
@@ -88,6 +89,7 @@ export function MissionDetailView({ mission, answer, backHref, scanHref, passHre
         setError(result.code);
         return;
       }
+      if (result.status === "completed" && progress.status !== "completed") track({ name: "mission_complete", params: { via: "answer" } });
       const next: Progress = { status: result.status, xpEarned: result.xpEarned, creditsEarned: result.creditsEarned, attemptsLeft: result.attemptsLeft };
       setProgress(next);
       setFeedback(feedbackFor(mission.type, next));

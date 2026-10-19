@@ -5,6 +5,8 @@ const clientEnvSchema = z.object({
   authDomain: z.string().min(1),
   projectId: z.string().min(1),
   appId: z.string().min(1),
+  /** Google Analytics (GA4) web stream id. Optional: without it nothing is measured. */
+  measurementId: z.string().regex(/^G-[A-Z0-9]+$/).optional(),
   useEmulator: z.boolean(),
   authEmulatorUrl: z.string().min(1),
   /** Host and port of the Firestore emulator, for the stage screen's listeners (phase 6). */
@@ -26,6 +28,7 @@ export function getClientEnv(): ClientEnv {
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || undefined,
     useEmulator: process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true",
     authEmulatorUrl:
       process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_URL ?? "http://127.0.0.1:9099",

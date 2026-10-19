@@ -5,6 +5,7 @@ import { useAuthActions } from "@/features/auth";
 import type { AliasErrorCode } from "../domain/alias";
 import type { AttendeeErrorCode } from "../domain/attendee-error";
 import type { RegisterAttendeeAction } from "./registration";
+import { track } from "@/shared/lib/analytics";
 
 export type RegistrationStatus = "idle" | "pending" | "success" | "error";
 
@@ -35,6 +36,7 @@ export function useAttendeeRegistration(register: RegisterAttendeeAction) {
         return false;
       }
 
+      track({ name: "sign_up", params: { method: "google" } });
       const refreshed = await refreshSession();
       if (!refreshed.ok) {
         // The profile exists; only the cookie swap failed. Retrying is safe (registration is idempotent).
