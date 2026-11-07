@@ -14,6 +14,7 @@
     "build:check": "node -e \"process.env.NEXT_DIST_DIR='.next-check';require('child_process').execSync('npx next build',{stdio:'inherit',env:process.env})\"",
     "icons": "node scripts/generate-icons.mjs",
     "admin:first": "node --env-file=.env.local scripts/grant-first-admin.mjs",
+    "talks:seed": "node --env-file=.env.local scripts/seed-talks.mjs",
     "load:seed": "node --env-file=.env.local scripts/load-test/seed.mjs",
     "load:run": "node --env-file=.env.local scripts/load-test/run.mjs",
     "load:cleanup": "node --env-file=.env.local scripts/load-test/cleanup.mjs",
