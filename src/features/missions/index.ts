@@ -6,7 +6,7 @@ export { SuggestMissionsView, type SuggestMissionsViewProps } from "./ui/Suggest
 export { MissionDetailView, type MissionDetailViewProps } from "./ui/MissionDetailView";
 export { MissionBoardView, type BoardQuadrant, type MissionBoardViewProps } from "./ui/MissionBoardView";
 export type { MissionAnswer, SubmitMissionAction, SubmitMissionActionResult } from "./ui/answer-action";
-export type { AdminOption, MinigameOption, MissionAdminActionResult, MoveMissionAction, SaveMissionAction, SeedMissionsAction, SetMissionActiveAction } from "./ui/admin-actions";
+export type { AdminOption, MinigameOption, DeleteMissionAction, MissionAdminActionResult, MoveMissionAction, SaveMissionAction, SeedMissionsAction, SetMissionActiveAction } from "./ui/admin-actions";
 export type { MissionAdminErrorCode, MissionDraft } from "./domain/manage";
 export { checkMission, DEFAULT_XP, MINIGAME_DIFFICULTIES, type MinigameDifficulty, type Mission, type MissionConfig } from "./domain/mission";
 export type { SuggestMissionsAction, SuggestMissionsActionResult } from "./ui/suggest-action";

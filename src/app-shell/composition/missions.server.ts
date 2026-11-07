@@ -2,7 +2,6 @@ import "server-only";
 import { missionCreditsFor } from "@/features/economy/server";
 import {
   CachedMissionSource,
-  DEFAULT_MISSIONS,
   FirestoreCompletionStore,
   FirestoreMissionSource,
   type SubmitProofDeps,
@@ -23,7 +22,6 @@ export const missionSource = perEdition(() => new CachedMissionSource(new Firest
 export const missionDeps: SubmitProofDeps = {
   source: missionSource,
   completions: new FirestoreCompletionStore(),
-  defaults: DEFAULT_MISSIONS,
   xp: rewardLedger,
   credits: { creditsFor: async (type, own) => missionCreditsFor(await currentEconomy(), type, own) },
   limiter: new FirestoreAttemptLimiter({ scope: "mission-answer", maxAttempts: 20, windowMs: 60_000 }),

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { err, ok, type Result } from "@/shared/lib/result";
 import {
   createMission,
+  deleteMission,
   listManagedMissions,
   moveMission,
   seedMissions,
@@ -10,6 +11,7 @@ import {
   type MissionAdminActor,
   type MissionAdminDeps,
   type MissionAuditEntry,
+  type MissionDeletion,
   type MissionDraft,
   type MissionPatch,
 } from "./manage";
@@ -43,7 +45,7 @@ const QUIZ_DRAFT: MissionDraft = {
 
 function memoryStore(initial: Mission[]) {
   const rows = new Map(initial.map((m) => [m.id, m]));
-  return {
+  const store = {
     rows,
     list: vi.fn(async (): Promise<Result<readonly Mission[], { code: string }>> => ok([...rows.values()])),
     create: vi.fn(async (m: Mission): Promise<Result<void, { code: "already-exists" | "unknown" }>> => {
@@ -62,7 +64,17 @@ function memoryStore(initial: Mission[]) {
       ids.forEach((id, order) => rows.set(id, { ...rows.get(id)!, order }));
       return ok(undefined);
     }),
+    /** Ids a cadet already has a record with: the real store checks this in the same transaction as the delete. */
+    touched: new Set<string>(),
+    delete: vi.fn(async (id: string): Promise<Result<MissionDeletion, { code: string }>> => {
+      const found = rows.get(id);
+      if (!found) return ok({ kind: "not-found" });
+      if (store.touched.has(id)) return ok({ kind: "has-completions" });
+      rows.delete(id);
+      return ok({ kind: "deleted", mission: found });
+    }),
   };
+  return store;
 }
 
 function setup(initial: Mission[] = [mission("bb", 1), mission("aa", 0), mission("cc", 2)]) {
@@ -74,6 +86,7 @@ function setup(initial: Mission[] = [mission("bb", 1), mission("aa", 0), mission
     checkpoints: { kindOf: vi.fn(async (id: string): Promise<Result<string | null, { code: string }>> => ok(id.startsWith("talk-") ? "talk" : id.startsWith("stand-") ? "stand" : null)) },
     speakers: { activeIds: vi.fn(async (): Promise<Result<ReadonlySet<string>, { code: string }>> => ok(new Set(["ana-torres"]))) },
     minigames: { ids: ["circuits", "bug-kong"] },
+    references: { to: vi.fn(async (): Promise<Result<readonly string[], { code: string }>> => ok([])) },
     images: { ref: vi.fn((path: string, purpose: string) => (path.includes(`/${purpose}/`) ? { path, url: `https://cdn/${path}` } : null)), remove: vi.fn(async () => {}) },
     audit: { append: vi.fn(async (entry: MissionAuditEntry) => (entries.push(entry), ok(undefined))) },
     now: () => NOW,
@@ -98,6 +111,7 @@ describe("mission admin", () => {
     expect(await createMission(ctx.deps, actor, { id: "new-1", draft: QUIZ_DRAFT })).toEqual(forbidden);
     expect(await updateMission(ctx.deps, actor, { id: "aa", draft: QUIZ_DRAFT })).toEqual(forbidden);
     expect(await setMissionActive(ctx.deps, actor, { id: "aa", active: false })).toEqual(forbidden);
+    expect(await deleteMission(ctx.deps, actor, { id: "aa" })).toEqual(forbidden);
     expect(await moveMission(ctx.deps, actor, { id: "aa", to: 1 })).toEqual(forbidden);
     expect(ctx.store.create).not.toHaveBeenCalled();
     expect(ctx.store.update).not.toHaveBeenCalled();
@@ -335,6 +349,58 @@ describe("mission admin", () => {
 
     it("is not found for an unknown mission", async () => {
       expect(await moveMission(ctx.deps, ADMIN, { id: "zz", to: 0 })).toEqual(err({ code: "not-found" }));
+    });
+  });
+
+  describe("deleteMission", () => {
+    it("deletes a mission nobody has touched, drops its picture and audits it", async () => {
+      ctx = setup([mission("aa", 0, { image: { path: "events/e/mission/a.png", url: "https://cdn/a.png" } }), mission("bb", 1)]);
+
+      expect(await deleteMission(ctx.deps, ADMIN, { id: "aa" })).toEqual(ok(undefined));
+
+      expect([...ctx.store.rows.keys()]).toEqual(["bb"]);
+      expect(ctx.deps.images.remove).toHaveBeenCalledWith("events/e/mission/a.png");
+      expect(ctx.entries).toEqual([{ action: "mission.deleted", actorUid: "a1", targetUid: "aa", details: { title: "Misión aa", type: "quiz" }, at: NOW }]);
+    });
+
+    it("lets the edition end with no missions at all", async () => {
+      ctx = setup([mission("aa", 0)]);
+
+      expect(await deleteMission(ctx.deps, ADMIN, { id: "aa" })).toEqual(ok(undefined));
+      expect(ctx.store.rows.size).toBe(0);
+    });
+
+    it("refuses when a cadet already has a record with it, and changes nothing", async () => {
+      ctx.store.touched.add("aa");
+
+      expect(await deleteMission(ctx.deps, ADMIN, { id: "aa" })).toEqual(err({ code: "has-completions" }));
+
+      expect(ctx.store.rows.has("aa")).toBe(true);
+      expect(ctx.deps.images.remove).not.toHaveBeenCalled();
+      expect(ctx.entries).toEqual([]);
+    });
+
+    it("refuses while a communication or a badge uses it, without touching the store", async () => {
+      ctx.deps.references.to.mockResolvedValueOnce(ok(["Transmisión 1"]));
+
+      expect(await deleteMission(ctx.deps, ADMIN, { id: "aa" })).toEqual(err({ code: "in-use" }));
+
+      expect(ctx.deps.references.to).toHaveBeenCalledWith("aa");
+      expect(ctx.store.delete).not.toHaveBeenCalled();
+    });
+
+    it("is not found for an unknown or malformed id", async () => {
+      expect(await deleteMission(ctx.deps, ADMIN, { id: "zz" })).toEqual(err({ code: "not-found" }));
+      expect(await deleteMission(ctx.deps, ADMIN, { id: "No Valid" })).toEqual(err({ code: "not-found" }));
+    });
+
+    it("reports a failure to read the references or to delete", async () => {
+      ctx.deps.references.to.mockResolvedValueOnce(err({ code: "x" }));
+      expect(await deleteMission(ctx.deps, ADMIN, { id: "aa" })).toEqual(err({ code: "unknown" }));
+
+      ctx.store.delete.mockResolvedValueOnce(err({ code: "x" }));
+      expect(await deleteMission(ctx.deps, ADMIN, { id: "aa" })).toEqual(err({ code: "unknown" }));
+      expect(ctx.entries).toEqual([]);
     });
   });
 

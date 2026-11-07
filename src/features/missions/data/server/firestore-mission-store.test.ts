@@ -19,6 +19,11 @@ function fakeFirestore(initial: Record<string, Doc>) {
   const db = {
     collection: withEventScope((name: string) => ({
       get: async () => ({ docs: [...store.keys()].filter((key) => key.startsWith(`${name}/`)).map(snapshot) }),
+      where: (field: string, _op: string, value: unknown) => {
+        const matches = () => [...store.keys()].filter((key) => key.startsWith(`${name}/`) && store.get(key)?.[field] === value).map(snapshot);
+        const query = { isQuery: true, matches, limit: () => query };
+        return query;
+      },
       doc: (id: string) => ({
         path: `${name}/${id}`,
         create: async (data: Doc) => {
@@ -30,7 +35,12 @@ function fakeFirestore(initial: Record<string, Doc>) {
     runTransaction: async <T,>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
       const pending: Array<() => void> = [];
       const result = await fn({
-        get: async (ref: { path: string }) => snapshot(ref.path),
+        get: async (ref: { path: string; isQuery?: boolean; matches?: () => unknown[] }) => {
+          if (!ref.isQuery) return snapshot(ref.path);
+          const docs = ref.matches!();
+          return { empty: docs.length === 0, docs };
+        },
+        delete: (ref: { path: string }) => pending.push(() => store.delete(ref.path)),
         update: (ref: { path: string }, data: Doc) => pending.push(() => store.set(ref.path, { ...store.get(ref.path), ...data })),
       });
       pending.forEach((commit) => commit());
@@ -135,11 +145,32 @@ describe("FirestoreMissionStore", () => {
     expect(fake.store.get("events/e1/missions/ai-quiz")?.order).toBe(1);
   });
 
+  it("deletes a mission nobody has a record with, and reports it", async () => {
+    fake.store.set("events/e1/missionCompletions/u1_other-mission", { uid: "u1", missionId: "other-mission" });
+
+    const result = await store.delete("ai-quiz");
+
+    expect(result).toEqual({ ok: true, value: { kind: "deleted", mission: { ...QUIZ, image: null } } });
+    expect(fake.store.has("events/e1/missions/ai-quiz")).toBe(false);
+  });
+
+  it("keeps a mission any cadet has a record with, whatever its status", async () => {
+    fake.store.set("events/e1/missionCompletions/u1_ai-quiz", { uid: "u1", missionId: "ai-quiz", status: "failed" });
+
+    expect(await store.delete("ai-quiz")).toEqual({ ok: true, value: { kind: "has-completions" } });
+    expect(fake.store.has("events/e1/missions/ai-quiz")).toBe(true);
+  });
+
+  it("answers not-found for a mission that does not exist", async () => {
+    expect(await store.delete("ghost")).toEqual({ ok: true, value: { kind: "not-found" } });
+  });
+
   it("reports failed writes", async () => {
     const broken = new FirestoreMissionStore(() => ({ collection: () => { throw new Error("offline"); } }) as unknown as Firestore, testEventResolver);
 
     expect(await broken.create(QUIZ)).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.update("ai-quiz", { xp: 1 })).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.setOrder(["ai-quiz"])).toEqual({ ok: false, error: { code: "unknown" } });
+    expect(await broken.delete("ai-quiz")).toEqual({ ok: false, error: { code: "unknown" } });
   });
 });

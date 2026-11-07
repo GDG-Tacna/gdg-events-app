@@ -15,6 +15,7 @@ const server = {
   updateMission: vi.fn(),
   setMissionActive: vi.fn(),
   moveMission: vi.fn(),
+  deleteMission: vi.fn(),
 };
 vi.mock("@/features/missions/server", () => server);
 
@@ -36,7 +37,7 @@ describe("mission admin actions", () => {
     features.FEATURES.missions = true;
     guards.getSession.mockResolvedValue(session("admin"));
     permissions.mayEdit.mockImplementation(async (who: { role: string | null }) => who.role === "admin");
-    for (const name of ["seedMissions", "createMission", "updateMission", "setMissionActive", "moveMission"] as const) {
+    for (const name of ["seedMissions", "createMission", "updateMission", "setMissionActive", "moveMission", "deleteMission"] as const) {
       server[name].mockResolvedValue({ ok: true, value: null });
     }
   });
@@ -47,6 +48,7 @@ describe("mission admin actions", () => {
     ["update", () => actions.updateMissionAction({ id: "m-1", draft: DRAFT })],
     ["activate", () => actions.setMissionActiveAction({ id: "m-1", active: true })],
     ["move", () => actions.moveMissionAction({ id: "m-1", to: 0 })],
+    ["delete", () => actions.deleteMissionAction({ id: "m-1" })],
   ] as const;
 
   it.each(calls)("%s does nothing when the admin or missions are switched off", async (_, call) => {
@@ -118,6 +120,27 @@ describe("mission admin actions", () => {
     await actions.moveMissionAction({ id: "m-1", to: 2 });
     expect(server.setMissionActive).toHaveBeenCalledWith({ marker: "admin" }, ADMIN, { id: "m-1", active: false });
     expect(server.moveMission).toHaveBeenCalledWith({ marker: "admin" }, ADMIN, { id: "m-1", to: 2 });
+  });
+
+  it("deletes with the actor of the session and drops the cached missions", async () => {
+    expect(await actions.deleteMissionAction({ id: "m-1" })).toEqual({ ok: true });
+
+    expect(server.deleteMission).toHaveBeenCalledWith({ marker: "admin" }, ADMIN, { id: "m-1" });
+    expect(source.invalidate).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletes only with a well-formed input, and only for an admin", async () => {
+    expect(await actions.deleteMissionAction({ id: 7 } as never)).toEqual({ ok: false, code: "not-found" });
+    guards.getSession.mockResolvedValue(session("staff"));
+    expect(await actions.deleteMissionAction({ id: "m-1" })).toEqual({ ok: false, code: "forbidden" });
+    expect(server.deleteMission).not.toHaveBeenCalled();
+  });
+
+  it("keeps the cache and passes the reason when a mission cannot be deleted", async () => {
+    server.deleteMission.mockResolvedValue({ ok: false, error: { code: "has-completions" } });
+
+    expect(await actions.deleteMissionAction({ id: "m-1" })).toEqual({ ok: false, code: "has-completions" });
+    expect(source.invalidate).not.toHaveBeenCalled();
   });
 
   it("passes a refusal through and keeps the cache", async () => {

@@ -1,8 +1,8 @@
 import "server-only";
-import { MISSIONS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
+import { MISSIONS_COLLECTION, MISSION_COMPLETIONS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
-import type { MissionPatch, MissionStore } from "../../domain/manage";
+import type { MissionDeletion, MissionPatch, MissionStore } from "../../domain/manage";
 import type { Mission, MissionConfig } from "../../domain/mission";
 import { FirestoreMissionSource, toMission } from "./firestore-mission-source";
 
@@ -75,6 +75,28 @@ export class FirestoreMissionStore extends FirestoreMissionSource implements Mis
       });
     } catch (cause) {
       logServerError("missions.store.update", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async delete(id: string): Promise<Result<MissionDeletion, { code: string }>> {
+    try {
+      const db = this.getDb();
+      const eventId = await this.getEventId();
+      const ref = eventCollection(db, eventId, MISSIONS_COLLECTION).doc(id);
+      const records = eventCollection(db, eventId, MISSION_COMPLETIONS_COLLECTION).where("missionId", "==", id).limit(1);
+
+      // Reading the records inside the transaction makes a cadet's answer that lands meanwhile retry the delete.
+      return await db.runTransaction(async (tx): Promise<Result<MissionDeletion, { code: string }>> => {
+        const [snapshot, taken] = await Promise.all([tx.get(ref), tx.get(records)]);
+        const mission = snapshot.exists ? toMission(id, snapshot.data()) : null;
+        if (!mission) return ok({ kind: "not-found" });
+        if (!taken.empty) return ok({ kind: "has-completions" });
+        tx.delete(ref);
+        return ok({ kind: "deleted", mission });
+      });
+    } catch (cause) {
+      logServerError("missions.store.delete", cause);
       return err({ code: "unknown" });
     }
   }

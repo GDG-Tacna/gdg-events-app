@@ -10,7 +10,6 @@ const catalogs = vi.hoisted(() => ({ list: vi.fn(), getGalaxyMap: vi.fn() }));
 vi.mock("./missions.server", () => ({ missionSource: { list: catalogs.list } }));
 vi.mock("./quadrants.server", () => ({ galaxyDeps: { marker: "galaxy" } }));
 vi.mock("@/features/quadrants/server", () => ({ getGalaxyMap: catalogs.getGalaxyMap }));
-vi.mock("@/features/missions/server", () => ({ DEFAULT_MISSIONS: [{ id: "bundled", quadrantId: "cloud", xp: 40, active: true }] }));
 
 const { dashboardDeps, openMissionsSummary } = await import("./dashboard.server");
 
@@ -50,10 +49,10 @@ describe("dashboard composition", () => {
     expect(catalogs.getGalaxyMap).toHaveBeenCalledWith({ marker: "galaxy" });
   });
 
-  it("uses the bundled missions while the edition has none, and gives up (null) when a catalog cannot be read", async () => {
+  it("offers nothing while the edition has no missions, and gives up (null) when a catalog cannot be read", async () => {
     catalogs.list.mockResolvedValue({ ok: true, value: [] });
     catalogs.getGalaxyMap.mockResolvedValue({ ok: true, value: GALAXY });
-    expect(await openMissionsSummary()).toEqual({ xp: 40, quadrants: ["Google Cloud"] });
+    expect(await openMissionsSummary()).toEqual({ xp: 0, quadrants: [] });
 
     catalogs.list.mockResolvedValue({ ok: false, error: { code: "unknown" } });
     expect(await openMissionsSummary()).toBeNull();

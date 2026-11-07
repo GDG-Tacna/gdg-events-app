@@ -9,7 +9,7 @@ import { formatNumber, interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
 import { Button, ButtonLink, Card, Icon, InlineAlert, SortableList, type IconName } from "@/shared/ui";
 import type { Mission, MissionType } from "../domain/mission";
-import type { AdminOption, MissionAdminActionResult, MoveMissionAction, SeedMissionsAction, SetMissionActiveAction } from "./admin-actions";
+import type { AdminOption, DeleteMissionAction, MissionAdminActionResult, MoveMissionAction, SeedMissionsAction, SetMissionActiveAction } from "./admin-actions";
 
 export interface MissionsAdminViewProps {
   missions: readonly Mission[];
@@ -20,6 +20,7 @@ export interface MissionsAdminViewProps {
   seed: SeedMissionsAction;
   setActive: SetMissionActiveAction;
   move: MoveMissionAction;
+  remove: DeleteMissionAction;
   /** Plain paths (a client component cannot receive functions from the server): a mission is edited at `${editBase}/${id}`. */
   hrefs: { create: string; editBase: string; suggest?: string };
 }
@@ -40,9 +41,9 @@ const chip ="type-caption border-line-strong text-foreground px-space-3 rounded-
 /**
  * The Misiones screen: every mission of the edition in the order attendees see them, with its quadrant, type, XP
  * and state, a handle to drag it to another place, and buttons to edit and activate or deactivate. While the edition
- * has no missions of its own it offers to load the bundled set. Nothing is deleted; the server decides everything.
+ * has no missions of its own it offers to load the bundled set. A mission can be deleted only while no cadet has a record with it; the server decides that, and everything else.
  */
-export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, setActive, move, hrefs }: MissionsAdminViewProps) {
+export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, setActive, move, remove, hrefs }: MissionsAdminViewProps) {
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -166,6 +167,20 @@ export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, se
                     }
                   >
                     {mission.active ? copy.admin.missions.deactivate : copy.admin.missions.activate}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy !== null}
+                    loading={busy === `delete:${mission.id}`}
+                    aria-label={label(copy.admin.missions.delete)}
+                    onClick={() => {
+                      if (!window.confirm(interpolate(copy.admin.missions.confirmDelete, { title: mission.title }))) return;
+                      void run(`delete:${mission.id}`, () => remove({ id: mission.id }), interpolate(copy.admin.missions.deletedDone, { title: mission.title }));
+                    }}
+                  >
+                    <Icon name="trash" size={16} />
+                    {copy.admin.missions.delete}
                   </Button>
                 </div>
               </Card>

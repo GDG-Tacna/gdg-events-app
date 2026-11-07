@@ -2,7 +2,6 @@ import "server-only";
 import type { RankLadder } from "@/features/attendee";
 import { getEditionLadder } from "@/features/attendee/server";
 import type { AttendeeSource, WalletView } from "@/features/dashboard";
-import { DEFAULT_MISSIONS } from "@/features/missions/server";
 import { getGalaxyMap } from "@/features/quadrants/server";
 import { currentEconomy, rewardLedger } from "./economy.server";
 import { attendeeDeps } from "./attendee.server";
@@ -31,7 +30,7 @@ export const dashboardDeps: { attendees: AttendeeSource; ranks: () => Promise<Ra
 export async function openMissionsSummary(): Promise<{ xp: number; quadrants: string[] } | null> {
   const [listed, galaxy] = await Promise.all([missionSource.list(), getGalaxyMap(galaxyDeps)]);
   if (!listed.ok || !galaxy.ok) return null;
-  const missions = (listed.value.length > 0 ? listed.value : DEFAULT_MISSIONS).filter((mission) => mission.active);
+  const missions = listed.value.filter((mission) => mission.active);
   const withMissions = new Set(missions.map((mission) => mission.quadrantId));
   return {
     xp: missions.reduce((total, mission) => total + mission.xp, 0),

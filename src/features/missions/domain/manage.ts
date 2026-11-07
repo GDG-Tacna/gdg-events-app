@@ -21,6 +21,10 @@ export type MissionAdminErrorCode =
   | "type-change"
   | "already-exists"
   | "already-seeded"
+  /** Some cadet already has a record with the mission (done, failed or half way): it can only be deactivated. */
+  | "has-completions"
+  /** A communication unlocks with it or a badge asks for it: those change first. */
+  | "in-use"
   | "not-found"
   | "unauthenticated"
   | "forbidden"
@@ -61,6 +65,19 @@ export interface MissionStore {
   update(id: string, patch: MissionPatch): Promise<Result<{ before: Mission; after: Mission } | null, { code: string }>>;
   /** Saves the display order: the position of each id in the list. */
   setOrder(ids: readonly string[]): Promise<Result<void, { code: string }>>;
+  /**
+   * Deletes the mission unless some cadet has a record with it. The check and the delete are one transaction, so a
+   * cadet answering at the same moment cannot slip a record in between.
+   */
+  delete(id: string): Promise<Result<MissionDeletion, { code: string }>>;
+}
+
+export type MissionDeletion = { kind: "deleted"; mission: Mission } | { kind: "not-found" } | { kind: "has-completions" };
+
+/** What still points at a mission: the saved communications that unlock with it and the saved badges that ask for it. */
+export interface MissionReferences {
+  /** Names of the records that use the mission; empty when nothing does. */
+  to(missionId: string): Promise<Result<readonly string[], { code: string }>>;
 }
 
 /** The edition's active quadrant ids (the quadrants feature answers it). */
@@ -84,7 +101,7 @@ export interface MinigameDirectory {
 }
 
 export interface MissionAuditEntry {
-  action: "missions.seeded" | "mission.created" | "mission.updated" | "mission.activated" | "mission.deactivated" | "mission.reordered";
+  action: "missions.seeded" | "mission.created" | "mission.updated" | "mission.activated" | "mission.deactivated" | "mission.reordered" | "mission.deleted";
   actorUid: string;
   targetUid: string;
   details: Record<string, string | null>;
@@ -101,6 +118,7 @@ export interface MissionAdminDeps {
   checkpoints: CheckpointDirectory;
   speakers: SpeakerDirectory;
   minigames: MinigameDirectory;
+  references: MissionReferences;
   images: RecordImages;
   audit: MissionAudit;
   now: () => Date;
@@ -315,4 +333,28 @@ export async function moveMission(
 
   await audit(deps, { action: "mission.reordered", actorUid: actor.uid, targetUid: input.id, details: { order: ids.join(",") } });
   return ok(ids);
+}
+
+/**
+ * Deletes a mission nobody has touched. Once any cadet has a record with it (even a failed attempt) it can only be
+ * deactivated, because their XP, badges and communications depend on it. Refused while a communication or badge uses
+ * it. Its picture is deleted with it.
+ */
+export async function deleteMission(deps: MissionAdminDeps, actor: MissionAdminActor, input: { id: string }): Promise<Result<void, MissionAdminError>> {
+  if (forbidden(actor)) return err(missionAdminError("forbidden"));
+  if (!isMissionId(input.id)) return err(missionAdminError("not-found"));
+
+  const used = await deps.references.to(input.id);
+  if (!used.ok) return err(missionAdminError("unknown"));
+  if (used.value.length > 0) return err(missionAdminError("in-use"));
+
+  const deleted = await deps.store.delete(input.id);
+  if (!deleted.ok) return err(missionAdminError("unknown"));
+  if (deleted.value.kind === "not-found") return err(missionAdminError("not-found"));
+  if (deleted.value.kind === "has-completions") return err(missionAdminError("has-completions"));
+
+  const { mission } = deleted.value;
+  await dropReplacedImage(deps.images, mission.image ?? null, null);
+  await audit(deps, { action: "mission.deleted", actorUid: actor.uid, targetUid: mission.id, details: { title: mission.title, type: mission.config.type } });
+  return ok(undefined);
 }

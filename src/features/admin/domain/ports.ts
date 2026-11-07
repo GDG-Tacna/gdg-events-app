@@ -79,6 +79,7 @@ export interface AuditEntry {
     | "mission.activated"
     | "mission.deactivated"
     | "mission.reordered"
+    | "mission.deleted"
     | "layout.seeded"
     | "quadrant.created"
     | "quadrant.updated"

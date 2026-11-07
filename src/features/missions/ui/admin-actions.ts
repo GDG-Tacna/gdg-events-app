@@ -7,6 +7,7 @@ export type MissionAdminActionResult = { ok: true } | { ok: false; code: Mission
 export type SeedMissionsAction = () => Promise<MissionAdminActionResult>;
 export type SaveMissionAction = (input: { id: string; draft: MissionDraft }) => Promise<MissionAdminActionResult>;
 export type SetMissionActiveAction = (input: { id: string; active: boolean }) => Promise<MissionAdminActionResult>;
+export type DeleteMissionAction = (input: { id: string }) => Promise<MissionAdminActionResult>;
 export type MoveMissionAction = (input: { id: string; to: number }) => Promise<MissionAdminActionResult>;
 
 /** A quadrant or a checkpoint as the admin forms list them. */

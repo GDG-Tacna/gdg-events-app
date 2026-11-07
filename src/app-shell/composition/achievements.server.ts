@@ -13,7 +13,7 @@ import {
 import { rankFor } from "@/features/attendee";
 import { getEditionLadder } from "@/features/attendee/server";
 import { FirestoreCheckInCounter } from "@/features/checkins/server";
-import { DEFAULT_MISSIONS, type Mission } from "@/features/missions/server";
+import { type Mission } from "@/features/missions/server";
 import { countContacts } from "@/features/network/server";
 import { getGalaxyMap } from "@/features/quadrants/server";
 import { err, ok, type Result } from "@/shared/lib/result";
@@ -26,12 +26,8 @@ import { rankDeps } from "./ranks.server";
 import { perEdition } from "./per-edition";
 import { moduleOn } from "@/app-shell/modules.server";
 
-/** The edition's missions, or the bundled ones while it has none (the same rule the missions board follows). */
-async function offeredMissions(): Promise<Result<readonly Mission[], { code: string }>> {
-  const listed = await missionSource.list();
-  if (!listed.ok) return listed;
-  return ok(listed.value.length > 0 ? listed.value : DEFAULT_MISSIONS);
-}
+/** The edition's saved missions (the same rule the missions board follows). */
+const offeredMissions = (): Promise<Result<readonly Mission[], { code: string }>> => missionSource.list();
 
 const counter = new FirestoreCheckInCounter();
 

@@ -23,7 +23,6 @@ const QUIZ = mission("quiz-1", { type: "quiz", question: "¿Q?", options: ["a", 
 const KEYWORD = mission("kw-1", { type: "keyword", prompt: "Pide la clave", keywords: ["clave"] }, { order: 0 });
 const STAND = mission("stand-1", { type: "stand", checkpointId: "stand-ai-1" }, { order: 2, xp: 30 });
 const HIDDEN = mission("hidden-1", { type: "talk", checkpointId: "talk-1" }, { active: false });
-const DEFAULT = mission("default-1", { type: "talk", checkpointId: "talk-keynote" });
 
 /** A completion store kept in memory that runs `decide` like the transaction does. */
 function memoryCompletions(initial: MissionCompletion[] = []) {
@@ -56,7 +55,6 @@ function setup({ stored = [QUIZ, KEYWORD, STAND, HIDDEN], completions = [] as Mi
   const deps = {
     source: { list: vi.fn(async (): Promise<Result<readonly Mission[], { code: string }>> => ok(stored)) },
     completions: memoryCompletions(completions),
-    defaults: [DEFAULT],
     xp,
     limiter: { consume: vi.fn(async () => true) },
   } satisfies SubmitProofDeps;
@@ -101,12 +99,13 @@ describe("getMissionBoard", () => {
     expect(board.ok && [board.value.completed, board.value.total, board.value.xpEarned]).toEqual([1, 3, 40]);
   });
 
-  it("serves the bundled missions while the edition has none", async () => {
+  it("shows no missions while the edition has none (the bundled set is only loaded by an admin)", async () => {
     const { deps } = setup({ stored: [] });
 
     const board = await getMissionBoard(deps, "u1");
 
-    expect(board.ok && board.value.missions.map((m) => m.id)).toEqual(["default-1"]);
+    expect(board.ok && board.value.missions).toEqual([]);
+    expect(board.ok && board.value.total).toBe(0);
   });
 
   it("orders ties by title", async () => {
@@ -202,10 +201,10 @@ describe("submitMissionProof", () => {
     expect(await submitMissionProof(ctx.deps, "u1", "quiz-1", { kind: "keyword", value: "b" })).toEqual(err({ code: "wrong-proof" }));
   });
 
-  it("answers the bundled missions while the edition has none", async () => {
+  it("answers no mission while the edition has none", async () => {
     const empty = setup({ stored: [] });
 
-    expect(await submitMissionProof(empty.deps, "u1", "default-1", { kind: "checkpoint", checkpointId: "talk-keynote" })).toMatchObject({ ok: true });
+    expect(await submitMissionProof(empty.deps, "u1", "talk-keynote", { kind: "checkpoint", checkpointId: "talk-keynote" })).toEqual(err({ code: "not-found" }));
   });
 
   it("reports failures to read the missions or to store the answer", async () => {

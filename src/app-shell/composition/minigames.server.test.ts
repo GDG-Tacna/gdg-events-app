@@ -6,7 +6,6 @@ const mocks = vi.hoisted(() => ({ list: vi.fn(), listFor: vi.fn(), read: vi.fn()
 vi.mock("./missions.server", () => ({ missionSource: { list: mocks.list }, missionDeps: { completions: { listFor: mocks.listFor } } }));
 vi.mock("./economy.server", () => ({ rewardLedger: { marker: "ledger" } }));
 vi.mock("@/features/admin/server", () => ({ FirestoreAuditLog: class {} }));
-vi.mock("@/features/missions/server", () => ({ DEFAULT_MISSIONS: [{ id: "bundled", minigame: "warp-timing", active: true }] }));
 vi.mock("@/features/minigames/server", async () => {
   const settings = await import("@/features/minigames/domain/settings");
   return {
@@ -42,10 +41,10 @@ describe("minigameDeps.missions.bonusInfo", () => {
     expect(await minigameDeps.missions.bonusInfo("u1", "nope")).toEqual(ok(null));
   });
 
-  it("uses the bundled missions while the edition has none", async () => {
+  it("finds no mission while the edition has none", async () => {
     mocks.list.mockResolvedValue(ok([]));
 
-    expect(await minigameDeps.missions.bonusInfo("u1", "bundled")).toMatchObject({ value: { minigame: "warp-timing" } });
+    expect(await minigameDeps.missions.bonusInfo("u1", "bundled")).toEqual({ ok: true, value: null });
   });
 
   it("reports a failed read", async () => {

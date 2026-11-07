@@ -8,6 +8,7 @@ import type { MissionAdminActionResult } from "@/features/missions";
 import {
   DEFAULT_MISSIONS,
   createMission,
+  deleteMission,
   moveMission,
   seedMissions,
   setMissionActive,
@@ -43,6 +44,7 @@ const saveSchema = z.object({
   }),
 });
 const activeSchema = z.object({ id: z.string().max(60), active: z.boolean() });
+const deleteSchema = z.object({ id: z.string().max(60) });
 const moveSchema = z.object({ id: z.string().max(60), to: z.number().int().min(0).max(999) });
 
 /**
@@ -94,6 +96,14 @@ export async function setMissionActiveAction(input: { id: string; active: boolea
   const parsed = activeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "not-found" };
   return done(await setMissionActive(missionAdminDeps, actor, parsed.data));
+}
+
+export async function deleteMissionAction(input: { id: string }): Promise<MissionAdminActionResult> {
+  const actor = await adminActor();
+  if (isResult(actor)) return actor;
+  const parsed = deleteSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "not-found" };
+  return done(await deleteMission(missionAdminDeps, actor, parsed.data));
 }
 
 export async function moveMissionAction(input: { id: string; to: number }): Promise<MissionAdminActionResult> {

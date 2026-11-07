@@ -5,7 +5,6 @@ vi.mock("server-only", () => ({}));
 const missions = { missionSource: { list: vi.fn() } };
 vi.mock("@/app-shell/composition/missions.server", () => missions);
 vi.mock("@/app-shell/composition/quadrants.server", () => ({ galaxyDeps: {} }));
-vi.mock("@/features/missions/server", () => ({ DEFAULT_MISSIONS: [{ id: "keynote", title: "Charla inaugural", order: 0 }] }));
 const quadrants = { getGalaxyMap: vi.fn() };
 vi.mock("@/features/quadrants/server", () => quadrants);
 
@@ -29,9 +28,9 @@ describe("loadOdysseyFormOptions", () => {
     });
   });
 
-  it("offers the bundled missions while the edition has none, and fails loudly on a failed read", async () => {
+  it("offers no missions while the edition has none, and fails loudly on a failed read", async () => {
     missions.missionSource.list.mockResolvedValue(ok([]));
-    expect((await loadOdysseyFormOptions()).missions).toEqual([{ id: "keynote", name: "Charla inaugural" }]);
+    expect((await loadOdysseyFormOptions()).missions).toEqual([]);
 
     missions.missionSource.list.mockResolvedValue(err({ code: "x" }));
     await expect(loadOdysseyFormOptions()).rejects.toThrow("Could not read the missions");

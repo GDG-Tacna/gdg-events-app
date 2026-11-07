@@ -1,7 +1,6 @@
 import "server-only";
 import { FirestoreAuditLog } from "@/features/admin/server";
 import { FirestoreMinigameStore, getMinigameSettings, type MinigameAdminDeps, type MinigameDeps } from "@/features/minigames/server";
-import { DEFAULT_MISSIONS } from "@/features/missions/server";
 import { err, ok } from "@/shared/lib/result";
 import { currentEditionOf } from "@/features/event/server";
 import { ttlCached } from "@/shared/lib/ttl-cache";
@@ -41,8 +40,7 @@ export const minigameDeps: MinigameDeps = {
     bonusInfo: async (uid, missionId) => {
       const [listed, completions] = await Promise.all([missionSource.list(), missionDeps.completions.listFor(uid)]);
       if (!listed.ok || !completions.ok) return err({ code: "unknown" });
-      const missions = listed.value.length > 0 ? listed.value : DEFAULT_MISSIONS;
-      const mission = missions.find((candidate) => candidate.id === missionId);
+      const mission = listed.value.find((candidate) => candidate.id === missionId);
       if (!mission) return ok(null);
       const completion = completions.value.find((candidate) => candidate.missionId === missionId);
       return ok({

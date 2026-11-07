@@ -28,7 +28,6 @@ vi.mock("@/features/network/server", async () => {
 vi.mock("@/features/admin/server", () => ({ FirestoreAuditLog: class {} }));
 vi.mock("@/features/attendee/server", () => ({ getEditionLadder: mocks.getEditionLadder }));
 vi.mock("@/features/quadrants/server", () => ({ getGalaxyMap: mocks.getGalaxyMap }));
-vi.mock("@/features/missions/server", () => ({ DEFAULT_MISSIONS: [{ id: "bundled", quadrantId: "ai", active: true }] }));
 vi.mock("@/features/checkins/server", () => ({
   FirestoreCheckInCounter: class {
     checkInsOf = mocks.checkInsOf;
@@ -97,11 +96,11 @@ describe("achievementDeps.progress", () => {
     expect(mocks.contactsOf).toHaveBeenCalledWith("u1");
   });
 
-  it("uses the bundled missions while the edition has none, and counts someone without a profile from zero", async () => {
+  it("counts no quadrant mission while the edition has none, and someone without a profile from zero", async () => {
     mocks.missions.mockResolvedValue(ok([]));
     mocks.findByUid.mockResolvedValue(ok(null));
 
-    expect(await achievementDeps.progress.progress("u1")).toMatchObject({ ok: true, value: { missionsByQuadrant: new Map([["ai", ["bundled"]]]), level: 1, credits: 0 } });
+    expect(await achievementDeps.progress.progress("u1")).toMatchObject({ ok: true, value: { missionsByQuadrant: new Map(), level: 1, credits: 0 } });
   });
 
   it.each([

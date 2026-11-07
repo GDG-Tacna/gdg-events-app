@@ -53,8 +53,6 @@ export interface MissionBoard {
 export interface MissionReadDeps {
   source: MissionSource;
   completions: CompletionStore;
-  /** The bundled missions, served until the edition saves its own. */
-  defaults: readonly Mission[];
   /** The edition's economy; without it missions give no G-Credits. */
   credits?: CreditRules;
 }
@@ -66,10 +64,11 @@ export interface SubmitProofDeps extends MissionReadDeps {
 
 const byOrder = (a: Mission, b: Mission) => a.order - b.order || a.title.localeCompare(b.title);
 
-async function offeredMissions(deps: Pick<MissionReadDeps, "source" | "defaults">): Promise<Result<readonly Mission[], MissionError>> {
+/** The edition's saved missions. The bundled set is never served on its own: an admin loads it on purpose. */
+async function offeredMissions(deps: Pick<MissionReadDeps, "source">): Promise<Result<readonly Mission[], MissionError>> {
   const listed = await deps.source.list();
   if (!listed.ok) return err(missionError("unknown"));
-  return ok(listed.value.length > 0 ? listed.value : deps.defaults);
+  return ok(listed.value);
 }
 
 const creditsOf = (deps: Pick<MissionReadDeps, "credits">, mission: Mission): Promise<number> =>

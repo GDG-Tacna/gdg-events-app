@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { galaxyDeps } from "@/app-shell/composition/quadrants.server";
 import { missionAdminDeps } from "@/app-shell/composition/mission-admin.server";
 import { requireRole } from "@/app-shell/guards";
-import { moveMissionAction, seedMissionsAction, setMissionActiveAction } from "@/app-shell/missions/manage.actions";
+import { deleteMissionAction, moveMissionAction, seedMissionsAction, setMissionActiveAction } from "@/app-shell/missions/manage.actions";
 import { MissionsAdminView } from "@/features/missions";
 import { DEFAULT_MISSIONS, listManagedMissions } from "@/features/missions/server";
 import { getGalaxyMap } from "@/features/quadrants/server";
@@ -36,6 +36,7 @@ export default async function AdminMissionsPage() {
         seed={seedMissionsAction}
         setActive={setMissionActiveAction}
         move={moveMissionAction}
+        remove={deleteMissionAction}
         hrefs={{
           create: `${ROUTES.adminMissions}/nueva`,
           editBase: ROUTES.adminMissions,

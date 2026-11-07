@@ -12,6 +12,7 @@ vi.mock("@/app-shell/missions/manage.actions", () => ({
   updateMissionAction: async () => ({ ok: true }),
   setMissionActiveAction: async () => ({ ok: true }),
   moveMissionAction: async () => ({ ok: true }),
+  deleteMissionAction: async () => ({ ok: true }),
 }));
 const formOptions = { loadMissionFormOptions: vi.fn() };
 vi.mock("@/app-shell/missions/form-options.server", () => formOptions);
@@ -91,6 +92,7 @@ describe("admin mission pages", () => {
       seed: actions.seedMissionsAction,
       setActive: actions.setMissionActiveAction,
       move: actions.moveMissionAction,
+      remove: actions.deleteMissionAction,
       // Plain text only: a client component cannot receive functions from a server page.
       hrefs: { create: "/admin/misiones/nueva", editBase: "/admin/misiones", suggest: "/admin/misiones/sugerir" },
     });

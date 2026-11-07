@@ -26,14 +26,14 @@ describe("odyssey composition", () => {
     expect(missions.missionDeps.completions.listFor).toHaveBeenCalledWith("u1");
   });
 
-  it("names missions from the edition's own, or the bundled ones while it has none", async () => {
+  it("names the edition's own missions, and none while it has none", async () => {
     missions.missionSource.list.mockResolvedValueOnce(ok([{ id: "own-1", title: "Propia" }]));
     const own = await odysseyDeps.progress.titles();
     expect(own.ok && [...own.value]).toEqual([["own-1", "Propia"]]);
 
     missions.missionSource.list.mockResolvedValueOnce(ok([]));
     const bundled = await odysseyDeps.progress.titles();
-    expect(bundled.ok && bundled.value.get("ai-stand")).toBe("Visita el stand de AI");
+    expect(bundled.ok && bundled.value.size).toBe(0);
   });
 
   it("knows the edition's active quadrants and missions for the admin, and reports failed reads", async () => {

@@ -1,6 +1,6 @@
 import "server-only";
 import { FirestoreAuditLog } from "@/features/admin/server";
-import { DEFAULT_MISSIONS, type Mission } from "@/features/missions/server";
+import { type Mission } from "@/features/missions/server";
 import {
   CachedCommunicationSource,
   CachedStoryTitle,
@@ -16,12 +16,8 @@ import { missionDeps, missionSource } from "./missions.server";
 import { galaxyDeps } from "./quadrants.server";
 import { perEdition } from "./per-edition";
 
-/** The edition's missions, or the bundled ones while it has none (the same rule the missions board follows). */
-async function offeredMissions(): Promise<Result<readonly Mission[], { code: string }>> {
-  const listed = await missionSource.list();
-  if (!listed.ok) return listed;
-  return ok(listed.value.length > 0 ? listed.value : DEFAULT_MISSIONS);
-}
+/** The edition's saved missions (the same rule the missions board follows). */
+const offeredMissions = (): Promise<Result<readonly Mission[], { code: string }>> => missionSource.list();
 
 /** The edition's communications, kept for a minute. Admin changes invalidate it. */
 export const communicationSource = perEdition(() => new CachedCommunicationSource(new FirestoreCommunicationStore()));

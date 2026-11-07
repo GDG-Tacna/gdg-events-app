@@ -21,6 +21,7 @@ export { DEFAULT_XP, MISSION_TYPES, parseMission, type Mission, type MissionConf
 export type { AttemptLimiter, CompletionStore, CreditRules, MissionSource, XpGranter } from "./domain/ports";
 export {
   createMission,
+  deleteMission,
   listManagedMissions,
   missionAdminError,
   moveMission,
@@ -35,6 +36,8 @@ export {
   type MissionAdminErrorCode,
   type MissionAudit,
   type MissionDraft,
+  type MissionDeletion,
+  type MissionReferences,
   type MissionStore,
   type QuadrantDirectory,
 } from "./domain/manage";

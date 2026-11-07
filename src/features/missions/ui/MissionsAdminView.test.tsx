@@ -37,6 +37,7 @@ function renderView(missions: readonly Mission[] = MISSIONS, overrides: Partial<
     seed: vi.fn(async () => ({ ok: true as const })),
     setActive: vi.fn(async () => ({ ok: true as const })),
     move: vi.fn(async () => ({ ok: true as const })),
+    remove: vi.fn(async () => ({ ok: true as const })),
     hrefs: { create: "/admin/misiones/nueva", editBase: "/admin/misiones" },
     ...overrides,
   };
@@ -60,6 +61,37 @@ describe("MissionsAdminView", () => {
     expect(row("Misión old-one")).toHaveTextContent(copy.admin.missions.otherQuadrant);
     expect(screen.getByRole("link", { name: `${copy.admin.missions.edit}: Misión ai-quiz` })).toHaveAttribute("href", "/admin/misiones/ai-quiz");
     expect(screen.getByRole("link", { name: copy.admin.missions.create })).toHaveAttribute("href", "/admin/misiones/nueva");
+  });
+
+  it("deletes a mission after confirming, and refreshes", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { props } = renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: `${copy.admin.missions.delete}: Misión ai-quiz` }));
+
+    await waitFor(() => expect(props.remove).toHaveBeenCalledWith({ id: "ai-quiz" }));
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("Misión ai-quiz"));
+    expect(await screen.findByText("«Misión ai-quiz» se eliminó.")).toHaveAttribute("role", "status");
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("does nothing when the confirmation is declined", () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { props } = renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: `${copy.admin.missions.delete}: Misión ai-quiz` }));
+
+    expect(props.remove).not.toHaveBeenCalled();
+  });
+
+  it("explains why a mission cannot be deleted", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderView(MISSIONS, { remove: vi.fn(async () => ({ ok: false as const, code: "has-completions" as const })) });
+
+    fireEvent.click(screen.getByRole("button", { name: `${copy.admin.missions.delete}: Misión ai-quiz` }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.missions.errors["has-completions"]);
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("says which missions offer a mini-game", () => {
@@ -106,7 +138,7 @@ describe("MissionsAdminView", () => {
   it("offers to load the bundled missions while the edition has none, warning about creating first", async () => {
     const { props } = renderView([]);
 
-    expect(screen.getByText(/los cadetes ven las 16 misiones por defecto/)).toBeInTheDocument();
+    expect(screen.getByText(/los cadetes no ven ninguna. Puedes cargar las 16 misiones por defecto/)).toBeInTheDocument();
     expect(screen.getByText(copy.admin.missions.createWarning)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: copy.admin.missions.seed }));
 

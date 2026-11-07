@@ -32,7 +32,7 @@ export type MissionConfig =
   /** A word given at a stand or by a speaker. Stored normalized (`normalizeKeyword`). */
   | { type: "keyword"; prompt: string; keywords: readonly string[] };
 
-/** A mission of one edition. Stable slug id; deactivated, never deleted. */
+/** A mission of one edition. Stable slug id. Deactivated at any time; deleted only while no cadet has a record with it. */
 export interface Mission {
   id: string;
   title: string;
