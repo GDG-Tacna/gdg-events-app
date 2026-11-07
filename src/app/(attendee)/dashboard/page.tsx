@@ -23,6 +23,8 @@ import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { ScreenEnter, SpaceBackground } from "@/shared/ui";
 import { moduleOn } from "@/app-shell/modules.server";
+import { linkedSpeaker } from "@/app-shell/speakers/linked-speaker.server";
+import { SpeakerCallout } from "@/features/speakers";
 
 export const metadata: Metadata = { title: `${copy.dashboard.title} · ${copy.brand.name}` };
 
@@ -53,12 +55,14 @@ export default async function DashboardPage() {
     availableSquads: offeredSquads(squads).length,
   });
 
-  const [squadCredits, standing, missions, poll, avatarLook] = await Promise.all([
+  const [squadCredits, standing, missions, poll, avatarLook, speaker] = await Promise.all([
     squadId === null ? null : squadStanding(squadId),
     (await moduleOn("leaderboard")) ? fleetStanding(session.uid) : null,
     (await moduleOn("missions")) ? openMissionsSummary() : null,
     FEATURES.polls && (await moduleOn("polls")) ? livePoll(session.uid) : null,
     getAvatarLook(avatarDeps, session.uid),
+    // A speaker who plays here (the guard sent them to their code otherwise) gets the way to it.
+    linkedSpeaker(session.uid),
   ]);
 
   return (
@@ -81,6 +85,7 @@ export default async function DashboardPage() {
             missionsSlot={missions ? <MissionsCard href={ROUTES.missions} xp={missions.xp} quadrants={missions.quadrants} /> : undefined}
             installSlot={<InstallHint />}
             pollSlot={poll ? <LivePollCard poll={poll} href={ROUTES.poll} /> : undefined}
+            speakerSlot={speaker ? <SpeakerCallout name={speaker.name} href={ROUTES.speaker} /> : undefined}
           />
         </ScreenEnter>
       </main>

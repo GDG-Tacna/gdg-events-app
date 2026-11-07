@@ -46,8 +46,9 @@ const venueSchema = z.object({
  * shape are checked here, the actor comes from the verified session, and every use case checks the admin
  * role again. After any change the attendees' cached map is dropped so they see it at once.
  */
-async function adminActor(): Promise<QuadrantAdminActor | { ok: false; code: QuadrantAdminErrorCode }> {
-  if (!FEATURES.admin || !(await moduleOn("map"))) return { ok: false, code: "disabled" };
+async function adminActor(plan = false): Promise<QuadrantAdminActor | { ok: false; code: QuadrantAdminErrorCode }> {
+  // Zones group the missions and stay editable with the map off; the venue plan is the map module's.
+  if (!FEATURES.admin || (plan && !(await moduleOn("map")))) return { ok: false, code: "disabled" };
   const session = await getSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   if (session.role !== "admin" || !(await mayEdit(session, "map"))) return { ok: false, code: "forbidden" };
@@ -63,7 +64,7 @@ function done(result: { ok: true } | { ok: false; error: { code: QuadrantAdminEr
 }
 
 export async function seedLayoutAction(): Promise<SaveVenueActionResult> {
-  const actor = await adminActor();
+  const actor = await adminActor(true);
   if (refused(actor)) return actor;
   const result = await seedLayout(quadrantAdminDeps, actor);
   if (!result.ok) return { ok: false, code: result.error.code };
@@ -104,7 +105,7 @@ export async function moveQuadrantAction(input: { id: string; to: number }): Pro
 }
 
 export async function saveVenueAction(venue: VenueMap & { backgroundPath?: string | null }): Promise<SaveVenueActionResult> {
-  const actor = await adminActor();
+  const actor = await adminActor(true);
   if (refused(actor)) return actor;
   const parsed = venueSchema.safeParse(venue);
   if (!parsed.success) return { ok: false, code: "invalid-venue" };

@@ -14,6 +14,8 @@ const leaderboardServer = { getCadetStanding: vi.fn() };
 vi.mock("@/features/leaderboard/server", () => leaderboardServer);
 vi.mock("@/app-shell/composition/polls.server", () => ({ voteDeps: { marker: "votes" } }));
 vi.mock("@/app-shell/composition/avatar.server", () => ({ avatarDeps: { marker: "avatars" } }));
+const speakers = vi.hoisted(() => ({ linkedSpeaker: vi.fn(async (): Promise<{ id: string; name: string } | null> => null) }));
+vi.mock("@/app-shell/speakers/linked-speaker.server", () => speakers);
 const avatarServer = vi.hoisted(() => ({ getAvatarLook: vi.fn() }));
 vi.mock("@/features/avatar/server", () => avatarServer);
 const pollsServer = vi.hoisted(() => ({ getCadetPoll: vi.fn() }));
@@ -244,7 +246,15 @@ describe("DashboardPage", () => {
     features.FEATURES.network = true;
   });
 
-  it("never offers the pass, Red or raffle cards: the dashboard keeps the cadet card, the welcome and the terminal", async () => {
+  it("hands a cadet who is also a speaker the way to their speaker code, and nobody else", async () => {
+    speakers.linkedSpeaker.mockResolvedValueOnce({ id: "ana-torres", name: "Ana Torres" });
+    expect((await renderPage()).speakerSlot).toBeTruthy();
+
+    speakers.linkedSpeaker.mockResolvedValueOnce(null);
+    expect((await renderPage()).speakerSlot).toBeUndefined();
+  });
+
+  it("never offers the pass, Red or raffle cards: the dashboard keeps the cadet card, the ranking and the terminal", async () => {
     const props = await renderPage();
 
     expect(props).not.toHaveProperty("passSlot");

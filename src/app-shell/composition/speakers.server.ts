@@ -36,6 +36,12 @@ export const speakerAccessDeps: SpeakerAccessDeps = {
   now: () => new Date(),
 };
 
+/**
+ * Which accounts are linked to a speaker of the edition, kept for a minute: the guards ask it on every cadet screen.
+ * Accepting a link, a new link and removing access clear it.
+ */
+export const keptSpeakerAccess = ttlCached(() => speakerAccessStore.rows(), { key: currentEditionOf });
+
 /** The speakers kept for a minute per edition, for screens that only name them (the agenda). An admin change clears it. */
 export const keptSpeakers = ttlCached(() => speakerStore.list(), { key: currentEditionOf });
 

@@ -10,7 +10,9 @@ import { publicEditionId, registerRequestEdition } from "@/features/event/server
 import { ROUTES, homeFor } from "@/shared/config/routes";
 import { editionRoleOf, editionRolesOf } from "./composition/admin.server";
 import { authDeps } from "./composition/auth.server";
+import { moduleOn } from "./modules.server";
 import { resolveSession, type AppRole, type AppSession, type EditionAccess } from "./session-role";
+import { linkedSpeaker, speakerDetour } from "./speakers/linked-speaker.server";
 import { hasWorkingEditionCookie, readWorkingEdition } from "./working-edition.server";
 
 export type { AppRole, AppSession } from "./session-role";
@@ -67,6 +69,8 @@ export async function requireRole(allowed: readonly AppRole[]): Promise<AppSessi
 export async function requireAttendee(): Promise<AppSession> {
   const session = await requireSession();
   sendToTheirEditions(session);
+  // A speaker who may not play, or who has no cadet profile yet, starts on their code screen.
+  if ((await speakerDetour(session)) === "code") redirect(ROUTES.speaker);
   if (session.role === null) redirect(ROUTES.onboarding);
   if (session.role !== "attendee") redirect(homeFor(session.role));
   return session;
@@ -78,5 +82,7 @@ export async function requireOnboardingPending(): Promise<AppSession> {
   // A staff or organizer of another edition must not sign up as a cadet here by mistake (it would replace their role).
   sendToTheirEditions(session);
   if (session.role !== null) redirect(ROUTES.dashboard);
+  // A speaker signs up as a cadet only where speakers may play (their code screen offers it then).
+  if ((await linkedSpeaker(session.uid)) && !(await moduleOn("speakerPlay"))) redirect(ROUTES.speaker);
   return session;
 }

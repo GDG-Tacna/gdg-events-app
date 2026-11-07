@@ -119,11 +119,8 @@ export const copy = {
     progressSpoken: "{xp} de {next} XP",
     squadRetired: "Escuadrón retirado",
     maxRank: "Rango máximo alcanzado",
-    welcomeGreeting: "¡Bienvenido a bordo,",
-    /** The welcome's text in parts, so the community and the event can be highlighted. */
-    welcomeBody: { before: "La tripulación de ", community: "GDG Tacna", middle: " te da la bienvenida a la flota de ", event: "DevFest 2026", after: ". Tu odisea galáctica acaba de comenzar." },
     rankProgress: "Hacia el siguiente rango",
-    /** The section of entries under the welcome. */
+    /** The section of entries beside the cadet card. */
     terminal: { title: "Terminal de misión", flavor: "Fase 1 // Despegue" },
     missionsCard: {
       title: "Misiones disponibles",
@@ -135,12 +132,7 @@ export const copy = {
       open: "Ver misiones",
     },
     account: {
-      open: "Menú de tu cuenta",
-      title: "Tu cuenta",
-      qr: "Mi QR",
       network: "Mi tarjeta de la Red",
-      install: "Instalar la app",
-      signOut: "Cerrar sesión",
     },
     squadCalloutTitle: "Descubre tu escuadrón",
     squadCalloutBody: "Únete a una facción y compite junto a tu equipo.",
@@ -1721,10 +1713,11 @@ export const copy = {
           leaderboard: "Ranking y escenario",
           raffle: "Sorteo",
           polls: "Encuestas en vivo",
+          speakerPlay: "Speakers como cadetes",
         },
         help: {
           squads: "Los cadetes descubren su escuadrón y suman en equipo.",
-          map: "Zonas, plano del local y la agenda de charlas.",
+          map: "El plano del local. Apagado, la pestaña de los cadetes pasa a ser solo la Agenda de charlas.",
           missions: "Quiz, palabras clave, stands y charlas que dan XP.",
           odyssey: "Transmisiones que se descifran al completar misiones.",
           achievements: "Insignias automáticas y la pestaña Logros.",
@@ -1733,6 +1726,7 @@ export const copy = {
           leaderboard: "Tu puesto, el top 10 y la pantalla del proyector.",
           raffle: "Sorteo final con los G-Credits como boletos.",
           polls: "Preguntas al público que los cadetes votan desde la app, con premio opcional.",
+          speakerPlay: "Los speakers también juegan como cadetes. Apagado, su cuenta solo abre su QR de speaker.",
         },
         /** Placeholder: {parts}. */
         offWith: "Se apaga con {parts}.",
@@ -2366,6 +2360,16 @@ export const copy = {
     intro: "Muéstralo a los cadetes que se acerquen: al escanearlo completan «Conoce al speaker». Cambia cada dos minutos.",
     none: "Tu cuenta no está vinculada a un speaker de este evento. Pide al equipo tu enlace de speaker.",
     inactive: "Ya no figuras como speaker activo de este evento. Si es un error, avisa al equipo.",
+    /** On the cadet's home, for a speaker who also plays. Placeholder in title: {name}. */
+    callout: {
+      label: "Tu acceso de speaker",
+      title: "Eres speaker: {name}",
+      body: "Muestra tu QR a los cadetes para que completen «Conoce al speaker».",
+      open: "Mostrar mi QR de speaker",
+    },
+    /** On the code screen, when speakers may also play. */
+    toDashboard: "Ir a mi panel de cadete",
+    play: "Jugar como cadete",
   },
   system: {
     errorTitle: "Algo falló en la nave",

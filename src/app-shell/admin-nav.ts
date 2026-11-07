@@ -34,7 +34,8 @@ const AREAS: readonly Area[] = [
   { href: ROUTES.adminTalks, label: n.talks, icon: "mic", card: a.talks, group: "program", section: "talks" },
   { href: ROUTES.adminSpeakers, label: n.speakers, icon: "person", card: a.speakers, group: "program", section: "talks" },
   { href: ROUTES.adminCheckpoints, label: n.checkpoints, icon: "store", card: a.checkpoints, group: "program", section: "checkpoints" },
-  { href: ROUTES.adminZones, label: n.zones, icon: "layers", card: a.zones, group: "program", module: "map", section: "map" },
+  // Zones group the missions, so they stay with the map off; only the venue plan belongs to the map module.
+  { href: ROUTES.adminZones, label: n.zones, icon: "layers", card: a.zones, group: "program", section: "map" },
   { href: ROUTES.adminMap, label: n.map, icon: "map", card: a.map, group: "program", module: "map", section: "map" },
 
   { href: ROUTES.adminMissions, label: n.missions, icon: "target", card: a.missions, group: "game", module: "missions", section: "missions" },

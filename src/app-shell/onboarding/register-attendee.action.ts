@@ -3,6 +3,8 @@
 import { z } from "zod";
 import { getSession } from "@/app-shell/guards";
 import { attendeeDeps } from "@/app-shell/composition/attendee.server";
+import { moduleOn } from "@/app-shell/modules.server";
+import { linkedSpeaker } from "@/app-shell/speakers/linked-speaker.server";
 import type { RegisterAttendeeActionResult, RegisterAttendeeInput } from "@/features/attendee";
 import { registerAttendee } from "@/features/attendee/server";
 
@@ -19,6 +21,8 @@ export async function registerAttendeeAction(input: RegisterAttendeeInput): Prom
   if (!session) return { ok: false, code: "unauthenticated" };
   // Staff and admin accounts are not onboarded as attendees.
   if (session.role !== null && session.role !== "attendee") return { ok: false, code: "forbidden" };
+  // Where speakers may not play, a speaker's account only shows their code: it never becomes a cadet.
+  if ((await linkedSpeaker(session.uid)) && !(await moduleOn("speakerPlay"))) return { ok: false, code: "forbidden" };
 
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "alias-invalid", alias: "too-long" };

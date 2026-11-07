@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/composition/attendee.server", () => ({ attendeeDeps: { marker: "deps" } }));
+const speakers = vi.hoisted(() => ({ linkedSpeaker: vi.fn(async (): Promise<{ id: string; name: string } | null> => null) }));
+vi.mock("@/app-shell/speakers/linked-speaker.server", () => speakers);
+const modules = vi.hoisted(() => ({ moduleOn: vi.fn(async () => true) }));
+vi.mock("@/app-shell/modules.server", () => modules);
 
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
@@ -30,6 +34,20 @@ describe("registerAttendeeAction", () => {
 
     expect(await registerAttendeeAction({ alias: "Nova_7" })).toEqual({ ok: false, code: "forbidden" });
     expect(attendeeServer.registerAttendee).not.toHaveBeenCalled();
+  });
+
+  it("never makes a speaker a cadet where speakers may not play, and does where they may", async () => {
+    guards.getSession.mockResolvedValue(session(null));
+    speakers.linkedSpeaker.mockResolvedValue({ id: "ana-torres", name: "Ana Torres" });
+    attendeeServer.registerAttendee.mockResolvedValue({ ok: true, value: { created: true } });
+
+    modules.moduleOn.mockResolvedValueOnce(false);
+    expect(await registerAttendeeAction({ alias: "Nova_7" })).toEqual({ ok: false, code: "forbidden" });
+    expect(attendeeServer.registerAttendee).not.toHaveBeenCalled();
+
+    modules.moduleOn.mockResolvedValueOnce(true);
+    expect(await registerAttendeeAction({ alias: "Nova_7" })).toEqual({ ok: true, created: true });
+    expect(modules.moduleOn).toHaveBeenCalledWith("speakerPlay");
   });
 
   it("registers with the uid of the verified session, never one from the client", async () => {

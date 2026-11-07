@@ -11,6 +11,13 @@ const edition = vi.hoisted(() => ({ publicEditionId: vi.fn(async () => "devfest-
 vi.mock("@/features/event/server", () => edition);
 const working = vi.hoisted(() => ({ readWorkingEdition: vi.fn(async (): Promise<string | null> => null), hasWorkingEditionCookie: vi.fn(async () => false) }));
 vi.mock("./working-edition.server", () => working);
+const speakers = vi.hoisted(() => ({
+  linkedSpeaker: vi.fn(async (): Promise<{ id: string; name: string } | null> => null),
+  speakerDetour: vi.fn(async (): Promise<"code" | null> => null),
+}));
+vi.mock("./speakers/linked-speaker.server", () => speakers);
+const modules = vi.hoisted(() => ({ moduleOn: vi.fn(async () => true) }));
+vi.mock("./modules.server", () => modules);
 
 // Next.js implements redirect/notFound by throwing; mirror that so the guards stop like they do in production.
 class Redirected extends Error {
@@ -183,6 +190,33 @@ describe("guards", () => {
 
       signedIn("admin");
       expect(await redirectTarget(requireAttendee)).toBe("/admin");
+    });
+  });
+
+  describe("speakers", () => {
+    it("sends a speaker to their code when the detour says so, before onboarding or the cadet screens", async () => {
+      speakers.speakerDetour.mockResolvedValueOnce("code");
+      signedIn(null);
+      expect(await redirectTarget(requireAttendee)).toBe("/speaker");
+
+      speakers.speakerDetour.mockResolvedValueOnce("code");
+      signedIn("attendee");
+      expect(await redirectTarget(requireAttendee)).toBe("/speaker");
+
+      speakers.speakerDetour.mockResolvedValueOnce(null);
+      signedIn("attendee");
+      expect(await redirectTarget(requireAttendee)).toBeNull();
+    });
+
+    it("lets a speaker sign up as a cadet only where speakers may play", async () => {
+      speakers.linkedSpeaker.mockResolvedValue({ id: "ana-torres", name: "Ana Torres" });
+      signedIn(null);
+
+      modules.moduleOn.mockResolvedValueOnce(true);
+      expect(await redirectTarget(requireOnboardingPending)).toBeNull();
+      modules.moduleOn.mockResolvedValueOnce(false);
+      expect(await redirectTarget(requireOnboardingPending)).toBe("/speaker");
+      speakers.linkedSpeaker.mockResolvedValue(null);
     });
   });
 

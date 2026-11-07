@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/app-shell/composition/speakers.server", () => ({ speakerAccessDeps: { marker: "access" } }));
+const composition = vi.hoisted(() => ({ speakerAccessDeps: { marker: "access" }, keptSpeakerAccess: { clear: vi.fn() } }));
+vi.mock("@/app-shell/composition/speakers.server", () => composition);
 
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);

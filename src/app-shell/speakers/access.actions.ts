@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { speakerAccessDeps } from "@/app-shell/composition/speakers.server";
+import { keptSpeakerAccess, speakerAccessDeps } from "@/app-shell/composition/speakers.server";
 import { getSession } from "@/app-shell/guards";
 import { mayEdit } from "@/app-shell/permissions.server";
 import { runInEdition } from "@/features/event/server";
@@ -33,6 +33,8 @@ export async function inviteSpeakerAction(input: { speakerId: string; email: str
   const parsed = inviteSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "invalid-email" };
   const made = await inviteSpeaker(speakerAccessDeps, actor, parsed.data);
+  // A new link unlinks any account: the guards must stop treating it as the speaker's at once.
+  if (made.ok) keptSpeakerAccess.clear();
   return made.ok ? { ok: true, path: made.value.path } : { ok: false, code: made.error.code };
 }
 
@@ -43,6 +45,7 @@ export async function unlinkSpeakerAction(input: { speakerId: string }): Promise
   const parsed = speakerSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "not-found" };
   const done = await unlinkSpeaker(speakerAccessDeps, actor, parsed.data);
+  if (done.ok) keptSpeakerAccess.clear();
   return done.ok ? { ok: true } : { ok: false, code: done.error.code };
 }
 
@@ -58,5 +61,7 @@ export async function acceptSpeakerInviteAction(input: { token: string }): Promi
   const link = parsed.success ? splitSpeakerToken(parsed.data.token) : null;
   if (!link) return { ok: false, code: "not-found" };
   const accepted = await runInEdition(link.eventId, () => acceptSpeakerInvite(speakerAccessDeps, { uid: session.uid, verifiedEmail: session.verifiedEmail ?? null }, link.secret));
+  // The account is a speaker now: its next screens (the guards) must know it.
+  if (accepted.ok) keptSpeakerAccess.clear();
   return accepted.ok ? { ok: true } : { ok: false, code: accepted.error.code };
 }

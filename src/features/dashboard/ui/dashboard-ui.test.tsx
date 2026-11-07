@@ -10,7 +10,6 @@ import { buildOverview, type DashboardOverview } from "../domain/overview";
 import { DashboardView } from "./DashboardView";
 import { PlayerCard } from "./PlayerCard";
 import { SquadCallout } from "./SquadCallout";
-import { WelcomeBanner } from "./WelcomeBanner";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
 
@@ -172,18 +171,6 @@ describe("PlayerCard", () => {
   });
 });
 
-describe("WelcomeBanner", () => {
-  it("welcomes the attendee by alias on behalf of GDG Tacna", () => {
-    render(<WelcomeBanner alias="Nova_7" />);
-
-    expect(screen.getByText(copy.dashboard.welcomeGreeting, { exact: false })).toHaveTextContent("Nova_7");
-    const body = copy.dashboard.welcomeBody;
-    expect(screen.getByText(body.community).tagName).toBe("STRONG");
-    expect(screen.getByText(body.event).tagName).toBe("STRONG");
-    expect(screen.getByText(body.community).parentElement).toHaveTextContent(`${body.before}${body.community}${body.middle}${body.event}${body.after}`);
-  });
-});
-
 describe("SquadCallout", () => {
   it("invites the attendee to the reveal with a real link and one logo per squad", () => {
     const { container } = render(<SquadCallout previews={PREVIEWS} href="/squad" />);
@@ -212,22 +199,18 @@ describe("DashboardView", () => {
     expect(within(card).getByRole("link", { name: copy.pass.open })).toHaveAttribute("href", "/pass");
   });
 
-  it("has the brand, the screen title for screen readers, the welcome, and on the header the account menu and sign out", () => {
+  it("has the brand, the screen title for screen readers, and only sign out on the header, with no welcome banner", () => {
     renderView({ qrHref: "/pass", networkHref: "/red" });
 
     expect(screen.getByRole("heading", { level: 1, name: copy.dashboard.title })).toHaveClass("sr-only");
-    expect(screen.getByText(copy.dashboard.welcomeBody.community)).toBeInTheDocument();
+    // The app is used for one day: the home keeps only what the cadet acts on.
+    expect(screen.queryByText(/Bienvenido a bordo/)).not.toBeInTheDocument();
     const header = screen.getByRole("banner");
-    expect(within(header).getByRole("button", { name: copy.dashboard.account.open })).toBeInTheDocument();
+    // The QR and the Red live on the cadet card: the header has no account menu (the gear repeated them).
+    expect(within(header).getAllByRole("button")).toHaveLength(1);
     // Sign out lives on the header, never inside the content where it gets lost.
     expect(within(header).getByRole("button", { name: copy.auth.signOut }).className).toContain("size-12");
     expect(screen.getAllByRole("button", { name: copy.auth.signOut })).toHaveLength(1);
-  });
-
-  it("leaves the account menu out when it would be empty", () => {
-    renderView();
-
-    expect(screen.queryByRole("button", { name: copy.dashboard.account.open })).not.toBeInTheDocument();
   });
 
   it("shows the squad badge inside the attendee card when the attendee has a squad, and no invitation", () => {
@@ -238,13 +221,12 @@ describe("DashboardView", () => {
     expect(screen.queryByRole("link", { name: copy.reveal.discover })).not.toBeInTheDocument();
   });
 
-  it("puts the ranking and the welcome in the cadet's column, under the attendee card", () => {
+  it("puts the ranking in the cadet's column, under the attendee card", () => {
     renderView({ standingSlot: <section aria-label="Ranking">#3</section> });
 
     const [card, ranking] = order(copy.dashboard.attendeeCardLabel, "Ranking");
     expect(follows(card, ranking)).toBe(true);
     expect(terminal()).not.toContainElement(ranking);
-    expect(terminal()).not.toContainElement(screen.getByText(copy.dashboard.welcomeBody.community));
   });
 
   it("lists the terminal's entries in order: missions, squad credits (members only), install", () => {

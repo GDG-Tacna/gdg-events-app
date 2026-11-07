@@ -1,7 +1,7 @@
 import { copy } from "@/shared/copy/es";
 import { Card, Skeleton, SpaceBackground } from "@/shared/ui";
 
-/** Mirrors the dashboard (attendee card, welcome and squad invitation) while the session and profile load. */
+/** Mirrors the dashboard (attendee card, ranking and squad invitation) while the session and profile load. */
 export default function DashboardLoading() {
   return (
     <>

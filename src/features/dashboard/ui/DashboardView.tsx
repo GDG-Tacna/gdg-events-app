@@ -5,10 +5,8 @@ import { copy } from "@/shared/copy/es";
 import type { PixelSpriteData } from "@/shared/types/pixel";
 import { BrandMark } from "@/shared/ui";
 import type { DashboardOverview, SquadCalloutKind } from "../domain/overview";
-import { AccountMenu } from "./AccountMenu";
 import { PlayerCard } from "./PlayerCard";
 import { SquadCallout } from "./SquadCallout";
-import { WelcomeBanner } from "./WelcomeBanner";
 
 export interface DashboardViewProps {
   overview: DashboardOverview;
@@ -37,11 +35,13 @@ export interface DashboardViewProps {
   installSlot?: ReactNode;
   /** The live poll while one is open, built by the app shell; first, since it lasts only minutes. */
   pollSlot?: ReactNode;
+  /** For a cadet who is also a speaker: the way to their speaker code, built by the app shell; at the top. */
+  speakerSlot?: ReactNode;
 }
 
 /**
- * The cadet's dashboard, an arcade terminal: the brand with the account menu and sign out on the header, the compact
- * cadet card (and their place in the ranking), the welcome, then the "Terminal de misión" with every entry. One column
+ * The cadet's dashboard, an arcade terminal: the brand with sign out on the header (the QR and the Red are on the card), the compact
+ * cadet card (and their place in the ranking), then the "Terminal de misión" with every entry. One column
  * up to 520px; from 760px the cadet's column on the left and the terminal on the right. Data arrives ready.
  */
 export function DashboardView({
@@ -59,6 +59,7 @@ export function DashboardView({
   standingSlot,
   installSlot,
   pollSlot,
+  speakerSlot,
 }: DashboardViewProps) {
   const t = copy.dashboard;
   return (
@@ -66,7 +67,6 @@ export function DashboardView({
       <header className="gap-space-3 flex items-start justify-between">
         <BrandMark />
         <div className="gap-space-2 flex shrink-0 items-center">
-          <AccountMenu qrHref={qrHref} networkHref={networkHref} />
           <SignOutButton variant="icon" />
         </div>
       </header>
@@ -74,10 +74,10 @@ export function DashboardView({
 
       <div className="gap-space-5 grid min-[760px]:grid-cols-2 min-[760px]:items-start">
         <div className="gap-space-4 flex flex-col">
+          {speakerSlot}
           {pollSlot}
           <PlayerCard overview={overview} squadSlot={squadCallout === "badge" ? squadBadge : undefined} qrHref={qrHref} networkHref={networkHref} avatarLook={avatarLook} avatarHref={avatarHref} />
           {standingSlot}
-          <WelcomeBanner alias={overview.alias} />
         </div>
 
         <section aria-labelledby="terminal-title" className="gap-space-4 flex flex-col">

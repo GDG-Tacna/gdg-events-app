@@ -11,6 +11,7 @@ export type {
   SpeakerActionResult,
   UnlinkSpeakerAction,
 } from "./ui/actions";
+export { SpeakerCallout, type SpeakerCalloutProps } from "./ui/SpeakerCallout";
 export { SpeakerInvitePanel, type SpeakerInvitePanelProps } from "./ui/SpeakerInvitePanel";
 export { SpeakerAvatar, SpeakersAdminView, type SpeakersAdminViewProps } from "./ui/SpeakersAdminView";
 export { SPEAKER_CODE_LIFETIME_SECONDS, isSpeakerCode, type SpeakerCodeErrorCode } from "./domain/speaker-code";

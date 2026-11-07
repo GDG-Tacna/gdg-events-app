@@ -33,8 +33,10 @@ describe("admin navigation", () => {
     expect(program).toEqual(["/admin/charlas", "/admin/speakers", "/admin/puestos", "/admin/zonas", "/admin/mapa"]);
   });
 
-  it("hides the zones with the plan when the map is switched off, and makes both view-only together", () => {
-    expect(adminNavItems((module) => module !== "map").map((item) => item.href)).not.toContain("/admin/zonas");
+  it("hides only the plan when the map is switched off (zones group the missions), and makes both view-only together", () => {
+    const hrefs = adminNavItems((module) => module !== "map").map((item) => item.href);
+    expect(hrefs).toContain("/admin/zonas");
+    expect(hrefs).not.toContain("/admin/mapa");
     expect(readOnlyAreas({ map: "view" })).toEqual(["/admin/zonas", "/admin/mapa"]);
   });
 });

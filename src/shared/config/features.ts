@@ -29,6 +29,8 @@ export const FEATURES = {
   raffle: true,
   /** Block 7: live polls (the admin opens one at a time; cadets vote, with an optional prize; results on the stage). */
   polls: true,
+  /** Block 7: speakers linked to their account may also play as cadets; switched off, they only reach their code. */
+  speakerPlay: true,
 } as const;
 
 export type FeatureName = keyof typeof FEATURES;

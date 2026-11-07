@@ -10,6 +10,4 @@ export type { WalletView } from "./domain/overview";
 export { DashboardView, type DashboardViewProps } from "./ui/DashboardView";
 export { PlayerCard, type PlayerCardProps } from "./ui/PlayerCard";
 export { MissionsCard, type MissionsCardProps } from "./ui/MissionsCard";
-export { AccountMenu, type AccountMenuProps } from "./ui/AccountMenu";
 export { SquadCallout, type SquadCalloutProps } from "./ui/SquadCallout";
-export { WelcomeBanner } from "./ui/WelcomeBanner";

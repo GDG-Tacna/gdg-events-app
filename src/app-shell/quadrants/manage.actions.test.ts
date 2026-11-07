@@ -48,15 +48,25 @@ describe("map admin actions", () => {
     ["save venue", () => actions.saveVenueAction(VENUE as never)],
   ] as const;
 
-  it.each(calls)("%s is off with the admin or the map switched off, and only for admins", async (_, call) => {
-    features.FEATURES.map = false;
+  it.each(calls)("%s is off with the admin switched off, and only for admins", async (_, call) => {
+    features.FEATURES.admin = false;
     expect(await call()).toEqual({ ok: false, code: "disabled" });
-    features.FEATURES.map = true;
+    features.FEATURES.admin = true;
     guards.getSession.mockResolvedValue(null);
     expect(await call()).toEqual({ ok: false, code: "unauthenticated" });
     guards.getSession.mockResolvedValue(session("staff"));
     expect(await call()).toEqual({ ok: false, code: "forbidden" });
     expect(source.invalidate).not.toHaveBeenCalled();
+  });
+
+  it("keeps the zones editable with the map switched off (they group the missions); only the plan is off", async () => {
+    features.FEATURES.map = false;
+
+    expect(await actions.seedLayoutAction()).toEqual({ ok: false, code: "disabled" });
+    expect(await actions.saveVenueAction(VENUE as never)).toEqual({ ok: false, code: "disabled" });
+    expect(await actions.createQuadrantAction(QUADRANT)).toEqual({ ok: true });
+    expect(await actions.setQuadrantActiveAction({ id: "ai", active: false })).toEqual({ ok: true });
+    expect(server.saveVenue).not.toHaveBeenCalled();
   });
 
   it("seeds, reports the stand QR codes, and drops the attendees' cached map", async () => {
