@@ -15,6 +15,7 @@
     "icons": "node scripts/generate-icons.mjs",
     "admin:first": "node --env-file=.env.local scripts/grant-first-admin.mjs",
     "talks:seed": "node --env-file=.env.local scripts/seed-talks.mjs",
+    "talks:missions": "node --env-file=.env.local scripts/seed-talk-missions.mjs",
     "load:seed": "node --env-file=.env.local scripts/load-test/seed.mjs",
     "load:run": "node --env-file=.env.local scripts/load-test/run.mjs",
     "load:cleanup": "node --env-file=.env.local scripts/load-test/cleanup.mjs",

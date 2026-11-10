@@ -14,6 +14,14 @@ const UTC_OFFSET = "-05:00";
 const DEFAULT_EVENT_ID = "devfest-2026";
 const ROOM = { id: "auditorio", name: "Auditorio principal", tagline: "Charlas y keynotes del evento", planet: "gdg" };
 
+const BUNDLED_ZONES = [
+  { id: "cloud", name: "Google Cloud", tagline: "Infraestructura que escala hasta las estrellas", planet: "cloud", order: 0 },
+  { id: "firebase", name: "Firebase", tagline: "Lanza tu app a la órbita en minutos", planet: "firebase", order: 1 },
+  { id: "android", name: "Android", tagline: "Pilotea la flota de dispositivos", planet: "android", order: 2 },
+  { id: "ai", name: "AI", tagline: "Inteligencia para navegar la galaxia", planet: "ai", order: 3 },
+  { id: "community", name: "Comunidad GDG", tagline: "La tripulación que hace posible la misión", planet: "gdg", order: 4 },
+];
+
 const TEAM = "Equipo GDG Tacna";
 
 // Titles are capped at 80 characters by the app: the two long ones are shortened and kept whole in the description.
@@ -98,10 +106,24 @@ async function create(ref, data, label, auditEntry) {
   console.log(`  created        ${label}`);
 }
 
+// An edition with no zones of its own serves the bundled ones (see features/quadrants/data/default-layout.ts); saving
+// any zone makes the edition's own list the only one. So when the room would be the first, the bundled zones are saved
+// with it, or they would disappear (and every mission pointing at them would lose its zone).
+console.log("Zones");
+const quadrants = await event.collection("quadrants").get();
+if (quadrants.docs.every((doc) => doc.id === ROOM.id)) {
+  for (const zone of BUNDLED_ZONES) {
+    await create(event.collection("quadrants").doc(zone.id), { name: zone.name, tagline: zone.tagline, planet: zone.planet, order: zone.order, active: true }, `${zone.id} (${zone.name})`, {
+      action: "quadrant.created",
+      targetUid: zone.id,
+      details: { name: zone.name },
+    });
+  }
+}
+const order = Math.max(BUNDLED_ZONES.length - 1, ...quadrants.docs.filter((doc) => doc.id !== ROOM.id).map((doc) => Number(doc.data().order) || 0)) + 1;
+
 // Room (zone).
 console.log("Room");
-const quadrants = await event.collection("quadrants").get();
-const order = quadrants.docs.reduce((max, doc) => Math.max(max, Number(doc.data().order) || 0), 0) + 1;
 await create(
   event.collection("quadrants").doc(ROOM.id),
   { name: ROOM.name, tagline: ROOM.tagline, planet: ROOM.planet, order, active: true },
