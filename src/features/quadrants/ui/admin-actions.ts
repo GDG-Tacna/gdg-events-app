@@ -10,6 +10,7 @@ export type SaveVenueActionResult = { ok: true; standQrs: string[]; failedQrs: s
 export type SeedLayoutAction = () => Promise<SaveVenueActionResult>;
 export type SaveQuadrantAction = (input: { id: string; name: string; tagline: string; planet: string }) => Promise<QuadrantAdminActionResult>;
 export type SetQuadrantActiveAction = (input: { id: string; active: boolean }) => Promise<QuadrantAdminActionResult>;
+export type DeleteQuadrantAction = (input: { id: string }) => Promise<QuadrantAdminActionResult>;
 export type MoveQuadrantAction = (input: { id: string; to: number }) => Promise<QuadrantAdminActionResult>;
 /** The plan to save, with the background it keeps (its path) or null for none. */
 export type SaveVenueAction = (venue: VenueMap & { backgroundPath?: string | null }) => Promise<SaveVenueActionResult>;

@@ -30,12 +30,13 @@ const a = copy.admin.areas;
 const AREAS: readonly Area[] = [
   { href: ROUTES.adminEvent, label: n.event, icon: "calendar", card: a.event, group: "event", section: "event" },
   { href: ROUTES.adminTeam, label: n.team, icon: "users", card: a.team, group: "event", section: "team" },
+  { href: ROUTES.adminCadets, label: n.cadets, icon: "person", card: a.cadets, group: "event", section: "cadets" },
 
   { href: ROUTES.adminTalks, label: n.talks, icon: "mic", card: a.talks, group: "program", section: "talks" },
   { href: ROUTES.adminSpeakers, label: n.speakers, icon: "person", card: a.speakers, group: "program", section: "talks" },
   { href: ROUTES.adminCheckpoints, label: n.checkpoints, icon: "store", card: a.checkpoints, group: "program", section: "checkpoints" },
-  // Zones group the missions, so they stay with the map off; only the venue plan belongs to the map module.
-  { href: ROUTES.adminZones, label: n.zones, icon: "layers", card: a.zones, group: "program", section: "map" },
+  // Zones group the missions, so they stay with the map off and have their own permission; only the venue plan belongs to the map module.
+  { href: ROUTES.adminZones, label: n.zones, icon: "layers", card: a.zones, group: "program", section: "zones" },
   { href: ROUTES.adminMap, label: n.map, icon: "map", card: a.map, group: "program", module: "map", section: "map" },
 
   { href: ROUTES.adminMissions, label: n.missions, icon: "target", card: a.missions, group: "game", module: "missions", section: "missions" },

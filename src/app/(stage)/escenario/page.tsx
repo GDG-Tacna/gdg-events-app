@@ -56,6 +56,7 @@ export default async function StagePage() {
         initialBoard={board.ok ? board.value : null}
         squadsOn={squadsOn}
         pollsOn={FEATURES.polls && pollsOn}
+        talkQrOn={FEATURES.checkins}
       />
     </>
   );

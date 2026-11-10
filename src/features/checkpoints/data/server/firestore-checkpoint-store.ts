@@ -2,12 +2,12 @@ import "server-only";
 import type { Firestore } from "firebase-admin/firestore";
 import { getActiveEventId, type ActiveEventResolver } from "@/shared/lib/firebase/active-event";
 import { getAdminFirestore } from "@/shared/lib/firebase/admin";
-import { CHECKPOINTS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
+import { CHECKINS_COLLECTION, CHECKPOINTS_COLLECTION, MISSIONS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { isCheckpointId, isCheckpointKind } from "@/features/checkins";
 import { NO_FOOD_REQUIREMENTS, parseFoodRequirements, type FoodRequirements } from "../../domain/food-gate";
-import type { CheckpointStore, ManagedCheckpoint } from "../../domain/manage";
+import type { CheckpointDeletion, CheckpointStore, ManagedCheckpoint } from "../../domain/manage";
 
 const nameOf = (id: string, name: unknown): string => (typeof name === "string" && name.trim() !== "" ? name.trim() : id);
 
@@ -65,6 +65,30 @@ export class FirestoreCheckpointStore implements CheckpointStore {
     } catch (cause) {
       if (isAlreadyExists(cause)) return err({ code: "already-exists" });
       logServerError("checkpoints.store.create", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async delete(id: string): Promise<Result<CheckpointDeletion, { code: string }>> {
+    try {
+      const db = this.getDb();
+      const eventId = await this.getEventId();
+      const ref = eventCollection(db, eventId, CHECKPOINTS_COLLECTION).doc(id);
+      const checkIns = eventCollection(db, eventId, CHECKINS_COLLECTION).where("checkpointId", "==", id).limit(1);
+      const missions = eventCollection(db, eventId, MISSIONS_COLLECTION).where("config.checkpointId", "==", id).limit(1);
+
+      // Reading the check-ins and missions inside the transaction makes a scan or a new mission at the same moment retry the delete.
+      return await db.runTransaction(async (tx): Promise<Result<CheckpointDeletion, { code: string }>> => {
+        const [snapshot, scanned, tied] = await Promise.all([tx.get(ref), tx.get(checkIns), tx.get(missions)]);
+        const checkpoint = snapshot.exists ? toCheckpoint(id, snapshot.data()) : null;
+        if (!checkpoint) return ok({ kind: "not-found" });
+        if (!scanned.empty) return ok({ kind: "has-check-ins" });
+        if (!tied.empty) return ok({ kind: "has-missions" });
+        tx.delete(ref);
+        return ok({ kind: "deleted", checkpoint });
+      });
+    } catch (cause) {
+      logServerError("checkpoints.store.delete", cause);
       return err({ code: "unknown" });
     }
   }

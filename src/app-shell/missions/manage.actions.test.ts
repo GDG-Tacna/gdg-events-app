@@ -5,6 +5,8 @@ vi.mock("@/app-shell/composition/mission-admin.server", () => ({ missionAdminDep
 const source = { invalidate: vi.fn() };
 vi.mock("@/app-shell/composition/missions.server", () => ({ missionSource: source }));
 
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
@@ -36,6 +38,7 @@ describe("mission admin actions", () => {
     features.FEATURES.admin = true;
     features.FEATURES.missions = true;
     guards.getSession.mockResolvedValue(session("admin"));
+    deletion.mayDeleteItems.mockResolvedValue(true);
     permissions.mayEdit.mockImplementation(async (who: { role: string | null }) => who.role === "admin");
     for (const name of ["seedMissions", "createMission", "updateMission", "setMissionActive", "moveMission", "deleteMission"] as const) {
       server[name].mockResolvedValue({ ok: true, value: null });
@@ -134,6 +137,16 @@ describe("mission admin actions", () => {
     guards.getSession.mockResolvedValue(session("staff"));
     expect(await actions.deleteMissionAction({ id: "m-1" })).toEqual({ ok: false, code: "forbidden" });
     expect(server.deleteMission).not.toHaveBeenCalled();
+  });
+
+  it("refuses to delete once the edition is published, unless the admin is allowed to, and keeps the cache", async () => {
+    deletion.mayDeleteItems.mockResolvedValue(false);
+
+    expect(await actions.deleteMissionAction({ id: "m-1" })).toEqual({ ok: false, code: "edition-locked" });
+
+    expect(deletion.mayDeleteItems).toHaveBeenCalledWith(session("admin"));
+    expect(server.deleteMission).not.toHaveBeenCalled();
+    expect(source.invalidate).not.toHaveBeenCalled();
   });
 
   it("keeps the cache and passes the reason when a mission cannot be deleted", async () => {

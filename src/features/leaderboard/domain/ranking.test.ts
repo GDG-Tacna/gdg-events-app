@@ -160,6 +160,7 @@ describe("participantEntry", () => {
     ["no alias", { xp: 10 }],
     ["negative XP", { alias: "x", xp: -1 }],
     ["XP as text", { alias: "x", xp: "10" }],
+    ["a cadet an admin blocked", { alias: "Vetado", xp: 500, banned: true }],
   ])("ignores %s", (_, data) => {
     expect(participantEntry("u", data as Record<string, unknown> | undefined)).toBeNull();
   });

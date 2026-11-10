@@ -30,6 +30,7 @@ export {
   NAME_MAX_LENGTH,
   NAME_MIN_LENGTH,
   createCheckpoint,
+  deleteCheckpoint,
   listCheckpoints,
   normalizeName,
   renameCheckpoint,

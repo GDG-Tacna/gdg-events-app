@@ -22,6 +22,7 @@ const TALK: Talk = { id: "keynote", title: "Keynote", speakerIds: ["ana-torres"]
 function fakeFirestore(initial: Record<string, Doc> = {}) {
   const store = new Map<string, Doc>(Object.entries(initial));
   const snapshot = (path: string) => ({ exists: store.has(path), id: path.split("/").pop()!, data: () => store.get(path) });
+  const pick = (data: Doc | undefined, field: string) => field.split(".").reduce<unknown>((value, key) => (value as Doc | undefined)?.[key], data);
   const db = {
     collection: withEventScope((name: string) => ({
       doc: (id: string) => ({
@@ -32,19 +33,26 @@ function fakeFirestore(initial: Record<string, Doc> = {}) {
           store.set(`${name}/${id}`, data);
         },
       }),
-      where: (field: string, op: string, value: unknown) => ({
-        get: async () => {
-          if (op !== "==") throw new Error(`unexpected ${op}`);
-          const docs = [...store.entries()]
-            .filter(([path, data]) => path.startsWith(`${name}/`) && data[field] === value)
-            .map(([path, data]) => ({ id: path.split("/").pop()!, data: () => data }));
-          return { docs };
-        },
-      }),
+      where: (field: string, op: string, value: unknown) => {
+        if (op !== "==") throw new Error(`unexpected ${op}`);
+        const matching = () => [...store.entries()].filter(([path, data]) => path.startsWith(`${name}/`) && pick(data, field) === value);
+        const query = {
+          get: async () => ({ docs: matching().map(([path, data]) => ({ id: path.split("/").pop()!, data: () => data })) }),
+          isQuery: true,
+          matches: () => matching().map(([path]) => snapshot(path)),
+          limit: () => query,
+        };
+        return query;
+      },
     })),
     runTransaction: async <T,>(fn: (tx: unknown) => Promise<T>): Promise<T> =>
       fn({
-        get: async (ref: { path: string }) => snapshot(ref.path),
+        get: async (ref: { path: string; isQuery?: boolean; matches?: () => unknown[] }) => {
+          if (!ref.isQuery) return snapshot(ref.path);
+          const docs = ref.matches!();
+          return { empty: docs.length === 0, docs };
+        },
+        delete: (ref: { path: string }) => store.delete(ref.path),
         update: (ref: { path: string }, data: Doc) => store.set(ref.path, { ...store.get(ref.path), ...data }),
       }),
   };
@@ -124,5 +132,45 @@ describe("FirestoreTalkStore", () => {
     expect(await broken.list()).toEqual(err({ code: "unknown" }));
     expect(await broken.create(TALK)).toEqual(err({ code: "unknown" }));
     expect(await broken.update("keynote", { active: false })).toEqual(err({ code: "unknown" }));
+  });
+});
+
+describe("FirestoreTalkStore delete", () => {
+  let fake: ReturnType<typeof fakeFirestore>;
+  let store: InstanceType<typeof FirestoreTalkStore>;
+
+  beforeEach(() => {
+    fake = fakeFirestore({
+      "events/e1/checkpoints/keynote": { kind: "talk", name: "Keynote", active: true },
+      "events/e1/checkpoints/lunch-1": { kind: "catering", name: "Almuerzo", active: true },
+      "events/e1/missions/other": { config: { type: "talk", checkpointId: "otra" } },
+    });
+    store = new FirestoreTalkStore(() => fake.db, testEventResolver);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("deletes a talk nobody attended and no mission uses, and reports it", async () => {
+    const result = await store.delete("keynote");
+
+    expect(result.ok && result.value.kind).toBe("deleted");
+    expect(fake.store.has("events/e1/checkpoints/keynote")).toBe(false);
+  });
+
+  it("keeps a talk any cadet attended, or a mission points at", async () => {
+    fake.store.set("events/e1/checkins/u1_keynote", { uid: "u1", checkpointId: "keynote" });
+    expect(await store.delete("keynote")).toEqual({ ok: true, value: { kind: "has-check-ins" } });
+
+    fake.store.delete("events/e1/checkins/u1_keynote");
+    fake.store.set("events/e1/missions/keynote-m", { config: { type: "talk", checkpointId: "keynote" } });
+    expect(await store.delete("keynote")).toEqual({ ok: true, value: { kind: "has-missions" } });
+    expect(fake.store.has("events/e1/checkpoints/keynote")).toBe(true);
+  });
+
+  it("is not found for a station or a missing talk, and unknown when the database fails", async () => {
+    expect(await store.delete("lunch-1")).toEqual({ ok: true, value: { kind: "not-found" } });
+    expect(await store.delete("ghost")).toEqual({ ok: true, value: { kind: "not-found" } });
+    const broken = new FirestoreTalkStore(() => ({ collection: () => { throw new Error("offline"); } }) as unknown as Firestore, testEventResolver);
+
+    expect(await broken.delete("keynote")).toEqual({ ok: false, error: { code: "unknown" } });
   });
 });

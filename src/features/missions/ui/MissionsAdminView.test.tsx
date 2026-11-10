@@ -75,6 +75,13 @@ describe("MissionsAdminView", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
+  it("offers no delete button when the session may not delete here, but keeps the rest", () => {
+    renderView(MISSIONS, { canDelete: false });
+
+    expect(screen.queryByRole("button", { name: `${copy.admin.missions.delete}: Misión ai-quiz` })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `${copy.admin.missions.deactivate}: Misión ai-quiz` })).toBeInTheDocument();
+  });
+
   it("does nothing when the confirmation is declined", () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     const { props } = renderView();

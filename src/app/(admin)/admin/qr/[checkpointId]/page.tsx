@@ -27,7 +27,7 @@ export default async function AdminQrDisplayPage({ params }: PageProps<"/admin/q
     <ScreenEnter>
       <div className="gap-space-4 flex flex-col">
         <div>
-          <ButtonLink href={`${ROUTES.adminTalks}/${talk.id}`} variant="ghost" size="sm" className="-ml-space-4">
+          <ButtonLink href={ROUTES.adminTalks} variant="ghost" size="sm" className="-ml-space-4">
             {copy.admin.qr.back}
           </ButtonLink>
         </div>

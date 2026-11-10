@@ -13,7 +13,7 @@ const OWN = [
 ];
 const ADMIN = { uid: "a1", role: "admin" } as const;
 
-function setup(stored: RankLadder | null = null) {
+function setup(stored: RankLadder | null = null, gate: Result<number, { code: string }> | null = null) {
   const entries: RankAuditEntry[] = [];
   const deps = {
     store: {
@@ -21,6 +21,7 @@ function setup(stored: RankLadder | null = null) {
       save: vi.fn(async (): Promise<Result<void, { code: string }>> => ok(undefined)),
     },
     defaults: DEFAULTS,
+    ...(gate ? { gates: { highestLevelRequired: vi.fn(async () => gate) } } : {}),
     images: { ref: vi.fn((path: string, purpose: string) => (path.includes(`/${purpose}/`) ? { path, url: `https://cdn/${path}` } : null)), remove: vi.fn(async () => {}) },
     audit: { append: vi.fn(async (entry: RankAuditEntry) => (entries.push(entry), ok(undefined))) },
     now: () => new Date(0),
@@ -117,6 +118,52 @@ describe("rank admin", () => {
     expect(await saveRanks(deps, ADMIN, OWN)).toMatchObject({ ok: true });
     expect(deps.store.save).toHaveBeenCalledWith(OWN.map((rank) => ({ ...rank, iconPath: null })));
     expect(entries).toEqual([{ action: "ranks.updated", actorUid: "a1", targetUid: "ranks", details: { ladder: "Cadete:0,As:50" }, at: new Date(0) }]);
+  });
+
+  describe("taking ranks out of the ladder", () => {
+    const THREE = createRankLadder([...OWN, { id: "legend", name: "Leyenda", minXp: 500 }]);
+    const RENAMED = [{ id: "cadet", name: "Cadete 2", minXp: 0 }, { id: "ace", name: "As 2", minXp: 80 }, { id: "legend", name: "Leyenda", minXp: 900 }];
+
+    it("refuses it when the caller says the edition is locked, but still lets names and XP change", async () => {
+      const { deps } = setup(THREE);
+
+      expect(await saveRanks(deps, ADMIN, OWN, { mayRemove: false })).toEqual(err({ code: "edition-locked" }));
+      expect(deps.store.save).not.toHaveBeenCalled();
+
+      expect(await saveRanks(deps, ADMIN, RENAMED, { mayRemove: false })).toMatchObject({ ok: true });
+      // Adding ranks is not removing.
+      expect(await saveRanks(setup(createRankLadder(OWN)).deps, ADMIN, [...OWN, { id: "legend", name: "Leyenda", minXp: 500 }], { mayRemove: false })).toMatchObject({ ok: true });
+    });
+
+    it("counts a rank missing from the bundled ladder as removed when the edition has none of its own", async () => {
+      const { deps } = setup(null);
+
+      expect(await saveRanks(deps, ADMIN, OWN, { mayRemove: false })).toEqual(err({ code: "edition-locked" }));
+    });
+
+    it("lets whoever may remove do so when no meal asks for a level the shorter ladder lacks", async () => {
+      const { deps } = setup(THREE, ok(2));
+
+      expect(await saveRanks(deps, ADMIN, OWN, { mayRemove: true })).toMatchObject({ ok: true });
+      expect(deps.store.save).toHaveBeenCalledTimes(1);
+    });
+
+    it("refuses removing a rank while a meal asks for its level", async () => {
+      const { deps } = setup(THREE, ok(3));
+
+      expect(await saveRanks(deps, ADMIN, OWN, { mayRemove: true })).toEqual(err({ code: "rank-in-use" }));
+      expect(deps.store.save).not.toHaveBeenCalled();
+      // Without taking any rank out the gates are not even asked.
+      expect(await saveRanks(deps, ADMIN, THREE.map(({ id, name, minXp }) => ({ id, name, minXp })), { mayRemove: true })).toMatchObject({ ok: true });
+    });
+
+    it("reports a failed read of the ladder or of the gates", async () => {
+      const unreadable = setup(THREE);
+      unreadable.deps.store.load.mockResolvedValueOnce(err({ code: "x" }));
+      expect(await saveRanks(unreadable.deps, ADMIN, OWN)).toEqual(err({ code: "unknown" }));
+
+      expect(await saveRanks(setup(THREE, err({ code: "x" })).deps, ADMIN, OWN)).toEqual(err({ code: "unknown" }));
+    });
   });
 
   it("refuses an invalid ladder, anyone but an admin, and reports failures", async () => {

@@ -25,8 +25,8 @@ const result = (overrides: Partial<Extract<RecordCheckInActionResult, { ok: true
   ...overrides,
 });
 
-async function renderView(scanner: QrCamera, record: RecordCheckInAction = vi.fn(async () => result())) {
-  const view = render(<ScannerView camera={scanner} record={record} homeHref="/dashboard" />);
+async function renderView(scanner: QrCamera, record: RecordCheckInAction = vi.fn(async () => result()), extra: { missionsHref?: string } = {}) {
+  const view = render(<ScannerView camera={scanner} record={record} homeHref="/dashboard" {...extra} />);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(0);
   });
@@ -153,8 +153,8 @@ describe("ScannerView results", () => {
   it("lists the missions the scan completed, with the XP of the new ones only", async () => {
     const { scanner, see } = fakeScanner();
     const missions = [
-      { title: "Visita el stand de AI", xpEarned: 30, creditsEarned: 10, justCompleted: true },
-      { title: "Asiste a la charla", xpEarned: 50, creditsEarned: 10, justCompleted: false },
+      { id: "ai-stand", title: "Visita el stand de AI", xpEarned: 30, creditsEarned: 10, justCompleted: true },
+      { id: "keynote", title: "Asiste a la charla", xpEarned: 50, creditsEarned: 10, justCompleted: false },
     ];
     await renderView(scanner, vi.fn(async () => result({ kind: "stand", missions })));
 
@@ -165,6 +165,40 @@ describe("ScannerView results", () => {
     expect(items[0]).toHaveTextContent(`${copy.scanner.missions.completed}Visita el stand de AI+30 XP+10 G-Credits`);
     expect(items[1]).toHaveTextContent(`${copy.scanner.missions.already}Asiste a la charla`);
     expect(items[1]).not.toHaveTextContent("XP");
+  });
+
+  it("offers to see the missions the scan just completed on the board, which celebrates them", async () => {
+    const { scanner, see } = fakeScanner();
+    const missions = [
+      { id: "ai-stand", title: "Visita el stand de AI", xpEarned: 30, creditsEarned: 0, justCompleted: true },
+      { id: "keynote", title: "Asiste a la charla", xpEarned: 50, creditsEarned: 0, justCompleted: true },
+      { id: "old-one", title: "Ya hecha", xpEarned: 0, creditsEarned: 0, justCompleted: false },
+    ];
+    await renderView(scanner, vi.fn(async () => result({ kind: "stand", missions })), { missionsHref: "/missions" });
+
+    await see("devfest:cp:stand-ai-1");
+
+    expect(screen.getByRole("link", { name: copy.scanner.viewMissions })).toHaveAttribute("href", "/missions?completadas=ai-stand,keynote");
+    expect(screen.getByRole("button", { name: copy.scanner.scanAgain })).toBeInTheDocument();
+  });
+
+  it("says «Ver misión» for one, and offers nothing when none is new or the missions are off", async () => {
+    const one = fakeScanner();
+    const view = await renderView(one.scanner, vi.fn(async () => result({ kind: "talk", missions: [{ id: "keynote", title: "Asiste", xpEarned: 50, creditsEarned: 0, justCompleted: true }] })), { missionsHref: "/missions" });
+    await one.see("code");
+    expect(screen.getByRole("link", { name: copy.scanner.viewMission })).toHaveAttribute("href", "/missions?completadas=keynote");
+    view.unmount();
+
+    const repeat = fakeScanner();
+    const second = await renderView(repeat.scanner, vi.fn(async () => result({ kind: "talk", missions: [{ id: "keynote", title: "Asiste", xpEarned: 0, creditsEarned: 0, justCompleted: false }] })), { missionsHref: "/missions" });
+    await repeat.see("code");
+    expect(screen.queryByRole("link", { name: copy.scanner.viewMission })).not.toBeInTheDocument();
+    second.unmount();
+
+    const off = fakeScanner();
+    await renderView(off.scanner, vi.fn(async () => result({ kind: "talk", missions: [{ id: "keynote", title: "Asiste", xpEarned: 50, creditsEarned: 0, justCompleted: true }] })));
+    await off.see("code");
+    expect(screen.queryByRole("link", { name: copy.scanner.viewMission })).not.toBeInTheDocument();
   });
 
   it.each(["invalid-code", "expired-code", "checkpoint-inactive", "not-registered", "rate-limited", "unknown"] as const)(

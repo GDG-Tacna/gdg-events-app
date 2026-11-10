@@ -16,6 +16,8 @@ export interface RanksEditorProps {
   save: SaveRanksAction;
   /** Uploads a rank's icon. */
   upload: UploadImageAction;
+  /** Whether the session may take ranks out of the ladder (a draft edition, or an admin of every edition); the server decides again. A rank added in this session can always be dropped before saving. */
+  canRemove?: boolean;
 }
 
 interface Row {
@@ -40,12 +42,13 @@ function newId(rows: readonly Row[]): string {
  * at (the first always at 0). Ranks can be added and removed. Problems are pointed at before saving, with
  * the same rules as the server; saving reprices every attendee at once.
  */
-export function RanksEditor({ ranks, isDefault, save, upload }: RanksEditorProps) {
+export function RanksEditor({ ranks, isDefault, save, upload, canRemove = true }: RanksEditorProps) {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>(ranks.map((rank) => ({ id: rank.id, name: rank.name, xp: String(rank.minXp), icon: rank.icon ?? null })));
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [showProblems, setShowProblems] = useState(false);
+  const savedIds = useMemo(() => new Set(ranks.map((rank) => rank.id)), [ranks]);
 
   const ladder = rows.map((row) => ({ id: row.id, name: row.name, minXp: xpOf(row) }));
   const problems = useMemo(() => rankLadderProblems(rows.map((row) => ({ id: row.id, name: row.name, minXp: xpOf(row) }))), [rows]);
@@ -153,7 +156,7 @@ export function RanksEditor({ ranks, isDefault, save, upload }: RanksEditorProps
                     onChange={(event) => change(index, { xp: event.target.value.replace(/[^0-9]/g, "") })}
                   />
                 </div>
-                {index > 0 ? (
+                {index > 0 && (canRemove || !savedIds.has(row.id)) ? (
                   <Button
                     type="button"
                     variant="ghost"

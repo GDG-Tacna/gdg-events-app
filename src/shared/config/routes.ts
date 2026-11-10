@@ -36,6 +36,8 @@ export const ROUTES = {
   /** Admin area (Centro de control). Admin role only. */
   admin: "/admin",
   adminTeam: "/admin/team",
+  /** The cadets registered in the edition, and each one's page (`/admin/cadetes/{uid}`). */
+  adminCadets: "/admin/cadetes",
   /** Where a talk's QR is projected (`/admin/qr/{talkId}`); the list itself lives in Charlas. */
   adminQr: "/admin/qr",
   adminTalks: "/admin/charlas",

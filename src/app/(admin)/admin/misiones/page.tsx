@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { galaxyDeps } from "@/app-shell/composition/quadrants.server";
 import { missionAdminDeps } from "@/app-shell/composition/mission-admin.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { requireRole } from "@/app-shell/guards";
 import { deleteMissionAction, moveMissionAction, seedMissionsAction, setMissionActiveAction } from "@/app-shell/missions/manage.actions";
 import { MissionsAdminView } from "@/features/missions";
@@ -37,6 +38,7 @@ export default async function AdminMissionsPage() {
         setActive={setMissionActiveAction}
         move={moveMissionAction}
         remove={deleteMissionAction}
+        canDelete={await mayDeleteItems(session)}
         hrefs={{
           create: `${ROUTES.adminMissions}/nueva`,
           editBase: ROUTES.adminMissions,

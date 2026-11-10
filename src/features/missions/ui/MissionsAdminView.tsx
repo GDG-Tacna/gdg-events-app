@@ -21,6 +21,8 @@ export interface MissionsAdminViewProps {
   setActive: SetMissionActiveAction;
   move: MoveMissionAction;
   remove: DeleteMissionAction;
+  /** Whether the session may delete missions here (a draft edition, or an admin of every edition); the server decides again. */
+  canDelete?: boolean;
   /** Plain paths (a client component cannot receive functions from the server): a mission is edited at `${editBase}/${id}`. */
   hrefs: { create: string; editBase: string; suggest?: string };
 }
@@ -43,7 +45,7 @@ const chip ="type-caption border-line-strong text-foreground px-space-3 rounded-
  * and state, a handle to drag it to another place, and buttons to edit and activate or deactivate. While the edition
  * has no missions of its own it offers to load the bundled set. A mission can be deleted only while no cadet has a record with it; the server decides that, and everything else.
  */
-export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, setActive, move, remove, hrefs }: MissionsAdminViewProps) {
+export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, setActive, move, remove, canDelete = true, hrefs }: MissionsAdminViewProps) {
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -168,20 +170,22 @@ export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, se
                   >
                     {mission.active ? copy.admin.missions.deactivate : copy.admin.missions.activate}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={busy !== null}
-                    loading={busy === `delete:${mission.id}`}
-                    aria-label={label(copy.admin.missions.delete)}
-                    onClick={() => {
-                      if (!window.confirm(interpolate(copy.admin.missions.confirmDelete, { title: mission.title }))) return;
-                      void run(`delete:${mission.id}`, () => remove({ id: mission.id }), interpolate(copy.admin.missions.deletedDone, { title: mission.title }));
-                    }}
-                  >
-                    <Icon name="trash" size={16} />
-                    {copy.admin.missions.delete}
-                  </Button>
+                  {canDelete ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy !== null}
+                      loading={busy === `delete:${mission.id}`}
+                      aria-label={label(copy.admin.missions.delete)}
+                      onClick={() => {
+                        if (!window.confirm(interpolate(copy.admin.missions.confirmDelete, { title: mission.title }))) return;
+                        void run(`delete:${mission.id}`, () => remove({ id: mission.id }), interpolate(copy.admin.missions.deletedDone, { title: mission.title }));
+                      }}
+                    >
+                      <Icon name="trash" size={16} />
+                      {copy.admin.missions.delete}
+                    </Button>
+                  ) : null}
                 </div>
               </Card>
             );

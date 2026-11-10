@@ -34,6 +34,7 @@ function toEdition(id: string, data: DocumentData | undefined): Edition {
     startsAt: dateOf(data?.startsAt),
     endsAt: dateOf(data?.endsAt),
     status: data?.status === "finished" ? "finished" : "draft",
+    publishedAt: dateOf(data?.publishedAt),
   };
 }
 
@@ -128,8 +129,14 @@ export class FirestoreEditionCatalog implements EditionCatalog {
       return await db.runTransaction(async (tx) => {
         const snapshot = await tx.get(ref);
         const current: unknown = snapshot.data()?.activeEventId;
-        tx.set(ref, { activeEventId: id, updatedAt: new Date() }, { merge: true });
-        return ok({ previous: isEventId(current) ? current : EDITION.defaultEventId });
+        const previous = isEventId(current) ? current : EDITION.defaultEventId;
+        // Remember that both were public, for good: a published edition keeps its items from being deleted (see lifecycle).
+        const [becoming, leaving] = await Promise.all([tx.get(eventDocument(db, id)), tx.get(eventDocument(db, previous))]);
+        const now = new Date();
+        tx.set(ref, { activeEventId: id, updatedAt: now }, { merge: true });
+        if (becoming.data()?.publishedAt === undefined) tx.set(eventDocument(db, id), { publishedAt: now }, { merge: true });
+        if (previous !== id && leaving.data()?.publishedAt === undefined) tx.set(eventDocument(db, previous), { publishedAt: now }, { merge: true });
+        return ok({ previous });
       });
     } catch (cause) {
       logServerError("event.catalog.publish", cause);

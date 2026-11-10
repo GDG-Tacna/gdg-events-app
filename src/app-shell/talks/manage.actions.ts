@@ -2,9 +2,10 @@
 
 import { z } from "zod";
 import { refreshAgenda, talkAdminDeps } from "@/app-shell/composition/talks.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { getSession } from "@/app-shell/guards";
-import type { TalkAdminActionResult, TalkDraft } from "@/features/talks";
-import { createTalk, setTalkActive, updateTalk, type TalkAdminActor, type TalkAdminErrorCode } from "@/features/talks/server";
+import type { DeleteTalkActionResult, TalkAdminActionResult, TalkDraft } from "@/features/talks";
+import { createTalk, deleteTalk, setTalkActive, updateTalk, type TalkAdminActor, type TalkAdminErrorCode } from "@/features/talks/server";
 import { FEATURES } from "@/shared/config/features";
 import { mayEdit } from "@/app-shell/permissions.server";
 
@@ -54,6 +55,20 @@ export async function updateTalkAction(input: { id: string; draft: TalkDraft }):
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "invalid-title" };
   return done(await updateTalk(talkAdminDeps, actor, parsed.data));
+}
+
+export async function deleteTalkAction(input: { id: string }): Promise<DeleteTalkActionResult> {
+  const actor = await adminActor();
+  if (isResult(actor)) return { ok: false, code: actor.ok ? "unknown" : actor.code };
+  const parsed = z.object({ id: z.string().max(60) }).safeParse(input);
+  if (!parsed.success) return { ok: false, code: "not-found" };
+  // A published edition keeps its agenda: only an admin of every edition may delete there.
+  const session = await getSession();
+  if (!session || !(await mayDeleteItems(session))) return { ok: false, code: "edition-locked" };
+  const result = await deleteTalk(talkAdminDeps, actor, parsed.data);
+  if (!result.ok) return { ok: false, code: result.error.code };
+  refreshAgenda();
+  return { ok: true, title: result.value.title };
 }
 
 export async function setTalkActiveAction(input: { id: string; active: boolean }): Promise<TalkAdminActionResult> {

@@ -18,6 +18,7 @@ export {
   type EditionsDeps,
   type EditionsErrorCode,
 } from "./domain/editions";
+export { lifecycleOf, mayDelete, type EditionLifecycle } from "./domain/lifecycle";
 export { COPY_NEEDS, COPY_PARTS, copyEditionContent, isCopyPart, withNeeds, type CopyDeps, type CopyError, type CopyErrorCode, type CopyPart, type EditionCopier } from "./domain/copy";
 export { FirestoreEditionCopier } from "./data/server/firestore-edition-copier";
 export { EDITION_MODULES, MODULE_NEEDS, effectiveModules, getEditionModules, isEditionModule, listOffModules, setEditionModules, type EditionModule, type ModuleDeps, type ModuleStore, type ModuleSwitches, type ModulesErrorCode } from "./domain/modules";

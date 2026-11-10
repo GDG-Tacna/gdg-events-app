@@ -41,7 +41,8 @@ function findAll(node: ReactNode, type: unknown, found: Array<{ props: Record<st
 }
 const findElement = (node: ReactNode, type: unknown) => findAll(node, type)[0] ?? null;
 
-const GALAXY = { venue: { width: 100, height: 140, areas: [] }, quadrants: [{ id: "auditorio", name: "Auditorio", extra: 1 }] };
+const AUDITORIUM = { id: "auditorium", kind: "auditorium", label: "Auditorio", quadrantId: null, rect: { x: 0, y: 0, width: 50, height: 50 } };
+const GALAXY = { venue: { width: 100, height: 140, areas: [AUDITORIUM] }, quadrants: [{ id: "auditorio", name: "Auditorio", extra: 1 }] };
 const ITEMS = [{ id: "keynote", title: "Keynote", speaker: "Ana", startsAt: null, endsAt: null, roomId: "auditorio", description: "", status: "later", attended: true }];
 const page = (vista?: string) => MapPage({ searchParams: Promise.resolve(vista ? { vista } : {}) } as never);
 
@@ -70,6 +71,18 @@ describe("map page", () => {
     expect(findElement(tree, VenueMapView)).toBeNull();
     expect(findAll(tree, Link)).toHaveLength(0);
     features.FEATURES.map = true;
+  });
+
+  it("is only the agenda when the admin emptied the plan (an event with one room): no plan and no views to choose", async () => {
+    server.getGalaxyMap.mockResolvedValue({ ok: true, value: { ...GALAXY, venue: { ...GALAXY.venue, areas: [] } } });
+
+    const tree = await page();
+
+    expect(findElement(tree, AgendaView)).not.toBeNull();
+    expect(findElement(tree, VenueMapView)).toBeNull();
+    expect(findAll(tree, Link)).toHaveLength(0);
+    // Even when the address asks for the plan.
+    expect(findElement(await page("plano"), VenueMapView)).toBeNull();
   });
 
   it("is not found when the map and check-ins are both off, without reading the session", async () => {

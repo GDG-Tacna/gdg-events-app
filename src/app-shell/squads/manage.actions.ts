@@ -3,11 +3,13 @@
 import { z } from "zod";
 import { squadAdminDeps } from "@/app-shell/composition/squad-admin.server";
 import { squadCatalog } from "@/app-shell/composition/squads.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { getSession } from "@/app-shell/guards";
 import type { SquadAdminActionResult, SquadAdminErrorCode } from "@/features/squads";
 import {
   STATIC_SQUADS,
   createSquad,
+  deleteSquad,
   moveSquad,
   reactivateSquad,
   retireSquad,
@@ -78,6 +80,17 @@ export async function updateSquadAction(input: SquadInput): Promise<SquadAdminAc
   const parsed = squadSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "invalid-logo" };
   return done(await updateSquad(squadAdminDeps, actor, parsed.data));
+}
+
+export async function deleteSquadAction(input: { id: string }): Promise<SquadAdminActionResult> {
+  const actor = await adminActor();
+  if (isResult(actor)) return actor;
+  const parsed = z.object({ id: z.string().max(60) }).safeParse(input);
+  if (!parsed.success) return { ok: false, code: "not-found" };
+  // A published edition keeps its squads: only an admin of every edition may delete there.
+  const session = await getSession();
+  if (!session || !(await mayDeleteItems(session))) return { ok: false, code: "edition-locked" };
+  return done(await deleteSquad(squadAdminDeps, actor, parsed.data));
 }
 
 export async function retireSquadAction(input: { id: string }): Promise<SquadAdminActionResult> {

@@ -16,10 +16,20 @@ import { moduleOn } from "@/app-shell/modules.server";
 
 export const metadata: Metadata = { title: `${copy.missions.title} · ${copy.brand.name}` };
 
-export default async function MissionsPage() {
+/** The ids the scanner sends in `?completadas=` (a few mission ids); anything else in the address is ignored. */
+function celebratedIds(value: string | string[] | undefined): string[] {
+  const raw = Array.isArray(value) ? value.join(",") : (value ?? "");
+  return raw
+    .split(",")
+    .filter((id) => /^[a-z0-9][a-z0-9-]{1,39}$/.test(id))
+    .slice(0, 8);
+}
+
+export default async function MissionsPage({ searchParams }: PageProps<"/missions">) {
   if (!(await moduleOn("missions"))) notFound();
   // Visitors go to /login, users without a role go to onboarding, staff and admin go to their own home.
   const session = await requireAttendee();
+  const { completadas } = await searchParams;
 
   const [board, galaxy, games, storyTitle] = await Promise.all([
     getMissionBoard(missionDeps, session.uid),
@@ -42,7 +52,8 @@ export default async function MissionsPage() {
         <ScreenEnter>
           <MissionBoardView board={board.value} quadrants={quadrants} missionHref={(id) => `${ROUTES.missions}/${id}`} odysseyHref={(await moduleOn("odyssey")) ? ROUTES.odyssey : undefined}
             odysseyTitle={storyTitle}
-            enabledGames={games} />
+            enabledGames={games}
+            celebrate={celebratedIds(completadas)} />
         </ScreenEnter>
       </main>
     </>

@@ -19,6 +19,11 @@ function fakeFirestore(initial: Record<string, Doc>) {
   const db = {
     collection: withEventScope((name: string) => ({
       get: async () => ({ docs: [...store.keys()].filter((key) => key.startsWith(`${name}/`)).map(snapshot) }),
+      where: (field: string, _op: string, value: unknown) => {
+        const matches = () => [...store.keys()].filter((key) => key.startsWith(`${name}/`) && store.get(key)?.[field] === value).map(snapshot);
+        const query = { isQuery: true, matches, limit: () => query };
+        return query;
+      },
       doc: (id: string) => ({
         path: `${name}/${id}`,
         create: async (data: Doc) => {
@@ -30,7 +35,12 @@ function fakeFirestore(initial: Record<string, Doc>) {
     runTransaction: async <T,>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
       const pending: Array<() => void> = [];
       const result = await fn({
-        get: async (ref: { path: string }) => snapshot(ref.path),
+        get: async (ref: { path: string; isQuery?: boolean; matches?: () => unknown[] }) => {
+          if (!ref.isQuery) return snapshot(ref.path);
+          const docs = ref.matches!();
+          return { empty: docs.length === 0, docs };
+        },
+        delete: (ref: { path: string }) => pending.push(() => store.delete(ref.path)),
         update: (ref: { path: string }, data: Doc) => pending.push(() => store.set(ref.path, { ...store.get(ref.path), ...data })),
       });
       pending.forEach((commit) => commit());
@@ -68,6 +78,29 @@ describe("FirestoreBadgeStore", () => {
     expect(fake.store.get("events/e1/achievements/primer-salto")).toEqual({ name, description, tone, rule, order, active, imagePath: null, createdAt: expect.any(Date) });
     expect(await store.list()).toEqual(ok([FIRST, AI]));
     expect(console.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("deletes a badge nobody earned, and reports it", async () => {
+    await store.create(AI);
+    fake.store.set("events/e1/achievementAwards/u1_primer-salto", { uid: "u1", badgeId: "primer-salto" });
+
+    expect(await store.delete("maestro-ia")).toEqual(ok({ kind: "deleted", badge: AI }));
+    expect(fake.store.has("events/e1/achievements/maestro-ia")).toBe(false);
+  });
+
+  it("keeps a badge any cadet earned", async () => {
+    await store.create(AI);
+    fake.store.set("events/e1/achievementAwards/u1_maestro-ia", { uid: "u1", badgeId: "maestro-ia" });
+
+    expect(await store.delete("maestro-ia")).toEqual(ok({ kind: "has-awards" }));
+    expect(fake.store.has("events/e1/achievements/maestro-ia")).toBe(true);
+  });
+
+  it("answers not-found for a badge that does not exist, and unknown when the database fails", async () => {
+    expect(await store.delete("ghost")).toEqual(ok({ kind: "not-found" }));
+    const broken = new FirestoreBadgeStore(() => ({ collection: () => { throw new Error("offline"); } }) as unknown as Firestore, testEventResolver);
+
+    expect(await broken.delete("maestro-ia")).toEqual(err({ code: "unknown" }));
   });
 
   it("updates in a transaction, replacing the whole rule, and answers before and after", async () => {

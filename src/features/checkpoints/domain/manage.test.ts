@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { err, ok, type Result } from "@/shared/lib/result";
 import {
   createCheckpoint,
+  deleteCheckpoint,
   listCheckpoints,
   normalizeName,
   renameCheckpoint,
   setCheckpointActive,
   setFoodRequirements,
   suggestId,
+  type CheckpointDeletion,
   type CheckpointStore,
   type ManageActor,
   type ManageAudit,
@@ -25,14 +27,16 @@ interface Setup {
   list?: Result<readonly ManagedCheckpoint[], { code: string }>;
   create?: Result<void, { code: "already-exists" | "unknown" }>;
   update?: Result<{ before: ManagedCheckpoint; after: ManagedCheckpoint } | null, { code: string }>;
+  remove?: Result<CheckpointDeletion, { code: string }>;
   auditFails?: boolean;
 }
 
-function setup({ list = ok([LUNCH]), create = ok(undefined), update = ok({ before: LUNCH, after: LUNCH }), auditFails = false }: Setup = {}) {
+function setup({ list = ok([LUNCH]), create = ok(undefined), update = ok({ before: LUNCH, after: LUNCH }), remove = ok({ kind: "deleted", checkpoint: LUNCH } as CheckpointDeletion), auditFails = false }: Setup = {}) {
   const store: CheckpointStore = {
     list: vi.fn(async () => list),
     create: vi.fn(async () => create),
     update: vi.fn(async () => update),
+    delete: vi.fn(async () => remove),
   };
   const audit: ManageAudit = { append: vi.fn(async () => (auditFails ? err({ code: "unknown" }) : ok(undefined))) };
   const deps: ManageDeps = { store, audit, now: () => NOW };
@@ -226,6 +230,42 @@ describe("setCheckpointActive", () => {
     expect(await setCheckpointActive(t.deps, ADMIN, { id: "../x", active: false })).toEqual(err(manageError("not-found")));
     expect(t.store.update).not.toHaveBeenCalled();
     expect(await setCheckpointActive(setup({ update: ok(null) }).deps, ADMIN, { id: "lunch-1", active: false })).toEqual(err(manageError("not-found")));
+  });
+});
+
+describe("deleteCheckpoint", () => {
+  it("deletes a station nobody used and audits it", async () => {
+    const t = setup();
+
+    expect(await deleteCheckpoint(t.deps, ADMIN, { id: "lunch-1" })).toEqual(ok(LUNCH));
+
+    expect(t.store.delete).toHaveBeenCalledWith("lunch-1");
+    expect(t.audit.append).toHaveBeenCalledWith({ action: "checkpoint.deleted", actorUid: "a1", targetUid: "lunch-1", details: { kind: "catering", name: "Almuerzo" }, at: NOW });
+  });
+
+  it.each([
+    ["cadets checked in there", "has-check-ins"],
+    ["a mission points at it", "has-missions"],
+  ] as const)("refuses when %s, and changes nothing", async (_why, kind) => {
+    const t = setup({ remove: ok({ kind }) });
+
+    expect(await deleteCheckpoint(t.deps, ADMIN, { id: "lunch-1" })).toEqual(err(manageError(kind)));
+    expect(t.audit.append).not.toHaveBeenCalled();
+  });
+
+  it("is not found for an unknown or malformed station, and refuses everyone but admins", async () => {
+    expect(await deleteCheckpoint(setup({ remove: ok({ kind: "not-found" }) }).deps, ADMIN, { id: "ghost-1" })).toEqual(err(manageError("not-found")));
+    expect(await deleteCheckpoint(setup().deps, ADMIN, { id: "No Valid" })).toEqual(err(manageError("not-found")));
+    for (const role of ["staff", "attendee", null] as const) {
+      const t = setup();
+      expect(await deleteCheckpoint(t.deps, { uid: "x", role }, { id: "lunch-1" })).toEqual(err(manageError("forbidden")));
+      expect(t.store.delete).not.toHaveBeenCalled();
+    }
+  });
+
+  it("reports a failed delete, and keeps the delete when only its audit line fails", async () => {
+    expect(await deleteCheckpoint(setup({ remove: err({ code: "x" }) }).deps, ADMIN, { id: "lunch-1" })).toEqual(err(manageError("unknown")));
+    expect(await deleteCheckpoint(setup({ auditFails: true }).deps, ADMIN, { id: "lunch-1" })).toEqual(ok(LUNCH));
   });
 });
 

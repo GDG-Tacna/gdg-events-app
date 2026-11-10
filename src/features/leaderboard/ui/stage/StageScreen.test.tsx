@@ -199,6 +199,22 @@ describe("StageScreen", () => {
     expect((await axe(container)).violations).toEqual([]);
   });
 
+  it("hands a talk QR display to whoever draws the codes, and follows the stage when it changes", () => {
+    const renderTalkQr = vi.fn(({ talkId, name }: { talkId: string; name: string }) => <p>QR {talkId}: {name}</p>);
+    const fake = fakeFeed();
+    render(<StageScreen eventId="e1" feed={fake.feed} squads={SQUADS} sprites={SPRITES} initialStage={{ ...DEFAULT_STAGE, display: "talk-qr", talk: { talkId: "keynote", name: "Keynote" } }} initialBoard={INITIAL_BOARD} renderTalkQr={renderTalkQr} />);
+
+    expect(screen.getByText("QR keynote: Keynote")).toBeInTheDocument();
+    fake.push((h) => h.stage({ ...DEFAULT_STAGE }));
+    expect(screen.queryByText("QR keynote: Keynote")).not.toBeInTheDocument();
+  });
+
+  it("shows nothing for a talk QR display when no one draws the codes", () => {
+    render(<StageScreen eventId="e1" feed={fakeFeed().feed} squads={SQUADS} sprites={SPRITES} initialStage={{ ...DEFAULT_STAGE, display: "talk-qr", talk: { talkId: "keynote", name: "Keynote" } }} initialBoard={INITIAL_BOARD} />);
+
+    expect(screen.queryByText("Keynote")).not.toBeInTheDocument();
+  });
+
   it("hands a poll display to whoever draws polls, and follows the stage when it changes", () => {
     const renderPoll = vi.fn((pollId: string) => <p>Encuesta {pollId}</p>);
     const fake = fakeFeed();

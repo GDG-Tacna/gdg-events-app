@@ -23,6 +23,15 @@ describe("edition permissions", () => {
     expect(read.staffStations).toEqual(["stand"]);
   });
 
+  it("keeps the level an edition saved for the map as the level of its zones, which had no level of their own before", () => {
+    expect(parsePermissions({ organizer: { map: "none" } }).organizer).toMatchObject({ map: "none", zones: "none" });
+    expect(parsePermissions({ organizer: { map: "view" } }).organizer.zones).toBe("view");
+    // Once the zones have a level of their own it wins, whatever the map's.
+    expect(parsePermissions({ organizer: { map: "none", zones: "edit" } }).organizer).toMatchObject({ map: "none", zones: "edit" });
+    expect(parsePermissions({ organizer: { map: "bogus" } }).organizer.zones).toBe("edit");
+    expect(parsePermissions({ organizer: { raffle: "none" } }).organizer.zones).toBe("edit");
+  });
+
   it("never limits an admin of every edition, and gives nothing to anyone who is not an admin", () => {
     const limited: EditionPermissions = { ...DEFAULT_PERMISSIONS, organizer: { ...DEFAULT_PERMISSIONS.organizer, raffle: "none" } };
 

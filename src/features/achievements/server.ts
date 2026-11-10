@@ -14,6 +14,7 @@ export {
 } from "./domain/achievements";
 export {
   createBadge,
+  deleteBadge,
   listManagedBadges,
   moveBadge,
   seedBadges,

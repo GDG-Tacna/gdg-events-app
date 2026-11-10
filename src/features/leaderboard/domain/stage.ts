@@ -5,10 +5,10 @@ import { getFleetBoard, type BoardCadet, type FleetBoard, type LeaderboardDeps, 
 
 /**
  * What the stage screen shows, set by the admin from "Escenario": the ranking (live or frozen at a moment), a
- * waiting screen, the champions' reveal, a raffle draw or a live poll's results; and which ranking (cadets, squads or both alternating). One document
+ * waiting screen, the champions' reveal, a raffle draw, a live poll's results or a talk's attendance QR; and which ranking (cadets, squads or both alternating). One document
  * per edition, which the stage screen listens to.
  */
-export const STAGE_DISPLAYS = ["ranking", "waiting", "reveal", "raffle", "poll"] as const;
+export const STAGE_DISPLAYS = ["ranking", "waiting", "reveal", "raffle", "poll", "talk-qr"] as const;
 export type StageDisplay = (typeof STAGE_DISPLAYS)[number];
 export const STAGE_VIEWS = ["cadets", "squads", "both"] as const;
 export type StageView = (typeof STAGE_VIEWS)[number];
@@ -45,9 +45,11 @@ export interface StageState {
   background: ImageRef | null;
   /** The poll whose results are on screen (the polls feature draws them); kept until the stage shows something else. */
   poll: { pollId: string } | null;
+  /** The talk whose attendance QR is on screen, with its name so the title is there before the first code; kept until the stage shows something else. */
+  talk: { talkId: string; name: string } | null;
 }
 
-export const DEFAULT_STAGE: StageState = { display: "ranking", view: "both", frozen: null, champions: null, raffle: null, background: null, poll: null };
+export const DEFAULT_STAGE: StageState = { display: "ranking", view: "both", frozen: null, champions: null, raffle: null, background: null, poll: null, talk: null };
 
 /** What the admin can do from "Escenario". */
 export type StageCommand =
@@ -59,7 +61,9 @@ export type StageCommand =
   /** An uploaded image's path for the background, or `null` to go back to the space background. */
   | { type: "background"; path: string | null }
   /** A poll's results on screen (the app shell checks the poll exists and was opened). */
-  | { type: "poll"; pollId: string };
+  | { type: "poll"; pollId: string }
+  /** A talk's attendance QR on screen (the app shell checks the talk is open and gives its name). */
+  | { type: "talk-qr"; talkId: string; name: string };
 
 export interface StageStore {
   /** `null` while the edition has none saved. */
@@ -76,12 +80,17 @@ export interface StageDeps extends LeaderboardDeps {
   now: () => Date;
 }
 
-export type StageErrorCode = "invalid-command" | "not-frozen" | "unknown-poll" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
+export type StageErrorCode = "invalid-command" | "not-frozen" | "unknown-poll" | "unknown-talk" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 const POLL_ID = /^[a-z0-9][a-z0-9-]{3,47}$/;
 const isPollRef = (value: unknown): value is string => typeof value === "string" && POLL_ID.test(value);
+
+const TALK_ID = /^[a-z0-9][a-z0-9-]{1,47}$/;
+const TALK_NAME_MAX = 80;
+const isTalkRef = (value: unknown): value is string => typeof value === "string" && TALK_ID.test(value);
+const isTalkName = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0 && value.length <= TALK_NAME_MAX;
 
 /** A command from the admin's request, or `null` when it is not one. */
 export function parseStageCommand(input: unknown): StageCommand | null {
@@ -99,6 +108,8 @@ export function parseStageCommand(input: unknown): StageCommand | null {
       return input.path === null || (typeof input.path === "string" && input.path.length <= 200) ? { type: "background", path: input.path } : null;
     case "poll":
       return isPollRef(input.pollId) ? { type: "poll", pollId: input.pollId } : null;
+    case "talk-qr":
+      return isTalkRef(input.talkId) && isTalkName(input.name) ? { type: "talk-qr", talkId: input.talkId, name: input.name.trim() } : null;
     default:
       return null;
   }
@@ -122,7 +133,7 @@ async function apply(deps: StageDeps, state: StageState, command: StageCommand):
   switch (command.type) {
     case "show":
       // Leaving the reveal puts the ranking back; the champions, a draw or a poll stay only while shown.
-      return ok({ ...state, display: command.display, champions: null, raffle: null, poll: null });
+      return ok({ ...state, display: command.display, champions: null, raffle: null, poll: null, talk: null });
     case "view":
       return ok({ ...state, view: command.view });
     case "freeze": {
@@ -137,10 +148,10 @@ async function apply(deps: StageDeps, state: StageState, command: StageCommand):
       return ok({ ...state, frozen: null });
     case "reveal": {
       // Champions come from the frozen ranking when there is one, so the reveal matches what was on screen.
-      if (state.frozen) return ok({ ...state, display: "reveal", champions: championsOf(state.frozen), raffle: null, poll: null });
+      if (state.frozen) return ok({ ...state, display: "reveal", champions: championsOf(state.frozen), raffle: null, poll: null, talk: null });
       const board = await getFleetBoard(deps);
       if (!board.ok) return err({ code: "unknown" });
-      return ok({ ...state, display: "reveal", champions: championsOf(board.value), raffle: null, poll: null });
+      return ok({ ...state, display: "reveal", champions: championsOf(board.value), raffle: null, poll: null, talk: null });
     }
     case "background": {
       // Only an image uploaded for a stage background (or none) is accepted.
@@ -149,7 +160,9 @@ async function apply(deps: StageDeps, state: StageState, command: StageCommand):
       return choice.keep ? ok(state) : ok({ ...state, background: choice.image });
     }
     case "poll":
-      return ok({ ...state, display: "poll", poll: { pollId: command.pollId }, champions: null, raffle: null });
+      return ok({ ...state, display: "poll", poll: { pollId: command.pollId }, champions: null, raffle: null, talk: null });
+    case "talk-qr":
+      return ok({ ...state, display: "talk-qr", talk: { talkId: command.talkId, name: command.name }, champions: null, raffle: null, poll: null });
   }
 }
 
@@ -173,7 +186,7 @@ export async function updateStage(deps: StageDeps, actor: { uid: string; role: s
     action: "stage.updated",
     actorUid: actor.uid,
     targetUid: "stage",
-    details: { command: command.type, display: next.value.display, view: next.value.view, frozen: next.value.frozen ? "yes" : "no", background: next.value.background?.path ?? null, poll: next.value.poll?.pollId ?? null },
+    details: { command: command.type, display: next.value.display, view: next.value.view, frozen: next.value.frozen ? "yes" : "no", background: next.value.background?.path ?? null, poll: next.value.poll?.pollId ?? null, talk: next.value.talk?.talkId ?? null },
     at: deps.now(),
   });
   if (!written.ok) logServerError("stage.audit.append", new Error("audit entry missing for stage.updated"));
@@ -238,7 +251,10 @@ export function parseStageState(input: unknown): StageState | null {
   const poll = isRecord(input.poll) && isPollRef(input.poll.pollId) ? { pollId: input.poll.pollId } : null;
   // A poll display without its poll cannot be drawn.
   if (input.display === "poll" && !poll) return null;
-  return { display: input.display as StageDisplay, view: input.view as StageView, frozen, champions, raffle, background: parseBackground(input.background), poll };
+  const talk = isRecord(input.talk) && isTalkRef(input.talk.talkId) && isTalkName(input.talk.name) ? { talkId: input.talk.talkId, name: input.talk.name } : null;
+  // Likewise a talk QR display without its talk.
+  if (input.display === "talk-qr" && !talk) return null;
+  return { display: input.display as StageDisplay, view: input.view as StageView, frozen, champions, raffle, background: parseBackground(input.background), poll, talk };
 }
 
 /** A stored background: its path and the app's own address for it. Anything else reads as no background (never a broken state). */
@@ -296,6 +312,7 @@ export async function presentRaffle(deps: Pick<StageDeps, "stage" | "squads">, s
     display: "raffle",
     champions: null,
     poll: null,
+    talk: null,
     raffle: {
       drawId: showing.drawId,
       prizeName: showing.prizeName,

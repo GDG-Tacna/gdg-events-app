@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { quadrantAdminDeps } from "@/app-shell/composition/quadrant-admin.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { requireRole } from "@/app-shell/guards";
-import { moveQuadrantAction, seedLayoutAction, setQuadrantActiveAction } from "@/app-shell/quadrants/manage.actions";
+import { deleteQuadrantAction, moveQuadrantAction, seedLayoutAction, setQuadrantActiveAction } from "@/app-shell/quadrants/manage.actions";
 import { QuadrantsAdminView } from "@/features/quadrants";
 import { DEFAULT_QUADRANTS, listManagedQuadrants } from "@/features/quadrants/server";
 import { ROUTES } from "@/shared/config/routes";
@@ -13,7 +14,7 @@ export const metadata: Metadata = { title: copy.admin.map.title };
 
 export default async function AdminMapPage() {
   const session = await requireRole(["admin"]);
-  await requireSection(session, "map");
+  await requireSection(session, "zones");
 
   const quadrants = await listManagedQuadrants(quadrantAdminDeps, { uid: session.uid, role: session.role });
   // A failed read goes to the route error boundary instead of showing an empty list that is not real.
@@ -27,6 +28,8 @@ export default async function AdminMapPage() {
         seed={seedLayoutAction}
         setActive={setQuadrantActiveAction}
         move={moveQuadrantAction}
+        remove={deleteQuadrantAction}
+        canDelete={await mayDeleteItems(session)}
         hrefs={{ create: `${ROUTES.adminZones}/nueva`, editBase: ROUTES.adminZones, plan: ROUTES.adminMap }}
       />
     </ScreenEnter>

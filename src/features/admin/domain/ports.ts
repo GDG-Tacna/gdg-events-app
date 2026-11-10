@@ -42,11 +42,13 @@ export interface AuditEntry {
     | "checkpoint.renamed"
     | "checkpoint.activated"
     | "checkpoint.deactivated"
+    | "checkpoint.deleted"
     | "checkpoint.requirements"
     | "talk.created"
     | "talk.updated"
     | "talk.activated"
     | "talk.deactivated"
+    | "talk.deleted"
     | "speaker.created"
     | "speaker.updated"
     | "speaker.activated"
@@ -73,6 +75,7 @@ export interface AuditEntry {
     | "squad.retired"
     | "squad.reactivated"
     | "squad.reordered"
+    | "squad.deleted"
     | "missions.seeded"
     | "mission.created"
     | "mission.updated"
@@ -86,6 +89,7 @@ export interface AuditEntry {
     | "quadrant.activated"
     | "quadrant.deactivated"
     | "quadrant.reordered"
+    | "quadrant.deleted"
     | "venue.saved"
     | "ranks.updated"
     | "communications.seeded"
@@ -101,6 +105,7 @@ export interface AuditEntry {
     | "badge.activated"
     | "badge.deactivated"
     | "badge.reordered"
+    | "badge.deleted"
     | "minigames.updated"
     | "economy.updated"
     | "squad.bonus"
@@ -118,7 +123,12 @@ export interface AuditEntry {
     | "image.uploaded"
     | "invite.created"
     | "invite.revoked"
-    | "invite.accepted";
+    | "invite.accepted"
+    | "cadet.renamed"
+    | "cadet.squad"
+    | "cadet.banned"
+    | "cadet.unbanned"
+    | "cadet.deleted";
   actorUid: string;
   targetUid: string;
   /** Small, non-secret facts about the change (for example the new role). */

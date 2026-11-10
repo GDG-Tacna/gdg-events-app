@@ -57,7 +57,7 @@ describe("stage commands", () => {
     expect(await updateStage(ctx.deps, ADMIN, { type: "show", display: "ranking" })).toMatchObject({ ok: true, value: { display: "ranking", view: "squads" } });
 
     expect(ctx.entries).toHaveLength(3);
-    expect(ctx.entries[0]).toEqual({ action: "stage.updated", actorUid: "a1", targetUid: "stage", details: { command: "show", display: "waiting", view: "both", frozen: "no", background: null, poll: null }, at: NOW });
+    expect(ctx.entries[0]).toEqual({ action: "stage.updated", actorUid: "a1", targetUid: "stage", details: { command: "show", display: "waiting", view: "both", frozen: "no", background: null, poll: null, talk: null }, at: NOW });
   });
 
   it("freezes the ranking as it stands, keeps the first moment, and unfreezes", async () => {
@@ -163,6 +163,30 @@ describe("stage background", () => {
     expect(await updateStage(ctx.deps, ADMIN, { type: "poll", pollId: "Not A Poll" })).toEqual(err({ code: "invalid-command" }));
   });
 
+  it("puts a talk's attendance QR on screen with its name, and any other display takes it off", async () => {
+    const ctx = setup();
+
+    const shown = await updateStage(ctx.deps, ADMIN, { type: "talk-qr", talkId: "keynote", name: "  Keynote de apertura " });
+    expect(shown).toEqual(ok({ ...DEFAULT_STAGE, display: "talk-qr", talk: { talkId: "keynote", name: "Keynote de apertura" } }));
+    expect(ctx.entries[0]).toMatchObject({ details: { command: "talk-qr", display: "talk-qr", talk: "keynote" } });
+
+    // A poll, the reveal and a raffle each replace it; the ranking and the waiting screen too.
+    expect(await updateStage(ctx.deps, ADMIN, { type: "poll", pollId: "poll-abc123" })).toMatchObject({ ok: true, value: { display: "poll", talk: null } });
+    await updateStage(ctx.deps, ADMIN, { type: "talk-qr", talkId: "keynote", name: "Keynote" });
+    expect(await updateStage(ctx.deps, ADMIN, { type: "reveal" })).toMatchObject({ ok: true, value: { display: "reveal", talk: null } });
+    await updateStage(ctx.deps, ADMIN, { type: "talk-qr", talkId: "keynote", name: "Keynote" });
+    expect(await updateStage(ctx.deps, ADMIN, { type: "show", display: "ranking" })).toEqual(ok(DEFAULT_STAGE));
+  });
+
+  it("refuses a talk QR without a well-formed talk or name", async () => {
+    const ctx = setup();
+
+    for (const bad of [{ talkId: "Not A Talk", name: "x" }, { talkId: "keynote", name: "   " }, { talkId: "keynote", name: "x".repeat(81) }, { talkId: "keynote" }]) {
+      expect(await updateStage(ctx.deps, ADMIN, { type: "talk-qr", ...bad })).toEqual(err({ code: "invalid-command" }));
+    }
+    expect(ctx.deps.stage.save).not.toHaveBeenCalled();
+  });
+
   it("refuses an image that is not a stage background", async () => {
     const ctx = setup();
 
@@ -175,12 +199,20 @@ describe("parseStageState", () => {
   const stored = { display: "ranking", view: "both", frozen: { ...BOARD, at: { toDate: () => NOW } }, champions: { cadet: BOARD.cadets[0], squad: null } };
 
   it("reads a stored stage, with dates as timestamps, dates or text", () => {
-    expect(parseStageState(stored)).toEqual({ display: "ranking", view: "both", frozen: { ...BOARD, at: NOW }, champions: { cadet: BOARD.cadets[0], squad: null }, raffle: null, background: null, poll: null });
+    expect(parseStageState(stored)).toEqual({ display: "ranking", view: "both", frozen: { ...BOARD, at: NOW }, champions: { cadet: BOARD.cadets[0], squad: null }, raffle: null, background: null, poll: null, talk: null });
     expect(parseStageState({ ...stored, frozen: { ...BOARD, at: NOW.toISOString() } })?.frozen?.at).toEqual(NOW);
-    expect(parseStageState({ display: "waiting", view: "cadets" })).toEqual({ display: "waiting", view: "cadets", frozen: null, champions: null, raffle: null, background: null, poll: null });
+    expect(parseStageState({ display: "waiting", view: "cadets" })).toEqual({ display: "waiting", view: "cadets", frozen: null, champions: null, raffle: null, background: null, poll: null, talk: null });
     expect(parseStageState({ display: "poll", view: "both", poll: { pollId: "poll-abc123" } })?.poll).toEqual({ pollId: "poll-abc123" });
     // A poll display without a poll it can name cannot be drawn.
     expect(parseStageState({ display: "poll", view: "both", poll: { pollId: "Bad Id" } })).toBeNull();
+  });
+
+  it("reads a stored talk QR, and refuses a talk QR display without a talk it can name", () => {
+    expect(parseStageState({ display: "talk-qr", view: "both", talk: { talkId: "keynote", name: "Keynote" } })?.talk).toEqual({ talkId: "keynote", name: "Keynote" });
+    expect(parseStageState({ display: "talk-qr", view: "both" })).toBeNull();
+    expect(parseStageState({ display: "talk-qr", view: "both", talk: { talkId: "Bad Id", name: "Keynote" } })).toBeNull();
+    // A broken talk on another display is just no talk.
+    expect(parseStageState({ display: "ranking", view: "both", talk: { talkId: 7 } })).toMatchObject({ display: "ranking", talk: null });
   });
 
   it("reads a stored background, and treats a broken one as none without breaking the stage", () => {

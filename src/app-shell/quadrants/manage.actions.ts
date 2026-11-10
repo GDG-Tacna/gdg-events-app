@@ -3,10 +3,12 @@
 import { z } from "zod";
 import { quadrantAdminDeps } from "@/app-shell/composition/quadrant-admin.server";
 import { quadrantSource } from "@/app-shell/composition/quadrants.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { getSession } from "@/app-shell/guards";
 import type { QuadrantAdminActionResult, SaveVenueActionResult } from "@/features/quadrants";
 import {
   createQuadrant,
+  deleteQuadrant,
   moveQuadrant,
   saveVenue,
   seedLayout,
@@ -22,6 +24,7 @@ import { mayEdit } from "@/app-shell/permissions.server";
 
 const quadrantSchema = z.object({ id: z.string().max(48), name: z.string().max(200), tagline: z.string().max(300), planet: z.string().max(20) });
 const activeSchema = z.object({ id: z.string().max(48), active: z.boolean() });
+const deleteSchema = z.object({ id: z.string().max(48) });
 const moveSchema = z.object({ id: z.string().max(48), to: z.number().int().min(0).max(999) });
 /** Shape and size only; every rule of the plan is checked again by `parseVenueMap` in the use case. */
 const venueSchema = z.object({
@@ -51,7 +54,8 @@ async function adminActor(plan = false): Promise<QuadrantAdminActor | { ok: fals
   if (!FEATURES.admin || (plan && !(await moduleOn("map")))) return { ok: false, code: "disabled" };
   const session = await getSession();
   if (!session) return { ok: false, code: "unauthenticated" };
-  if (session.role !== "admin" || !(await mayEdit(session, "map"))) return { ok: false, code: "forbidden" };
+  // Zones and the venue plan have their own permission: an organizer may edit one and not the other.
+  if (session.role !== "admin" || !(await mayEdit(session, plan ? "map" : "zones"))) return { ok: false, code: "forbidden" };
   return { uid: session.uid, role: session.role };
 }
 
@@ -94,6 +98,18 @@ export async function setQuadrantActiveAction(input: { id: string; active: boole
   const parsed = activeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "not-found" };
   return done(await setQuadrantActive(quadrantAdminDeps, actor, parsed.data));
+}
+
+export async function deleteQuadrantAction(input: { id: string }): Promise<QuadrantAdminActionResult> {
+  const actor = await adminActor();
+  if (refused(actor)) return actor;
+  const parsed = deleteSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "not-found" };
+  // A published edition keeps its zones: only an admin of every edition may delete there, and only that admin may
+  // go past a talk, transmission, badge or stand that still names the zone.
+  const session = await getSession();
+  if (!session || !(await mayDeleteItems(session))) return { ok: false, code: "edition-locked" };
+  return done(await deleteQuadrant(quadrantAdminDeps, actor, { id: parsed.data.id, overrideReferences: session.adminScope === "global" }));
 }
 
 export async function moveQuadrantAction(input: { id: string; to: number }): Promise<QuadrantAdminActionResult> {

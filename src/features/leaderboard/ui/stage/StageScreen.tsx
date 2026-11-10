@@ -30,6 +30,8 @@ export interface StageScreenProps {
   squadsOn?: boolean;
   /** Draws a poll's live results (the polls feature, wired by the app shell); without it a poll display shows nothing. */
   renderPoll?: (pollId: string) => ReactNode;
+  /** Draws a talk's attendance QR (the ephemeral QR feature, wired by the app shell); without it a talk QR display shows nothing. */
+  renderTalkQr?: (talk: { talkId: string; name: string }) => ReactNode;
 }
 
 const t = copy.stage;
@@ -49,7 +51,7 @@ function StatusPill({ status }: { status: FeedStatus }) {
  * admin controls and to the edition's participants, and computes the ranking itself; it shows the live or frozen
  * ranking (cadets, squads, or both taking turns), a waiting screen, or the champions' reveal. It only reads.
  */
-export function StageScreen({ eventId, feed, squads, sprites, initialStage, initialBoard, alternateMs = 15_000, squadsOn = true, renderPoll }: StageScreenProps) {
+export function StageScreen({ eventId, feed, squads, sprites, initialStage, initialBoard, alternateMs = 15_000, squadsOn = true, renderPoll, renderTalkQr }: StageScreenProps) {
   const reduce = useReducedMotion();
   const [stage, setStage] = useState(initialStage);
   const [entries, setEntries] = useState<readonly RankingEntry[] | null>(null);
@@ -127,6 +129,7 @@ export function StageScreen({ eventId, feed, squads, sprites, initialStage, init
           {stage.display === "reveal" ? <RevealScreen champions={stage.champions} sprites={sprites} /> : null}
           {stage.display === "raffle" && stage.raffle ? <RaffleScreen key={stage.raffle.drawId} raffle={stage.raffle} /> : null}
           {stage.display === "poll" && stage.poll && renderPoll ? <div key={stage.poll.pollId} className="flex flex-1 flex-col">{renderPoll(stage.poll.pollId)}</div> : null}
+          {stage.display === "talk-qr" && stage.talk && renderTalkQr ? <div key={stage.talk.talkId} className="flex flex-1 flex-col">{renderTalkQr(stage.talk)}</div> : null}
           {stage.display === "ranking" && board ? (
             <AnimatePresence mode="wait" initial={false}>
               <motion.section

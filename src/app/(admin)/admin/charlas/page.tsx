@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { talkAdminDeps, talkRooms, talkSpeakers } from "@/app-shell/composition/talks.server";
 import { requireRole } from "@/app-shell/guards";
-import { setTalkActiveAction } from "@/app-shell/talks/manage.actions";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
+import { projectTalkAction } from "@/app-shell/talks/project.action";
+import { deleteTalkAction, setTalkActiveAction } from "@/app-shell/talks/manage.actions";
 import { toTalkView } from "@/app-shell/talks/talk-view.server";
 import { TalksAdminView } from "@/features/talks";
 import { listManagedTalks } from "@/features/talks/server";
@@ -26,7 +28,10 @@ export default async function AdminTalksPage() {
         talks={talks.value.map((talk) => toTalkView(talk, names(speakers)))}
         rooms={rooms}
         setActive={setTalkActiveAction}
-        hrefs={{ create: `${ROUTES.adminTalks}/nueva`, editBase: ROUTES.adminTalks, projectBase: ROUTES.adminQr }}
+        project={projectTalkAction}
+        remove={deleteTalkAction}
+        canDelete={await mayDeleteItems(session)}
+        hrefs={{ create: `${ROUTES.adminTalks}/nueva`, editBase: ROUTES.adminTalks, stage: ROUTES.adminStage }}
       />
     </ScreenEnter>
   );

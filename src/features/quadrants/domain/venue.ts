@@ -67,7 +67,7 @@ function parseArea(input: unknown, width: number, height: number): VenueArea | n
 }
 
 /**
- * Reads a venue plan from stored or admin-submitted data. `null` when it cannot be drawn: a size out of
+ * Reads a venue plan from stored or admin-submitted data (it may have no areas). `null` when it cannot be drawn: a size out of
  * range, an area outside the plan, two areas with the same id or on top of each other, or a stand without
  * a quadrant. Whether the quadrant exists is checked where the quadrants are known (`getGalaxyMap`).
  */
@@ -75,7 +75,9 @@ export function parseVenueMap(input: unknown): VenueMap | null {
   if (!isRecord(input)) return null;
   const { width, height, areas } = input;
   if (!isIntIn(width, VENUE_MIN_SIZE, VENUE_MAX_SIZE) || !isIntIn(height, VENUE_MIN_SIZE, VENUE_MAX_SIZE)) return null;
-  if (!Array.isArray(areas) || areas.length === 0 || areas.length > VENUE_MAX_AREAS) return null;
+  // A plan with no areas is valid: an event with a single room can take its last area out (and the plan then shows nothing).
+
+  if (!Array.isArray(areas) || areas.length > VENUE_MAX_AREAS) return null;
 
   const parsed: VenueArea[] = [];
   const ids = new Set<string>();

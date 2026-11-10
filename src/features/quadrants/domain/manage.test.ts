@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { err, ok, type Result } from "@/shared/lib/result";
 import {
   createQuadrant,
+  deleteQuadrant,
   getVenueForEdit,
   listManagedQuadrants,
   moveQuadrant,
@@ -12,6 +13,7 @@ import {
   type QuadrantAdminActor,
   type QuadrantAdminDeps,
   type QuadrantAuditEntry,
+  type QuadrantDeletion,
   type QuadrantPatch,
 } from "./manage";
 import type { Quadrant } from "./quadrant";
@@ -48,6 +50,15 @@ function setup({ quadrants = [quadrant("bb", 1), quadrant("aa", 0), quadrant("cc
       ids.forEach((id, order) => rows.set(id, { ...rows.get(id)!, order }));
       return ok(undefined);
     }),
+    /** Ids with a mission assigned: the real store checks this in the same transaction as the delete. */
+    withMissions: new Set<string>(),
+    deleteQuadrant: vi.fn(async (id: string): Promise<Result<QuadrantDeletion, { code: string }>> => {
+      const found = rows.get(id);
+      if (!found) return ok({ kind: "not-found" });
+      if (store.withMissions.has(id)) return ok({ kind: "has-missions" });
+      rows.delete(id);
+      return ok({ kind: "deleted", quadrant: found });
+    }),
     loadVenue: vi.fn(async (): Promise<Result<VenueMap | null, { code: string }>> => ok(saved.venue)),
     saveVenue: vi.fn(async (next: VenueMap): Promise<Result<void, { code: string }>> => {
       saved.venue = next;
@@ -58,6 +69,7 @@ function setup({ quadrants = [quadrant("bb", 1), quadrant("aa", 0), quadrant("cc
   const deps = {
     store,
     stands,
+    references: { to: vi.fn(async (): Promise<Result<readonly string[], { code: string }>> => ok([])) },
     images: { ref: vi.fn((path: string, purpose: string) => (path.includes(`/${purpose}/`) ? { path, url: `https://cdn/${path}` } : null)), remove: vi.fn(async () => {}) },
     audit: { append: vi.fn(async (entry: QuadrantAuditEntry) => (entries.push(entry), ok(undefined))) },
     defaults: DEFAULTS,
@@ -171,11 +183,82 @@ describe("quadrant and venue admin", () => {
     });
   });
 
+  describe("deleteQuadrant", () => {
+    it("deletes a zone with no mission and nothing pointing at it, and audits it", async () => {
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "bb" })).toEqual(ok(undefined));
+
+      expect([...ctx.rows.keys()].sort()).toEqual(["aa", "cc"]);
+      expect(ctx.entries).toEqual([{ action: "quadrant.deleted", actorUid: "a1", targetUid: "bb", details: { name: "BB", overridden: null }, at: NOW }]);
+    });
+
+    it("refuses while a mission is assigned to it, for everyone, and changes nothing", async () => {
+      ctx.deps.store.withMissions.add("bb");
+
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "bb" })).toEqual(err({ code: "has-missions" }));
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "bb", overrideReferences: true })).toEqual(err({ code: "has-missions" }));
+
+      expect(ctx.rows.has("bb")).toBe(true);
+      expect(ctx.entries).toEqual([]);
+    });
+
+    it("refuses while a talk, transmission or badge uses it, unless the admin of every edition goes on", async () => {
+      ctx.deps.references.to.mockResolvedValue(ok(["Keynote"]));
+
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "bb" })).toEqual(err({ code: "in-use" }));
+      expect(ctx.deps.store.deleteQuadrant).not.toHaveBeenCalled();
+
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "bb", overrideReferences: true })).toEqual(ok(undefined));
+      expect(ctx.deps.references.to).toHaveBeenCalledTimes(1);
+      expect(ctx.entries[0]).toMatchObject({ action: "quadrant.deleted", details: { overridden: "yes" } });
+    });
+
+    it("refuses while a stand of the plan belongs to it", async () => {
+      ctx = setup({ venue: plan([stand("bb-1", "bb", 0), stand("aa-1", "aa", 20)]) });
+
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "bb" })).toEqual(err({ code: "in-use" }));
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "cc" })).toEqual(ok(undefined));
+    });
+
+    it("never deletes the edition's last zone", async () => {
+      ctx = setup({ quadrants: [quadrant("solo", 0)] });
+
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "solo" })).toEqual(err({ code: "last-quadrant" }));
+      expect(ctx.rows.size).toBe(1);
+    });
+
+    it("is not found for an unknown or malformed zone, and refuses everyone but admins", async () => {
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "zz" })).toEqual(err({ code: "not-found" }));
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "No Valid" })).toEqual(err({ code: "not-found" }));
+      expect(await deleteQuadrant(ctx.deps, { uid: "s1", role: "staff" }, { id: "bb" })).toEqual(err({ code: "forbidden" }));
+      expect(ctx.rows.size).toBe(3);
+    });
+
+    it("reports failed reads and a failed delete", async () => {
+      ctx.deps.store.listQuadrants.mockResolvedValueOnce(err({ code: "x" }));
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "bb" })).toEqual(err({ code: "unknown" }));
+
+      ctx.deps.references.to.mockResolvedValueOnce(err({ code: "x" }));
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "bb" })).toEqual(err({ code: "unknown" }));
+
+      ctx.deps.store.deleteQuadrant.mockResolvedValueOnce(err({ code: "x" }));
+      expect(await deleteQuadrant(ctx.deps, ADMIN, { id: "bb" })).toEqual(err({ code: "unknown" }));
+      expect(ctx.entries).toEqual([]);
+    });
+  });
+
   describe("venue", () => {
     it("offers the bundled plan and quadrants to edit while the edition has none", async () => {
       const empty = setup({ quadrants: [] });
 
       expect(await getVenueForEdit(empty.deps, ADMIN)).toEqual(ok({ venue: DEFAULTS.venue, isDefault: true, quadrants: DEFAULTS.quadrants }));
+    });
+
+    it("saves a plan with no areas (an event with one room), with nothing to create for the stands", async () => {
+      const result = await saveVenue(ctx.deps, ADMIN, plan([]));
+
+      expect(result).toMatchObject({ ok: true, value: { venue: { areas: [] }, standQrs: [] } });
+      expect(ctx.saved.venue).toMatchObject({ areas: [] });
+      expect(ctx.deps.stands.ensure).toHaveBeenCalledWith(ADMIN, []);
     });
 
     it("offers the edition's own plan and every quadrant, active or not", async () => {

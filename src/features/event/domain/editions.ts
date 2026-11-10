@@ -2,6 +2,7 @@ import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { isEventId } from "@/shared/types/event";
 import { fromEventLocal } from "./event";
+import { lifecycleOf, type EditionLifecycle } from "./lifecycle";
 
 /**
  * The editions of the event (one per `events/{eventId}`): each has a name, where and when it happens, and
@@ -23,6 +24,8 @@ export interface Edition {
   startsAt: Date | null;
   endsAt: Date | null;
   status: EditionStatus;
+  /** When it first became the public edition; never cleared, so a published edition stays locked for deletions. */
+  publishedAt?: Date | null;
 }
 
 export interface EditionListing extends Edition {
@@ -241,6 +244,8 @@ export interface EditionChoice {
   name: string | null;
   isPublic: boolean;
   stage: EditionStage;
+  /** Draft, published or finished: what decides who may delete items in it. */
+  lifecycle: EditionLifecycle;
 }
 
 /** In course when public; finished when marked so or past its end; otherwise a draft. */
@@ -265,6 +270,6 @@ export async function listEditionChoices(deps: Pick<EditionsDeps, "catalog" | "n
     editions
       .filter((edition) => allowed === "all" || allowed.includes(edition.id))
       .sort(byRelevance)
-      .map((edition) => ({ id: edition.id, name: edition.name, isPublic: edition.isPublic, stage: stageOf(edition, edition.isPublic, now) })),
+      .map((edition) => ({ id: edition.id, name: edition.name, isPublic: edition.isPublic, stage: stageOf(edition, edition.isPublic, now), lifecycle: lifecycleOf(edition, edition.isPublic, now) })),
   );
 }

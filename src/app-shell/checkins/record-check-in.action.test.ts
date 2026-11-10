@@ -143,7 +143,7 @@ describe("recordCheckInAction", () => {
       kind,
       recorded: true,
       firstEntrance: false,
-      missions: [{ title: "Visita el stand", xpEarned: 30, creditsEarned: 10, justCompleted: true }],
+      missions: [{ id: "m-1", title: "Visita el stand", xpEarned: 30, creditsEarned: 10, justCompleted: true }],
       talkCredits: kind === "talk" ? 10 : 0,
       achievements: [],
     });
@@ -226,7 +226,7 @@ describe("recordCheckInAction with a speaker's code", () => {
       kind: "speaker",
       recorded: true,
       firstEntrance: false,
-      missions: [{ title: "Conoce a Ana", xpEarned: 40, creditsEarned: 10, justCompleted: true }],
+      missions: [{ id: "meet-ana", title: "Conoce a Ana", xpEarned: 40, creditsEarned: 10, justCompleted: true }],
       talkCredits: 0,
       achievements: [],
     });

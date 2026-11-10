@@ -4,6 +4,8 @@ vi.mock("server-only", () => ({}));
 const composition = vi.hoisted(() => ({ achievementAdminDeps: { marker: "admin" }, badgeSource: { invalidate: vi.fn() } }));
 vi.mock("@/app-shell/composition/achievements.server", () => composition);
 
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
@@ -14,13 +16,14 @@ const server = vi.hoisted(() => ({
   updateBadge: vi.fn(),
   setBadgeActive: vi.fn(),
   moveBadge: vi.fn(),
+  deleteBadge: vi.fn(),
 }));
 vi.mock("@/features/achievements/server", () => server);
 
 const features = vi.hoisted(() => ({ FEATURES: { admin: true, achievements: true } }));
 vi.mock("@/shared/config/features", () => features);
 
-const { createBadgeAction, moveBadgeAction, seedBadgesAction, setBadgeActiveAction, updateBadgeAction } = await import("./manage.actions");
+const { createBadgeAction, deleteBadgeAction, moveBadgeAction, seedBadgesAction, setBadgeActiveAction, updateBadgeAction } = await import("./manage.actions");
 
 const ADMIN = { uid: "a1", role: "admin" };
 const session = (role: "attendee" | "staff" | "admin" | null) => ({ uid: "a1", role, displayName: null, photoUrl: null });
@@ -32,6 +35,7 @@ const cases = [
   { name: "updateBadgeAction", run: () => updateBadgeAction(SAVE as never), useCase: server.updateBadge, args: [SAVE] },
   { name: "setBadgeActiveAction", run: () => setBadgeActiveAction({ id: "maestro-ia", active: false }), useCase: server.setBadgeActive, args: [{ id: "maestro-ia", active: false }] },
   { name: "moveBadgeAction", run: () => moveBadgeAction({ id: "maestro-ia", to: 0 }), useCase: server.moveBadge, args: [{ id: "maestro-ia", to: 0 }] },
+  { name: "deleteBadgeAction", run: () => deleteBadgeAction({ id: "maestro-ia" }), useCase: server.deleteBadge, args: [{ id: "maestro-ia" }] },
 ];
 
 describe.each(cases)("$name", ({ run, useCase, args }) => {
@@ -40,6 +44,7 @@ describe.each(cases)("$name", ({ run, useCase, args }) => {
     features.FEATURES.admin = true;
     features.FEATURES.achievements = true;
     guards.getSession.mockResolvedValue(session("admin"));
+    deletion.mayDeleteItems.mockResolvedValue(true);
   });
 
   it("is off with the admin or achievements switched off, and only for admins", async () => {
@@ -87,5 +92,30 @@ describe("input shape", () => {
     expect(server.updateBadge).not.toHaveBeenCalled();
     expect(server.setBadgeActive).not.toHaveBeenCalled();
     expect(server.moveBadge).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteBadgeAction", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    features.FEATURES.admin = true;
+    features.FEATURES.achievements = true;
+    guards.getSession.mockResolvedValue(session("admin"));
+    deletion.mayDeleteItems.mockResolvedValue(true);
+  });
+
+  it("refuses to delete once the edition is published, unless the admin is allowed to, and keeps the cache", async () => {
+    deletion.mayDeleteItems.mockResolvedValue(false);
+
+    expect(await deleteBadgeAction({ id: "maestro-ia" })).toEqual({ ok: false, code: "edition-locked" });
+
+    expect(deletion.mayDeleteItems).toHaveBeenCalledWith(session("admin"));
+    expect(server.deleteBadge).not.toHaveBeenCalled();
+    expect(composition.badgeSource.invalidate).not.toHaveBeenCalled();
+  });
+
+  it("deletes only with a well-formed input", async () => {
+    expect(await deleteBadgeAction({ id: 7 } as never)).toEqual({ ok: false, code: "not-found" });
+    expect(server.deleteBadge).not.toHaveBeenCalled();
   });
 });

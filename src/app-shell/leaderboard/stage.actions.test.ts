@@ -57,6 +57,13 @@ describe("updateStageAction", () => {
     expect(server.updateStage).toHaveBeenCalledTimes(1);
   });
 
+  it("cannot put a talk QR on screen: that goes through Charlas, which brings the talk's own name", async () => {
+    expect(await updateStageAction({ type: "talk-qr", talkId: "keynote", name: "Falsa" } as never)).toEqual({ ok: true });
+
+    // Without the name the use case refuses it: the command reaches it with no talk fields at all.
+    expect(server.updateStage).toHaveBeenCalledWith({ marker: "stage" }, { uid: "a1", role: "admin" }, { type: "talk-qr" });
+  });
+
   it("is only for admins", async () => {
     guards.getSession.mockResolvedValue(null);
     expect(await updateStageAction({ type: "freeze" })).toEqual({ ok: false, code: "unauthenticated" });

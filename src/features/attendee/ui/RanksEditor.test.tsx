@@ -20,8 +20,8 @@ const RANKS = [
 const ICON = "public/devfest-2026/rank/0f8e2c1a-1111-4222-8333-944455551111.webp";
 const upload = vi.fn<UploadImageAction>(async () => ({ ok: true, image: { path: ICON, url: `https://cdn/${ICON}`, width: 64, height: 64, format: "webp" } }));
 
-function renderEditor(save: SaveRanksAction = vi.fn(async () => ({ ok: true as const })), isDefault = false) {
-  render(<RanksEditor ranks={RANKS} isDefault={isDefault} save={save} upload={upload} />);
+function renderEditor(save: SaveRanksAction = vi.fn(async () => ({ ok: true as const })), isDefault = false, canRemove?: boolean) {
+  render(<RanksEditor ranks={RANKS} isDefault={isDefault} save={save} upload={upload} canRemove={canRemove} />);
   return save;
 }
 
@@ -43,6 +43,19 @@ describe("RanksEditor", () => {
     expect(xp(1)).toHaveAccessibleDescription(r.firstFixed);
     expect(screen.queryByRole("button", { name: "Quitar el rango 1" })).not.toBeInTheDocument();
     expect(screen.getByText(r.defaultNote)).toBeInTheDocument();
+  });
+
+  it("takes the remove buttons away from the saved ranks when the session may not remove, but a rank added now can still be dropped", () => {
+    renderEditor(undefined, false, false);
+
+    expect(screen.queryByRole("button", { name: "Quitar el rango 2" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Quitar el rango 3" })).not.toBeInTheDocument();
+    // Names and XP stay editable.
+    expect(name(2)).not.toHaveAttribute("readonly");
+
+    fireEvent.click(screen.getByRole("button", { name: r.add }));
+    fireEvent.click(screen.getByRole("button", { name: "Quitar el rango 4" }));
+    expect(within(screen.getByRole("list", { name: r.listLabel })).getAllByRole("listitem")).toHaveLength(3);
   });
 
   it("renames, changes XP, adds and removes ranks, and saves the ladder", async () => {

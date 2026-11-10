@@ -197,6 +197,10 @@ export const copy = {
     title: "Misiones activas",
     subtitle: "Completa misiones en cada zona para ganar XP Estelar.",
     summaryLabel: "Misiones completadas",
+    /** Said to screen readers when the board opens right after a scan. Placeholder: {title}. */
+    celebrated: "Misión cumplida: {title}",
+    /** The stamp on a card the cadet just completed. */
+    celebratedTag: "¡Cumplida!",
     summary: "{done} de {total} misiones",
     earned: "XP ganado en misiones",
     quadrantProgress: "{done} de {total}",
@@ -345,6 +349,8 @@ export const copy = {
     },
     already: { title: "Ya estabas registrado", body: "Este puesto ya contaba para ti: no se suma dos veces." },
     missions: { label: "Misiones de este puesto", completed: "Misión completada", already: "Ya la habías completado", xp: "+{xp} XP", credits: "+{n} G-Credits" },
+    viewMission: "Ver misión",
+    viewMissions: "Ver misiones",
     talkCredits: "+{n} G-Credits por asistir a esta charla",
     errors: {
       "invalid-code": {
@@ -734,6 +740,7 @@ export const copy = {
       squads: "Escuadrones",
       missions: "Misiones",
       zones: "Zonas",
+      cadets: "Cadetes",
       map: "Mapa",
       ranks: "Rangos",
       odyssey: "Historia",
@@ -1120,6 +1127,8 @@ export const copy = {
         /** Placeholder: {prize}. */
         raffle: "Sorteo: {prize}",
         poll: "Resultados de una encuesta",
+        /** Placeholder: {name}. */
+        talkQr: "QR de la charla: {name}",
       },
       pollTitle: "Encuesta en pantalla",
       pollHelp: "Muestra la pregunta con los votos en vivo. Solo aparecen las encuestas que ya se abrieron.",
@@ -1165,6 +1174,7 @@ export const copy = {
         "invalid-command": "Esa acción no existe. Recarga la página.",
         "not-frozen": "El ranking ya estaba en vivo.",
         "unknown-poll": "Esa encuesta no existe o todavía no se abrió.",
+        "unknown-talk": "Esa charla no existe o ya no está activa.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar.",
         forbidden: "Solo un admin puede controlar el escenario.",
         disabled: "El escenario no está disponible.",
@@ -1291,6 +1301,10 @@ export const copy = {
       activatedDone: "«{name}» vuelve a otorgarse.",
       /** Placeholder: {name}. */
       deactivatedDone: "«{name}» ya no se muestra ni se otorga; quien la ganó la conserva.",
+      delete: "Eliminar",
+      /** Placeholder: {name}. */
+      confirmDelete: "¿Eliminar la insignia «{name}»? Se borra para siempre. Solo se puede si ningún cadete la ha ganado.",
+      deletedDone: "La insignia «{name}» se eliminó.",
       form: {
         createTitle: "Nueva insignia",
         editTitle: "Editar insignia",
@@ -1338,6 +1352,9 @@ export const copy = {
         "invalid-image": "Esa imagen no es válida para un logro. Súbela de nuevo.",
         "already-exists": "Ya existe una insignia con ese identificador.",
         "already-seeded": "Esta edición ya tiene insignias.",
+        "has-awards": "No se puede eliminar: al menos un cadete ya ganó esta insignia. Desactívala para que no se otorgue más; quien la ganó la conserva.",
+        "last-badge": "No se puede eliminar la última insignia: la edición volvería a ofrecer las insignias por defecto. Desactívala si no la quieres.",
+        "edition-locked": "Esta edición ya está publicada: solo un admin de todas las ediciones puede eliminar. Puedes desactivar la insignia.",
         "not-found": "Esa insignia no existe.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar.",
         forbidden: "Solo un admin puede editar los logros.",
@@ -1373,10 +1390,87 @@ export const copy = {
       errors: {
         "invalid-ranks": "Los rangos no son válidos: revisa los nombres y que cada uno pida más XP que el anterior.",
         "invalid-image": "El ícono de un rango no es válido. Súbelo de nuevo.",
+        "edition-locked": "Esta edición ya está publicada: solo un admin de todas las ediciones puede quitar rangos. Puedes cambiar sus nombres y su XP.",
+        "rank-in-use": "No se puede quitar: una comida pide un nivel que dejaría de existir. Cambia primero sus requisitos en Puestos.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar.",
         forbidden: "Solo un admin puede editar los rangos.",
         disabled: "La edición de rangos no está disponible.",
         unknown: "No pudimos guardar los rangos. Inténtalo de nuevo.",
+      },
+    },
+    cadets: {
+      title: "Cadetes",
+      /** Placeholder: {n}. */
+      subtitle: "Quién se registró en esta edición ({n} en total). Entra a un cadete para cambiar su alias o escuadrón, bloquearlo o eliminar un registro hecho por error.",
+      searchLabel: "Buscar por alias",
+      searchPlaceholder: "Empieza a escribir un alias",
+      search: "Buscar",
+      clear: "Ver todos",
+      listLabel: "Cadetes de la edición",
+      empty: "Todavía no se registró ningún cadete.",
+      /** Placeholder: {q}. */
+      noResults: "Ningún alias empieza con «{q}».",
+      more: "Ver más cadetes",
+      noSquad: "Sin escuadrón",
+      /** Placeholder: {xp}. */
+      xp: "{xp} XP",
+      /** Placeholder: {n}. */
+      credits: "{n} G-Credits",
+      banned: "Bloqueado",
+      attended: "Ingresó",
+      notArrived: "Aún no llega",
+      back: "Volver a cadetes",
+      infoTitle: "Datos",
+      email: "Correo",
+      name: "Nombre en su cuenta",
+      registered: "Se registró",
+      arrival: "Ingreso al evento",
+      unknown: "Sin dato",
+      uid: "Identificador",
+      activityTitle: "Actividad",
+      /** Placeholders: {checkIns}, {missions}, {badges}, {contacts}. */
+      activity: "{checkIns} asistencias · {missions} misiones · {badges} insignias · {contacts} contactos",
+      aliasTitle: "Alias",
+      aliasLabel: "Alias del cadete",
+      aliasHint: "De 3 a 16 letras, números, guiones o guiones bajos. Debe ser único en la edición.",
+      saveAlias: "Guardar alias",
+      renamedDone: "Alias actualizado.",
+      squadTitle: "Escuadrón",
+      squadLabel: "Escuadrón del cadete",
+      squadHint: "Su XP se suma al escuadrón nuevo desde ahora; el escuadrón anterior lo pierde.",
+      saveSquad: "Guardar escuadrón",
+      squadDone: "Escuadrón actualizado.",
+      banTitle: "Bloquear acceso",
+      banHelp: "Su cuenta se desactiva: no podrá entrar a la app (a ninguna edición) y su sesión se cierra al instante. Puedes desbloquearlo cuando quieras.",
+      reasonLabel: "Motivo del bloqueo",
+      ban: "Bloquear cadete",
+      /** Placeholder: {alias}. */
+      confirmBan: "¿Bloquear a {alias}? No podrá entrar a la app hasta que lo desbloquees.",
+      bannedDone: "{alias} quedó bloqueado.",
+      /** Placeholder: {when}. */
+      bannedSince: "Bloqueado desde {when}.",
+      /** Placeholder: {reason}. */
+      bannedReason: "Motivo: {reason}",
+      unban: "Desbloquear cadete",
+      unbannedDone: "{alias} puede entrar otra vez.",
+      deleteTitle: "Eliminar registro",
+      deleteHelp: "Borra a este cadete de la edición: su perfil, su alias y todo lo que hizo (asistencias, misiones, insignias, contactos y votos), junto con el XP y los G-Credits que ganó aquí. Su cuenta se queda, así que puede registrarse de nuevo. No se puede deshacer.",
+      /** Placeholder: {alias}. */
+      deleteConfirmLabel: "Para confirmar, escribe su alias: {alias}",
+      delete: "Eliminar cadete",
+      errors: {
+        "invalid-alias": "El alias debe tener de 3 a 16 letras, números, guiones o guiones bajos, y no puede ser un nombre reservado.",
+        "alias-taken": "Otro cadete ya tiene ese alias.",
+        "unknown-squad": "Ese escuadrón no existe en esta edición.",
+        "invalid-reason": "Escribe el motivo del bloqueo (de 3 a 200 caracteres).",
+        "protected-account": "Esa cuenta tiene un rol del equipo (admin, organizador o staff): no se puede bloquear desde aquí.",
+        "own-account": "No puedes hacer esto con tu propia cuenta.",
+        "forbidden-delete": "Solo un admin de todas las ediciones puede eliminar cadetes.",
+        "not-found": "Ese cadete no existe en esta edición.",
+        unauthenticated: "Tu sesión terminó. Vuelve a entrar.",
+        forbidden: "Solo un admin con permiso en Cadetes puede hacer esto.",
+        disabled: "La gestión de cadetes no está disponible.",
+        unknown: "No pudimos aplicar el cambio. Inténtalo de nuevo.",
       },
     },
     map: {
@@ -1398,6 +1492,10 @@ export const copy = {
       deactivate: "Desactivar",
       activatedDone: "«{name}» vuelve a mostrarse.",
       deactivatedDone: "«{name}» ya no se muestra. Sus stands quedan como stands sin zona y sus misiones en «Otras misiones».",
+      delete: "Eliminar",
+      /** Placeholder: {name}. */
+      confirmDelete: "¿Eliminar la zona «{name}»? Se borra para siempre. Solo se puede si ninguna misión está asignada a ella.",
+      deletedDone: "La zona «{name}» se eliminó.",
       planets: { cloud: "Google Cloud", firebase: "Firebase", android: "Android", ai: "AI", gdg: "Comunidad GDG" },
       quadrantForm: {
         createTitle: "Nueva zona",
@@ -1463,6 +1561,10 @@ export const copy = {
         "unknown-quadrant": "Hay stands de una zona que no existe en esta edición.",
         "already-exists": "Ya existe una zona con ese identificador.",
         "already-seeded": "Esta edición ya tiene zonas.",
+        "has-missions": "No se puede eliminar: hay misiones asignadas a esta zona. Muévelas a otra zona o elimínalas primero, o desactiva la zona.",
+        "in-use": "No se puede eliminar: una charla, una transmisión, una insignia o un stand del plano usa esta zona. Cámbialos primero.",
+        "last-quadrant": "Una edición necesita al menos una zona: las misiones se agrupan en ellas.",
+        "edition-locked": "Esta edición ya está publicada: solo un admin de todas las ediciones puede eliminar. Puedes desactivar la zona.",
         "not-found": "Esa zona no existe.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar.",
         forbidden: "Solo un admin puede editar el mapa.",
@@ -1610,6 +1712,7 @@ export const copy = {
         "already-seeded": "Esta edición ya tiene misiones.",
         "has-completions": "No se puede eliminar: al menos un cadete ya tiene un registro con esta misión. Desactívala para ocultarla.",
         "in-use": "No se puede eliminar: una transmisión de la Odisea se desbloquea con esta misión o una insignia la pide. Cámbialas primero.",
+        "edition-locked": "Esta edición ya está publicada: solo un admin de todas las ediciones puede eliminar. Puedes desactivar la misión.",
         "not-found": "Esa misión no existe.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar.",
         forbidden: "Solo un admin puede gestionar misiones.",
@@ -1674,7 +1777,8 @@ export const copy = {
           checkpoints: "Puestos",
           talks: "Charlas",
           missions: "Misiones",
-          map: "Zonas y mapa",
+          zones: "Zonas",
+          map: "Plano del local",
           ranks: "Rangos",
           odyssey: "Historia",
           achievements: "Logros",
@@ -1682,6 +1786,7 @@ export const copy = {
           economy: "Economía",
           squads: "Escuadrones",
           squadCredits: "Créditos de escuadrón",
+          cadets: "Cadetes",
           stage: "Escenario",
           raffle: "Sorteo",
           polls: "Encuestas",
@@ -1828,6 +1933,10 @@ export const copy = {
       retiredDone: "«{name}» ya no se ofrece a cadetes nuevos. Sus miembros lo conservan.",
       /** Placeholder: {name}. */
       reactivatedDone: "«{name}» vuelve a ofrecerse.",
+      delete: "Eliminar",
+      /** Placeholder: {name}. */
+      confirmDelete: "¿Eliminar el escuadrón «{name}»? Se borra para siempre. Solo se puede si ningún cadete pertenece a él y nunca movió créditos.",
+      deletedDone: "El escuadrón «{name}» se eliminó.",
       form: {
         newTitle: "Nuevo escuadrón",
         editTitle: "Editar escuadrón",
@@ -1866,6 +1975,9 @@ export const copy = {
         "invalid-image": "Ese logo no es válido. Súbelo de nuevo.",
         "already-exists": "Ya existe un escuadrón con ese identificador.",
         "already-seeded": "Esta edición ya tiene escuadrones.",
+        "has-members": "No se puede eliminar: hay cadetes en este escuadrón. Retíralo cuando termine el evento; sus miembros lo conservan.",
+        "has-credits": "No se puede eliminar: el escuadrón ya movió créditos de escuadrón y ese historial lo necesita. Retíralo en su lugar.",
+        "edition-locked": "Esta edición ya está publicada: solo un admin de todas las ediciones puede eliminar. Puedes retirar el escuadrón.",
         "not-found": "Ese escuadrón no existe.",
         "event-not-finished": "Solo se puede retirar un escuadrón cuando el evento haya finalizado.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
@@ -1902,6 +2014,7 @@ export const copy = {
     },
     areas: {
       team: { title: "Equipo", description: "Da o quita los roles de staff, organizador y admin de esta edición." },
+      cadets: { title: "Cadetes", description: "Quién se registró en esta edición: cambia su alias o escuadrón, bloquéalos si hace falta y elimina registros hechos por error." },
       talks: { title: "Charlas", description: "Crea la agenda con ponente, horario y sala, y proyecta el QR de cada charla." },
       speakers: { title: "Speakers", description: "Las fichas de quienes dan las charlas: foto, cargo, bio y enlaces." },
       checkpoints: {
@@ -2014,6 +2127,10 @@ export const copy = {
       },
       /** Placeholder: {name}. */
       closedDone: "«{name}» está cerrado: ya no acepta escaneos.",
+      delete: "Eliminar",
+      /** Placeholder: {name}. */
+      confirmDelete: "¿Eliminar el puesto «{name}»? Se borra para siempre. Solo se puede si nadie hizo check-in allí y ninguna misión lo usa.",
+      deletedDone: "El puesto «{name}» se eliminó.",
       /** Placeholder: {name}. */
       openedDone: "«{name}» está abierto.",
       errors: {
@@ -2024,6 +2141,9 @@ export const copy = {
         "invalid-talks": "Las charlas mínimas son un entero entre 0 y 50.",
         "not-catering": "Solo los puestos de catering tienen requisitos.",
         "already-exists": "Ya existe un puesto con ese identificador.",
+        "has-check-ins": "No se puede eliminar: ya hay cadetes que hicieron check-in aquí. Ciérralo para que no acepte más escaneos.",
+        "has-missions": "No se puede eliminar: una misión usa este puesto. Cambia o elimina esa misión primero.",
+        "edition-locked": "Esta edición ya está publicada: solo un admin de todas las ediciones puede eliminar. Puedes cerrar el puesto.",
         "not-found": "Ese puesto no existe.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
         forbidden: "Solo un admin puede gestionar los puestos.",
@@ -2038,7 +2158,7 @@ export const copy = {
       empty: "Aún no hay charlas. Crea la primera.",
       create: "Nueva charla",
       edit: "Editar",
-      project: "Proyectar QR",
+      project: "Mostrar QR en pantalla",
       activate: "Abrir",
       deactivate: "Cerrar",
       active: "Abierta",
@@ -2051,6 +2171,10 @@ export const copy = {
       activatedDone: "«{title}» está abierta: su QR registra asistencia.",
       /** Placeholder: {title}. */
       deactivatedDone: "«{title}» está cerrada: su QR ya no registra asistencia.",
+      delete: "Eliminar",
+      /** Placeholder: {title}. */
+      confirmDelete: "¿Eliminar la charla «{title}»? Se borra para siempre. Solo se puede si nadie registró asistencia y ninguna misión la usa.",
+      deletedDone: "La charla «{title}» se eliminó.",
       form: {
         back: "Volver a las charlas",
         createTitle: "Nueva charla",
@@ -2077,7 +2201,7 @@ export const copy = {
         save: "Guardar charla",
         saving: "Guardando…",
         qrTitle: "QR de la charla",
-        qrBody: "Proyéctalo en la sala durante la charla: cambia solo cada pocos minutos, así que una foto no sirve después.",
+        qrBody: "Se muestra en la pantalla grande del escenario con el nombre de la charla, para que todos lo escaneen. Cambia solo cada pocos minutos, así que una foto no sirve después.",
       },
       errors: {
         "invalid-id": "El identificador usa minúsculas, números y guiones (2 a 48 caracteres).",
@@ -2088,6 +2212,9 @@ export const copy = {
         "invalid-description": "La descripción puede tener hasta 500 caracteres.",
         "unknown-room": "Esa sala ya no está en el plano. Elige otra.",
         "already-exists": "Ya existe un puesto o charla con ese identificador.",
+        "has-check-ins": "No se puede eliminar: ya hay cadetes con asistencia registrada. Ciérrala para que su QR no registre más.",
+        "has-missions": "No se puede eliminar: una misión usa esta charla. Cambia o elimina esa misión primero.",
+        "edition-locked": "Esta edición ya está publicada: solo un admin de todas las ediciones puede eliminar. Puedes cerrar la charla.",
         "not-found": "Esa charla no existe.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
         forbidden: "Solo un admin puede gestionar las charlas.",
@@ -2101,7 +2228,7 @@ export const copy = {
       listLabel: "Charlas activas",
       empty: "Aún no hay charlas activas para proyectar.",
       project: "Proyectar",
-      back: "Volver a la charla",
+      back: "Volver a las charlas",
       loading: "Generando código…",
       scanHint: "Escanea este código con la app para registrar tu asistencia.",
       /** Placeholder: {name}. */

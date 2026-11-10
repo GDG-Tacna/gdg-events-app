@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ADMIN_SECTIONS } from "@/features/event";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
 
@@ -11,6 +12,8 @@ const guards = { requireRole: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 const insightsServer = vi.hoisted(() => ({ getInsights: vi.fn() }));
+const permissions = vi.hoisted(() => ({ sectionLevels: vi.fn() }));
+vi.mock("@/app-shell/permissions.server", () => permissions);
 vi.mock("@/features/insights/server", () => insightsServer);
 
 const { default: AdminHomePage } = await import("./page");
@@ -25,6 +28,7 @@ describe("admin home page", () => {
     vi.resetAllMocks();
     guards.requireRole.mockResolvedValue({ uid: "a1", role: "admin", displayName: null, photoUrl: null });
     insightsServer.getInsights.mockResolvedValue({ ok: true, value: OVERVIEW });
+    permissions.sectionLevels.mockResolvedValue(Object.fromEntries(ADMIN_SECTIONS.map((section) => [section, "edit"])));
   });
 
   it("checks the admin role itself and reads the numbers as that admin", async () => {
@@ -32,6 +36,19 @@ describe("admin home page", () => {
 
     expect(guards.requireRole).toHaveBeenCalledWith(["admin"]);
     expect(insightsServer.getInsights).toHaveBeenCalledWith({ marker: "insights" }, { uid: "a1", role: "admin" });
+  });
+
+  it("links the «Cadetes registrados» tile to the cadets list for a session that may see it, and not for one that may not", async () => {
+    const { unmount } = render(await AdminHomePage());
+    expect(screen.getByRole("link", { name: /Cadetes registrados: 200/ })).toHaveAttribute("href", "/admin/cadetes");
+    unmount();
+
+    // An organizer the edition hides the section from sees the number but no link.
+    guards.requireRole.mockResolvedValue({ uid: "a1", role: "admin", adminScope: "edition", displayName: null, photoUrl: null });
+    permissions.sectionLevels.mockResolvedValue({ cadets: "none" });
+    render(await AdminHomePage());
+    expect(screen.queryByRole("link", { name: /Cadetes registrados/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: copy.admin.home.stats.label })).toHaveTextContent("200");
   });
 
   it("stops before reading anything when the guard stops the request", async () => {
@@ -60,6 +77,7 @@ describe("admin home page", () => {
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
       "/admin/eventos",
       "/admin/team",
+      "/admin/cadetes",
       "/admin/charlas",
       "/admin/speakers",
       "/admin/puestos",

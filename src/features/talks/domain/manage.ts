@@ -1,8 +1,9 @@
+import { isCheckpointId } from "@/features/checkins";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { checkTalk, compareTalks, type Talk, type TalkDataErrorCode, type TalkDraft } from "./talk";
 
-export type TalkAdminErrorCode = TalkDataErrorCode | "unknown-room" | "unknown-speaker" | "already-exists" | "not-found" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
+export type TalkAdminErrorCode = TalkDataErrorCode | "unknown-room" | "unknown-speaker" | "already-exists" | "has-check-ins" | "has-missions" | "edition-locked" | "not-found" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
 
 export interface TalkAdminError {
   code: TalkAdminErrorCode;
@@ -19,7 +20,11 @@ export interface TalkStore {
   create(talk: Talk): Promise<Result<void, { code: "already-exists" | "unknown" }>>;
   /** `null` when there is no talk with that id. */
   update(id: string, patch: TalkPatch): Promise<Result<{ before: Talk; after: Talk } | null, { code: string }>>;
+  /** Deletes the talk unless a check-in or a mission refers to it; the checks and the delete are one transaction. */
+  delete(id: string): Promise<Result<TalkDeletion, { code: string }>>;
 }
+
+export type TalkDeletion = { kind: "deleted"; talk: Talk } | { kind: "not-found" } | { kind: "has-check-ins" } | { kind: "has-missions" };
 
 /** The edition's active zones (the rooms a talk can be in) and its speakers (the quadrants and speakers features answer). */
 export interface TalkDirectory {
@@ -28,7 +33,7 @@ export interface TalkDirectory {
 }
 
 export interface TalkAuditEntry {
-  action: "talk.created" | "talk.updated" | "talk.activated" | "talk.deactivated";
+  action: "talk.created" | "talk.updated" | "talk.activated" | "talk.deactivated" | "talk.deleted";
   actorUid: string;
   targetUid: string;
   details: Record<string, string | null>;
@@ -110,6 +115,25 @@ export async function updateTalk(deps: TalkAdminDeps, actor: TalkAdminActor, inp
   const changed = FIELDS.filter((field) => !same(before[field], after[field]));
   if (changed.length > 0) await audit(deps, { action: "talk.updated", actorUid: actor.uid, targetUid: input.id, details: { changed: changed.join(",") } });
   return ok(after);
+}
+
+/**
+ * Deletes a talk nobody attended and no mission points at (an agenda item with history is only closed). The phase of the
+ * edition is checked by the caller.
+ */
+export async function deleteTalk(deps: TalkAdminDeps, actor: TalkAdminActor, input: { id: string }): Promise<Result<Talk, TalkAdminError>> {
+  if (forbidden(actor)) return err(adminError("forbidden"));
+  if (!isCheckpointId(input.id)) return err(adminError("not-found"));
+
+  const deleted = await deps.store.delete(input.id);
+  if (!deleted.ok) return err(adminError("unknown"));
+  if (deleted.value.kind === "not-found") return err(adminError("not-found"));
+  if (deleted.value.kind === "has-check-ins") return err(adminError("has-check-ins"));
+  if (deleted.value.kind === "has-missions") return err(adminError("has-missions"));
+
+  const { talk } = deleted.value;
+  await audit(deps, { action: "talk.deleted", actorUid: actor.uid, targetUid: talk.id, details: { title: talk.title } });
+  return ok(talk);
 }
 
 /** Opens or closes a talk; a closed talk's code no longer checks anyone in. */

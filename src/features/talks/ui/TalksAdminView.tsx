@@ -6,16 +6,22 @@ import { useState } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, ButtonLink, Card, InlineAlert } from "@/shared/ui";
-import type { SetTalkActiveAction, TalkAdminActionResult, TalkView } from "./admin-actions";
+import { Button, ButtonLink, Card, Icon, InlineAlert } from "@/shared/ui";
+import type { DeleteTalkAction, DeleteTalkActionResult, ProjectTalkAction, SetTalkActiveAction, TalkAdminActionResult, TalkView } from "./admin-actions";
+import { useProjectTalk } from "./use-project-talk";
 
 export interface TalksAdminViewProps {
   /** In agenda order (by start time, undated last). */
   talks: readonly TalkView[];
   rooms: ReadonlyArray<{ id: string; name: string }>;
   setActive: SetTalkActiveAction;
-  /** Plain paths (a client component cannot receive functions from the server). */
-  hrefs: { create: string; editBase: string; projectBase: string };
+  remove: DeleteTalkAction;
+  /** Whether the session may delete talks here (a draft edition, or an admin of every edition); the server decides again. */
+  canDelete?: boolean;
+  /** Puts a talk's QR on the stage screen at once. */
+  project: ProjectTalkAction;
+  /** Plain paths (a client component cannot receive functions from the server); `stage` is where the stage is controlled. */
+  hrefs: { create: string; editBase: string; stage: string };
 }
 
 const chip = "type-caption border-line-strong text-foreground px-space-3 rounded-full border py-1";
@@ -36,13 +42,14 @@ export function formatSlot(startsAt: string | null, endsAt: string | null): stri
 
 /**
  * The Charlas screen: the edition's agenda with each talk's time, speaker, room and state, and links to edit it
- * and project its QR, and to open or close it. Nothing is deleted: check-ins and missions point to the talk.
+ * and put its QR on the stage screen, and to open or close it. Nothing is deleted: check-ins and missions point to the talk.
  */
-export function TalksAdminView({ talks, rooms, setActive, hrefs }: TalksAdminViewProps) {
+export function TalksAdminView({ talks, rooms, setActive, remove, canDelete = true, project, hrefs }: TalksAdminViewProps) {
   const t = copy.admin.talks;
   const router = useRouter();
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const { projectTalk, projecting, projectError } = useProjectTalk(project, hrefs.stage);
   const roomName = (id: string | null) => (id ? (rooms.find((room) => room.id === id)?.name ?? t.noRoom) : t.noRoom);
 
   async function toggle(talk: TalkView) {
@@ -57,6 +64,22 @@ export function TalksAdminView({ talks, rooms, setActive, hrefs }: TalksAdminVie
     setBusy(null);
     if (!result.ok) return setNotice({ kind: "error", text: t.errors[result.code] });
     setNotice({ kind: "success", text: interpolate(talk.active ? t.deactivatedDone : t.activatedDone, { title: talk.title }) });
+    router.refresh();
+  }
+
+  async function handleDelete(talk: TalkView) {
+    if (busy !== null || !window.confirm(interpolate(t.confirmDelete, { title: talk.title }))) return;
+    setBusy(talk.id);
+    setNotice(null);
+    let result: DeleteTalkActionResult;
+    try {
+      result = await remove({ id: talk.id });
+    } catch {
+      result = { ok: false, code: "unknown" };
+    }
+    setBusy(null);
+    if (!result.ok) return setNotice({ kind: "error", text: t.errors[result.code] });
+    setNotice({ kind: "success", text: interpolate(t.deletedDone, { title: result.title }) });
     router.refresh();
   }
 
@@ -76,6 +99,7 @@ export function TalksAdminView({ talks, rooms, setActive, hrefs }: TalksAdminVie
         </p>
       ) : null}
       {notice?.kind === "error" ? <InlineAlert>{notice.text}</InlineAlert> : null}
+      {projectError ? <InlineAlert>{projectError}</InlineAlert> : null}
 
       {talks.length === 0 ? (
         <Card>
@@ -103,13 +127,19 @@ export function TalksAdminView({ talks, rooms, setActive, hrefs }: TalksAdminVie
                       {t.edit}
                     </Link>
                     {talk.active ? (
-                      <Link href={`${hrefs.projectBase}/${talk.id}`} aria-label={label(t.project)} className={linkClass}>
+                      <Button variant="ghost" size="sm" disabled={busy !== null || projecting !== null} loading={projecting === talk.id} aria-label={label(t.project)} onClick={() => void projectTalk(talk.id)}>
                         {t.project}
-                      </Link>
+                      </Button>
                     ) : null}
                     <Button variant="ghost" size="sm" disabled={busy !== null} aria-label={label(talk.active ? t.deactivate : t.activate)} onClick={() => void toggle(talk)}>
                       {talk.active ? t.deactivate : t.activate}
                     </Button>
+                    {canDelete ? (
+                      <Button variant="ghost" size="sm" disabled={busy !== null} aria-label={label(t.delete)} onClick={() => void handleDelete(talk)}>
+                        <Icon name="trash" size={16} />
+                        {t.delete}
+                      </Button>
+                    ) : null}
                   </div>
                 </Card>
               </li>

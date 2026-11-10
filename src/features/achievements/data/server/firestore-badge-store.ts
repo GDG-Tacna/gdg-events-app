@@ -3,12 +3,12 @@ import type { Firestore } from "firebase-admin/firestore";
 import { imageRefOf } from "@/features/media/server";
 import { getActiveEventId, type ActiveEventResolver } from "@/shared/lib/firebase/active-event";
 import { getAdminFirestore } from "@/shared/lib/firebase/admin";
-import { ACHIEVEMENTS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
+import { ACHIEVEMENTS_COLLECTION, ACHIEVEMENT_AWARDS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import type { BadgeSource } from "../../domain/achievements";
 import { parseBadge, type Badge } from "../../domain/badge";
-import type { BadgePatch, BadgeStore } from "../../domain/manage";
+import type { BadgeDeletion, BadgePatch, BadgeStore } from "../../domain/manage";
 
 /** A stored badge: its fields, and the image kept as a path whose address is rebuilt here. */
 function toBadge(id: string, data: unknown): Badge | null {
@@ -85,6 +85,28 @@ export class FirestoreBadgeStore implements BadgeSource, BadgeStore {
       });
     } catch (cause) {
       logServerError("achievements.store.update", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async delete(id: string): Promise<Result<BadgeDeletion, { code: string }>> {
+    try {
+      const db = this.getDb();
+      const eventId = await this.getEventId();
+      const ref = eventCollection(db, eventId, ACHIEVEMENTS_COLLECTION).doc(id);
+      const awards = eventCollection(db, eventId, ACHIEVEMENT_AWARDS_COLLECTION).where("badgeId", "==", id).limit(1);
+
+      // Reading the awards inside the transaction makes a badge earned at the same moment retry the delete.
+      return await db.runTransaction(async (tx): Promise<Result<BadgeDeletion, { code: string }>> => {
+        const [snapshot, earned] = await Promise.all([tx.get(ref), tx.get(awards)]);
+        const badge = snapshot.exists ? toBadge(id, snapshot.data()) : null;
+        if (!badge) return ok({ kind: "not-found" });
+        if (!earned.empty) return ok({ kind: "has-awards" });
+        tx.delete(ref);
+        return ok({ kind: "deleted", badge });
+      });
+    } catch (cause) {
+      logServerError("achievements.store.delete", cause);
       return err({ code: "unknown" });
     }
   }

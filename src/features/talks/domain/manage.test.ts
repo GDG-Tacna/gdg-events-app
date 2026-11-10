@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { err, ok, type Result } from "@/shared/lib/result";
-import { createTalk, listManagedTalks, setTalkActive, updateTalk, type TalkAdminDeps, type TalkPatch } from "./manage";
+import { createTalk, deleteTalk, listManagedTalks, setTalkActive, updateTalk, type TalkAdminDeps, type TalkDeletion, type TalkPatch } from "./manage";
 import type { Talk, TalkDraft } from "./talk";
 
 const NOW = new Date("2026-10-20T15:00:00Z");
@@ -18,7 +18,7 @@ const STORED: Talk = {
   active: true,
 };
 
-function setup({ rooms = ok(new Set(["auditorio", "sala-b"])) as Result<ReadonlySet<string>, { code: string }>, talks = [STORED] as Talk[] } = {}) {
+function setup({ rooms = ok(new Set(["auditorio", "sala-b"])) as Result<ReadonlySet<string>, { code: string }>, talks = [STORED] as Talk[], blocked = {} as Record<string, "has-check-ins" | "has-missions"> } = {}) {
   const store = new Map(talks.map((talk) => [talk.id, talk]));
   const deps = {
     store: {
@@ -34,6 +34,13 @@ function setup({ rooms = ok(new Set(["auditorio", "sala-b"])) as Result<Readonly
         const after = { ...before, ...patch };
         store.set(id, after);
         return ok({ before, after });
+      }),
+      delete: vi.fn(async (id: string): Promise<Result<TalkDeletion, { code: string }>> => {
+        const found = store.get(id);
+        if (!found) return ok({ kind: "not-found" });
+        if (blocked[id]) return ok({ kind: blocked[id] });
+        store.delete(id);
+        return ok({ kind: "deleted", talk: found });
       }),
     },
     directory: {
@@ -55,6 +62,7 @@ describe("talk administration", () => {
       expect(await createTalk(t.deps, actor, { id: "nueva", draft: DRAFT })).toEqual(err({ code: "forbidden" }));
       expect(await updateTalk(t.deps, actor, { id: "keynote", draft: DRAFT })).toEqual(err({ code: "forbidden" }));
       expect(await setTalkActive(t.deps, actor, { id: "keynote", active: false })).toEqual(err({ code: "forbidden" }));
+      expect(await deleteTalk(t.deps, actor, { id: "keynote" })).toEqual(err({ code: "forbidden" }));
     }
     expect(t.deps.store.create).not.toHaveBeenCalled();
     expect(t.deps.store.update).not.toHaveBeenCalled();
@@ -151,5 +159,43 @@ describe("talk administration", () => {
     expect(await updateTalk(t.deps, ADMIN, { id: "keynote", draft: DRAFT })).toEqual(err({ code: "unknown" }));
     expect(await setTalkActive(t.deps, ADMIN, { id: "keynote", active: false })).toEqual(err({ code: "unknown" }));
     expect(await createTalk(t.deps, ADMIN, { id: "otra", draft: DRAFT })).toEqual(err({ code: "unknown" }));
+  });
+});
+
+describe("deleteTalk", () => {
+  it("deletes a talk nobody attended and no mission uses, and audits it", async () => {
+    const t = setup();
+
+    expect(await deleteTalk(t.deps, ADMIN, { id: "keynote" })).toEqual(ok(STORED));
+
+    expect(t.store.has("keynote")).toBe(false);
+    expect(t.deps.audit.append).toHaveBeenCalledWith({ action: "talk.deleted", actorUid: "a1", targetUid: "keynote", details: { title: "Keynote" }, at: NOW });
+  });
+
+  it.each([
+    ["cadets attended it", "has-check-ins"],
+    ["a mission uses it", "has-missions"],
+  ] as const)("refuses when %s, and changes nothing", async (_why, kind) => {
+    const t = setup({ blocked: { keynote: kind } });
+
+    expect(await deleteTalk(t.deps, ADMIN, { id: "keynote" })).toEqual(err({ code: kind }));
+
+    expect(t.store.has("keynote")).toBe(true);
+    expect(t.deps.audit.append).not.toHaveBeenCalled();
+  });
+
+  it("is not found for an unknown or malformed talk", async () => {
+    const t = setup();
+
+    expect(await deleteTalk(t.deps, ADMIN, { id: "ghost" })).toEqual(err({ code: "not-found" }));
+    expect(await deleteTalk(t.deps, ADMIN, { id: "No Valid" })).toEqual(err({ code: "not-found" }));
+  });
+
+  it("reports a failed delete", async () => {
+    const t = setup();
+    t.deps.store.delete.mockResolvedValueOnce(err({ code: "x" }));
+
+    expect(await deleteTalk(t.deps, ADMIN, { id: "keynote" })).toEqual(err({ code: "unknown" }));
+    expect(t.deps.audit.append).not.toHaveBeenCalled();
   });
 });

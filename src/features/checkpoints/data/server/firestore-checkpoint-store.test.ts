@@ -18,10 +18,16 @@ function fakeFirestore(initial: Record<string, Doc>) {
   const store = new Map<string, Doc>(Object.entries(initial));
   const writes: string[] = [];
   const docSnapshot = (path: string) => ({ exists: store.has(path), id: path.split("/").pop()!, data: () => store.get(path) });
+  const pick = (data: Doc | undefined, field: string) => field.split(".").reduce<unknown>((value, key) => (value as Doc | undefined)?.[key], data);
 
   const db = {
     collection: withEventScope((name: string) => ({
       get: async () => ({ docs: [...store.keys()].filter((key) => key.startsWith(`${name}/`)).map(docSnapshot) }),
+      where: (field: string, _op: string, value: unknown) => {
+        const matches = () => [...store.keys()].filter((key) => key.startsWith(`${name}/`) && pick(store.get(key), field) === value).map(docSnapshot);
+        const query = { isQuery: true, matches, limit: () => query };
+        return query;
+      },
       doc: (id: string) => ({
         path: `${name}/${id}`,
         get: async () => docSnapshot(`${name}/${id}`),
@@ -35,7 +41,12 @@ function fakeFirestore(initial: Record<string, Doc>) {
     runTransaction: async <T,>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
       const pending: Array<() => void> = [];
       const tx = {
-        get: async (ref: { path: string }) => docSnapshot(ref.path),
+        get: async (ref: { path: string; isQuery?: boolean; matches?: () => unknown[] }) => {
+          if (!ref.isQuery) return docSnapshot(ref.path);
+          const docs = ref.matches!();
+          return { empty: docs.length === 0, docs };
+        },
+        delete: (ref: { path: string }) => pending.push(() => store.delete(ref.path)),
         update: (ref: { path: string }, data: Doc) => {
           pending.push(() => {
             store.set(ref.path, { ...store.get(ref.path), ...data });
@@ -169,5 +180,44 @@ describe("FirestoreCheckpointStore", () => {
     expect(await broken.list()).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.create({ id: "x-1", kind: "talk", name: "X", active: true, requirements: NONE })).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.update("x-1", { active: false })).toEqual({ ok: false, error: { code: "unknown" } });
+  });
+});
+
+describe("FirestoreCheckpointStore delete", () => {
+  const station = { kind: "stand", name: "Stand Cloud", active: true };
+  let fake: ReturnType<typeof fakeFirestore>;
+  let store: InstanceType<typeof FirestoreCheckpointStore>;
+
+  beforeEach(() => {
+    fake = fakeFirestore({ "events/e1/checkpoints/stand-cloud": station, "events/e1/missions/other": { config: { type: "stand", checkpointId: "stand-ai" } } });
+    store = new FirestoreCheckpointStore(() => fake.db, testEventResolver);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  it("deletes a station nobody used and no mission points at, and reports it", async () => {
+    const result = await store.delete("stand-cloud");
+
+    expect(result.ok && result.value.kind).toBe("deleted");
+    expect(fake.store.has("events/e1/checkpoints/stand-cloud")).toBe(false);
+  });
+
+  it("keeps a station any cadet checked in at", async () => {
+    fake.store.set("events/e1/checkins/u1_stand-cloud", { uid: "u1", checkpointId: "stand-cloud" });
+
+    expect(await store.delete("stand-cloud")).toEqual({ ok: true, value: { kind: "has-check-ins" } });
+    expect(fake.store.has("events/e1/checkpoints/stand-cloud")).toBe(true);
+  });
+
+  it("keeps a station a mission points at", async () => {
+    fake.store.set("events/e1/missions/cloud-stand", { config: { type: "stand", checkpointId: "stand-cloud" } });
+
+    expect(await store.delete("stand-cloud")).toEqual({ ok: true, value: { kind: "has-missions" } });
+  });
+
+  it("answers not-found for a missing or malformed station, and unknown when the database fails", async () => {
+    expect(await store.delete("ghost-1")).toEqual({ ok: true, value: { kind: "not-found" } });
+    const broken = new FirestoreCheckpointStore(() => ({ collection: () => { throw new Error("offline"); } }) as unknown as Firestore, testEventResolver);
+
+    expect(await broken.delete("stand-cloud")).toEqual({ ok: false, error: { code: "unknown" } });
   });
 });

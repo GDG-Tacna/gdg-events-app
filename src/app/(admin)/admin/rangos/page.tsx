@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { rankDeps } from "@/app-shell/composition/ranks.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { requireRole } from "@/app-shell/guards";
 import { uploadImageAction } from "@/app-shell/media/upload.action";
 import { saveRanksAction } from "@/app-shell/ranks/ranks.actions";
@@ -20,7 +21,7 @@ export default async function AdminRanksPage() {
 
   return (
     <ScreenEnter>
-      <RanksEditor ranks={ranks.value.ranks} isDefault={ranks.value.isDefault} save={saveRanksAction} upload={uploadImageAction} />
+      <RanksEditor ranks={ranks.value.ranks} isDefault={ranks.value.isDefault} save={saveRanksAction} upload={uploadImageAction} canRemove={await mayDeleteItems(session)} />
     </ScreenEnter>
   );
 }

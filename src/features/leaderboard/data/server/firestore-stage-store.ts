@@ -48,6 +48,7 @@ export class FirestoreStageStore implements StageStore {
         raffle: state.raffle ? { ...plain({ ...state.raffle, at: null }), at: state.raffle.at } : null,
         background: state.background ? { path: state.background.path, url: state.background.url } : null,
         poll: state.poll ? { pollId: state.poll.pollId } : null,
+        talk: state.talk ? { talkId: state.talk.talkId, name: state.talk.name } : null,
         updatedAt: new Date(),
       });
       return ok(undefined);

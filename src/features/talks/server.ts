@@ -4,6 +4,7 @@ import "server-only";
 export { checkTalk, compareTalks, parseLocalDateTime, toLocalDateTime, type Talk, type TalkDraft } from "./domain/talk";
 export {
   createTalk,
+  deleteTalk,
   listManagedTalks,
   setTalkActive,
   updateTalk,

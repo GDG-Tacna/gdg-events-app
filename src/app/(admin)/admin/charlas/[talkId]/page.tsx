@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { talkAdminDeps, talkRooms, talkSpeakers } from "@/app-shell/composition/talks.server";
 import { requireRole } from "@/app-shell/guards";
+import { projectTalkAction } from "@/app-shell/talks/project.action";
 import { updateTalkAction } from "@/app-shell/talks/manage.actions";
 import { toTalkView } from "@/app-shell/talks/talk-view.server";
 import { TalkForm } from "@/features/talks";
 import { listManagedTalks } from "@/features/talks/server";
+import { FEATURES } from "@/shared/config/features";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { ScreenEnter } from "@/shared/ui";
@@ -34,7 +36,8 @@ export default async function AdminEditTalkPage({ params }: PageProps<"/admin/ch
         speakersHref={ROUTES.adminSpeakers}
         listHref={ROUTES.adminTalks}
         // A closed talk has no code to project.
-        qrHref={talk.active ? `${ROUTES.adminQr}/${talk.id}` : undefined}
+        project={talk.active && FEATURES.checkins ? projectTalkAction : undefined}
+        stageHref={ROUTES.adminStage}
       />
     </ScreenEnter>
   );

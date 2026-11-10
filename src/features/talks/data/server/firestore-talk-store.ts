@@ -3,10 +3,10 @@ import type { Firestore } from "firebase-admin/firestore";
 import { isCheckpointId } from "@/features/checkins";
 import { getActiveEventId, type ActiveEventResolver } from "@/shared/lib/firebase/active-event";
 import { getAdminFirestore } from "@/shared/lib/firebase/admin";
-import { CHECKPOINTS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
+import { CHECKINS_COLLECTION, CHECKPOINTS_COLLECTION, MISSIONS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
-import type { TalkPatch, TalkStore } from "../../domain/manage";
+import type { TalkDeletion, TalkPatch, TalkStore } from "../../domain/manage";
 import type { Talk } from "../../domain/talk";
 
 const toDate = (value: unknown): Date | null => {
@@ -87,6 +87,30 @@ export class FirestoreTalkStore implements TalkStore {
     } catch (cause) {
       if (isAlreadyExists(cause)) return err({ code: "already-exists" });
       logServerError("talks.store.create", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async delete(id: string): Promise<Result<TalkDeletion, { code: string }>> {
+    try {
+      const db = this.getDb();
+      const eventId = await this.getEventId();
+      const ref = eventCollection(db, eventId, CHECKPOINTS_COLLECTION).doc(id);
+      const checkIns = eventCollection(db, eventId, CHECKINS_COLLECTION).where("checkpointId", "==", id).limit(1);
+      const missions = eventCollection(db, eventId, MISSIONS_COLLECTION).where("config.checkpointId", "==", id).limit(1);
+
+      // Reading the check-ins and missions inside the transaction makes a scan or a new mission at the same moment retry the delete.
+      return await db.runTransaction(async (tx): Promise<Result<TalkDeletion, { code: string }>> => {
+        const [snapshot, scanned, tied] = await Promise.all([tx.get(ref), tx.get(checkIns), tx.get(missions)]);
+        const talk = snapshot.exists ? toTalk(id, snapshot.data()) : null;
+        if (!talk) return ok({ kind: "not-found" });
+        if (!scanned.empty) return ok({ kind: "has-check-ins" });
+        if (!tied.empty) return ok({ kind: "has-missions" });
+        tx.delete(ref);
+        return ok({ kind: "deleted", talk });
+      });
+    } catch (cause) {
+      logServerError("talks.store.delete", cause);
       return err({ code: "unknown" });
     }
   }

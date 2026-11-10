@@ -18,6 +18,11 @@ function fakeFirestore(initial: Record<string, Doc>) {
   const db = {
     collection: withEventScope((name: string) => ({
       get: async () => ({ docs: [...store.keys()].filter((key) => key.startsWith(`${name}/`)).map(snapshot) }),
+      where: (field: string, _op: string, value: unknown) => {
+        const matches = () => [...store.keys()].filter((key) => key.startsWith(`${name}/`) && store.get(key)?.[field] === value).map(snapshot);
+        const query = { isQuery: true, matches, limit: () => query };
+        return query;
+      },
       doc: (id: string) => ({
         path: `${name}/${id}`,
         get: async () => snapshot(`${name}/${id}`),
@@ -31,7 +36,12 @@ function fakeFirestore(initial: Record<string, Doc>) {
     runTransaction: async <T,>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
       const pending: Array<() => void> = [];
       const result = await fn({
-        get: async (ref: { path: string }) => snapshot(ref.path),
+        get: async (ref: { path: string; isQuery?: boolean; matches?: () => unknown[] }) => {
+          if (!ref.isQuery) return snapshot(ref.path);
+          const docs = ref.matches!();
+          return { empty: docs.length === 0, docs };
+        },
+        delete: (ref: { path: string }) => pending.push(() => store.delete(ref.path)),
         update: (ref: { path: string }, data: Doc) => pending.push(() => store.set(ref.path, { ...store.get(ref.path), ...data })),
       });
       pending.forEach((commit) => commit());
@@ -81,6 +91,26 @@ describe("FirestoreQuadrantStore (admin side)", () => {
     expect(await store.updateQuadrant("ghost", { active: false })).toEqual({ ok: true, value: null });
   });
 
+  it("deletes a zone no mission is assigned to, and reports it", async () => {
+    await store.createQuadrant(AI);
+    fake.store.set("events/e1/missions/other", { quadrantId: "cloud" });
+
+    expect(await store.deleteQuadrant("ai")).toEqual({ ok: true, value: { kind: "deleted", quadrant: AI } });
+    expect(fake.store.has("events/e1/quadrants/ai")).toBe(false);
+  });
+
+  it("keeps a zone any mission is assigned to, active or not", async () => {
+    await store.createQuadrant(AI);
+    fake.store.set("events/e1/missions/ai-quiz", { quadrantId: "ai", active: false });
+
+    expect(await store.deleteQuadrant("ai")).toEqual({ ok: true, value: { kind: "has-missions" } });
+    expect(fake.store.has("events/e1/quadrants/ai")).toBe(true);
+  });
+
+  it("answers not-found for a zone that does not exist", async () => {
+    expect(await store.deleteQuadrant("ghost")).toEqual({ ok: true, value: { kind: "not-found" } });
+  });
+
   it("saves the order in one go", async () => {
     await store.createQuadrant(AI);
     await store.createQuadrant({ ...AI, id: "cloud", order: 1 });
@@ -118,6 +148,7 @@ describe("FirestoreQuadrantStore (admin side)", () => {
     expect(await broken.createQuadrant(AI)).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.updateQuadrant("ai", { active: false })).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.setQuadrantOrder(["ai"])).toEqual({ ok: false, error: { code: "unknown" } });
+    expect(await broken.deleteQuadrant("ai")).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.saveVenue(PLAN)).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.listQuadrants()).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.loadVenue()).toEqual({ ok: false, error: { code: "unknown" } });

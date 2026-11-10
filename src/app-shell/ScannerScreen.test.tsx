@@ -25,7 +25,7 @@ const { recordCheckInAction } = await import("@/app-shell/checkins/record-check-
 
 describe("ScannerScreen", () => {
   it("binds the real camera and the check-in action to the scanner", () => {
-    render(<ScannerScreen achievementsOn networkOn />);
+    render(<ScannerScreen achievementsOn networkOn missionsOn />);
 
     expect(screen.getByRole("heading", { level: 1, name: copy.scanner.title })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: copy.scanner.videoLabel })).toBeInTheDocument();
@@ -33,14 +33,14 @@ describe("ScannerScreen", () => {
   });
 
   it("links home, to Logros, to the Red and to the cadet's own QR (for a printed station code)", () => {
-    render(<ScannerScreen achievementsOn networkOn />);
+    render(<ScannerScreen achievementsOn networkOn missionsOn />);
 
-    expect(seen.props).toMatchObject({ homeHref: "/dashboard", achievementsHref: "/achievements", networkHref: "/red", passHref: "/pass" });
+    expect(seen.props).toMatchObject({ homeHref: "/dashboard", achievementsHref: "/achievements", networkHref: "/red", passHref: "/pass", missionsHref: "/missions" });
   });
 
   it("leaves out the links of modules the edition has off", () => {
-    render(<ScannerScreen achievementsOn={false} networkOn={false} />);
+    render(<ScannerScreen achievementsOn={false} networkOn={false} missionsOn={false} />);
 
-    expect(seen.props).toMatchObject({ achievementsHref: undefined, networkHref: undefined });
+    expect(seen.props).toMatchObject({ achievementsHref: undefined, networkHref: undefined, missionsHref: undefined });
   });
 });

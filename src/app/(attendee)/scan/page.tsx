@@ -13,14 +13,14 @@ export default async function ScanPage() {
   if (!FEATURES.checkins) notFound();
   // Visitors go to /login, users without a role go to onboarding, staff and admin go to their own home: only attendees scan.
   await requireAttendee();
-  const [achievementsOn, networkOn] = await Promise.all([moduleOn("achievements"), moduleOn("network")]);
+  const [achievementsOn, networkOn, missionsOn] = await Promise.all([moduleOn("achievements"), moduleOn("network"), moduleOn("missions")]);
 
   return (
     <>
       <SpaceBackground />
       <main className="px-space-4 pt-safe-space-6 pb-space-6 min-[760px]:pt-safe-space-8 min-[760px]:pb-space-8 mx-auto w-full">
         <ScreenEnter>
-          <ScannerScreen achievementsOn={achievementsOn} networkOn={networkOn} />
+          <ScannerScreen achievementsOn={achievementsOn} networkOn={networkOn} missionsOn={missionsOn} />
         </ScreenEnter>
       </main>
     </>

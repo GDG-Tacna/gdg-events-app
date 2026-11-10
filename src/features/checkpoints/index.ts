@@ -1,6 +1,7 @@
 // Public API (client-safe). Server-only exports live in `./server`.
 export type { ServeError, ServeErrorCode } from "./domain/serve-error";
 export { STATION_KINDS, isStationKind, type StationKind } from "./domain/serve";
+export type { DeleteCheckpointAction, DeleteCheckpointActionResult } from "./ui/manage-action";
 export type { ServeAction, ServeActionResult, StationMission } from "./ui/action";
 export type { ManageError, ManageErrorCode } from "./domain/manage-error";
 export type {

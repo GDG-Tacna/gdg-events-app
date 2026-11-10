@@ -24,10 +24,14 @@ export interface CheckpointStore {
     id: string,
     patch: { name?: string; active?: boolean; requirements?: FoodRequirements },
   ): Promise<Result<{ before: ManagedCheckpoint; after: ManagedCheckpoint } | null, { code: string }>>;
+  /** Deletes the checkpoint unless a check-in or a mission refers to it; the checks and the delete are one transaction. */
+  delete(id: string): Promise<Result<CheckpointDeletion, { code: string }>>;
 }
 
+export type CheckpointDeletion = { kind: "deleted"; checkpoint: ManagedCheckpoint } | { kind: "not-found" } | { kind: "has-check-ins" } | { kind: "has-missions" };
+
 export interface ManageAuditEntry {
-  action: "checkpoint.created" | "checkpoint.renamed" | "checkpoint.activated" | "checkpoint.deactivated" | "checkpoint.requirements";
+  action: "checkpoint.created" | "checkpoint.renamed" | "checkpoint.activated" | "checkpoint.deactivated" | "checkpoint.requirements" | "checkpoint.deleted";
   actorUid: string;
   targetUid: string;
   details: Record<string, string | null>;
@@ -175,6 +179,26 @@ export async function setCheckpointActive(
     });
   }
   return ok(updated.value.after);
+}
+
+/**
+ * Deletes a station nobody has used: no cadet checked in there and no mission points at it (a station with history is
+ * only closed). The phase of the edition is checked by the caller.
+ */
+export async function deleteCheckpoint(deps: ManageDeps, actor: ManageActor, input: { id: string }): Promise<Result<ManagedCheckpoint, ManageError>> {
+  const denied = requireAdmin(actor);
+  if (denied) return err(denied);
+  if (!isCheckpointId(input.id)) return err(manageError("not-found"));
+
+  const deleted = await deps.store.delete(input.id);
+  if (!deleted.ok) return err(manageError("unknown"));
+  if (deleted.value.kind === "not-found") return err(manageError("not-found"));
+  if (deleted.value.kind === "has-check-ins") return err(manageError("has-check-ins"));
+  if (deleted.value.kind === "has-missions") return err(manageError("has-missions"));
+
+  const { checkpoint } = deleted.value;
+  await audit(deps, { action: "checkpoint.deleted", actorUid: actor.uid, targetUid: checkpoint.id, details: { kind: checkpoint.kind, name: checkpoint.name } });
+  return ok(checkpoint);
 }
 
 const describeRequirements = (requirements: FoodRequirements) => ({

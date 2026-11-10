@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/composition/checkpoint-admin.server", () => ({ checkpointAdminDeps: { marker: "deps" } }));
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 vi.mock("@/app-shell/checkpoints/manage.actions", () => ({
   createCheckpointAction: async () => ({ ok: false, code: "unknown" }),
   renameCheckpointAction: async () => ({ ok: false, code: "unknown" }),
   setCheckpointActiveAction: async () => ({ ok: false, code: "unknown" }),
+  deleteCheckpointAction: async () => ({ ok: false, code: "unknown" }),
   setFoodRequirementsAction: async () => ({ ok: false, code: "unknown" }),
 }));
 vi.mock("@/app-shell/composition/ranks.server", () => ({ rankDeps: { marker: "ranks" } }));
@@ -43,6 +46,7 @@ describe("admin checkpoints page", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     guards.requireRole.mockResolvedValue({ uid: "a1", role: "admin", displayName: null, photoUrl: null });
+    deletion.mayDeleteItems.mockResolvedValue(true);
     server.listCheckpoints.mockResolvedValue({ ok: true, value: LIST });
     attendeeServer.getEditionLadder.mockResolvedValue([
       { id: "recruit", minXp: 0, level: 1 },
@@ -69,6 +73,8 @@ describe("admin checkpoints page", () => {
       rename: actions.renameCheckpointAction,
       setActive: actions.setCheckpointActiveAction,
       setRequirements: actions.setFoodRequirementsAction,
+      remove: actions.deleteCheckpointAction,
+      canDelete: true,
     });
     // The edition's ladder names the levels a meal can ask for.
     expect(attendeeServer.getEditionLadder).toHaveBeenCalledWith({ marker: "ranks" });
@@ -78,6 +84,12 @@ describe("admin checkpoints page", () => {
     ]);
     // No codes to link: staff scan the cadet's QR at the stations.
     expect(view?.props).not.toHaveProperty("hrefs");
+  });
+
+  it("hides the delete buttons from a session that may not delete in this edition", async () => {
+    deletion.mayDeleteItems.mockResolvedValueOnce(false);
+
+    expect(findElement(await AdminCheckpointsPage(), CheckpointsAdminView)?.props.canDelete).toBe(false);
   });
 
   it("leaves the talks out: they have their own screen (Charlas)", async () => {

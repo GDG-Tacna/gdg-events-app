@@ -3,11 +3,11 @@ import type { Firestore } from "firebase-admin/firestore";
 import { imageRefOf } from "@/features/media/server";
 import { getActiveEventId, type ActiveEventResolver } from "@/shared/lib/firebase/active-event";
 import { getAdminFirestore } from "@/shared/lib/firebase/admin";
-import { SQUADS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
+import { PARTICIPANTS_COLLECTION, SQUADS_COLLECTION, SQUAD_LEDGER_COLLECTION, SQUAD_REDEMPTIONS_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { isSquadId } from "@/shared/types/squad";
-import type { ManagedSquad, SquadStore } from "../../domain/manage";
+import type { ManagedSquad, SquadDeletion, SquadStore } from "../../domain/manage";
 import type { Squad } from "../../domain/squad";
 import { validateLogo } from "../../domain/squad-rules";
 
@@ -106,6 +106,31 @@ export class FirestoreSquadStore implements SquadStore {
       });
     } catch (cause) {
       logServerError("squads.store.update", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async delete(id: string): Promise<Result<SquadDeletion, { code: string }>> {
+    try {
+      const db = this.getDb();
+      const eventId = await this.getEventId();
+      const ref = eventCollection(db, eventId, SQUADS_COLLECTION).doc(id);
+      const members = eventCollection(db, eventId, PARTICIPANTS_COLLECTION).where("squad", "==", id).limit(1);
+      const earned = eventCollection(db, eventId, SQUAD_LEDGER_COLLECTION).where("squadId", "==", id).limit(1);
+      const redeemed = eventCollection(db, eventId, SQUAD_REDEMPTIONS_COLLECTION).where("squadId", "==", id).limit(1);
+
+      // Reading everything that depends on the squad inside the transaction makes a cadet joining at the same moment retry the delete.
+      return await db.runTransaction(async (tx): Promise<Result<SquadDeletion, { code: string }>> => {
+        const [snapshot, belonging, credited, spent] = await Promise.all([tx.get(ref), tx.get(members), tx.get(earned), tx.get(redeemed)]);
+        const squad = snapshot.exists ? toSquad(id, snapshot.data()) : null;
+        if (!squad) return ok({ kind: "not-found" });
+        if (!belonging.empty) return ok({ kind: "has-members" });
+        if (!credited.empty || !spent.empty) return ok({ kind: "has-credits" });
+        tx.delete(ref);
+        return ok({ kind: "deleted", squad });
+      });
+    } catch (cause) {
+      logServerError("squads.store.delete", cause);
       return err({ code: "unknown" });
     }
   }

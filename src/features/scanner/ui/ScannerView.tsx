@@ -22,6 +22,8 @@ export interface ScannerViewProps {
   networkHref?: string;
   /** The cadet's own pass, offered when a printed station code was scanned (staff scan the pass there). */
   passHref?: string;
+  /** The missions board, offered when the scan completed a mission (absent when missions are off). */
+  missionsHref?: string;
 }
 
 interface Message {
@@ -42,7 +44,7 @@ export function messageFor(outcome: ScanOutcome): Message {
  * of the last code with what to do next. Everything about the code is decided by the server; this
  * screen only shows the camera and the answer.
  */
-export function ScannerView({ camera: Camera, record, homeHref, achievementsHref, networkHref, passHref }: ScannerViewProps) {
+export function ScannerView({ camera: Camera, record, homeHref, achievementsHref, networkHref, passHref, missionsHref }: ScannerViewProps) {
   const { state, camera, cameraKey, start, scanAgain } = useScanner(record);
   const resultRef = useRef<HTMLHeadingElement>(null);
 
@@ -58,7 +60,10 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
   const toNetwork = done && !done.ok && done.code === "contact-code" ? networkHref : undefined;
   // A printed station code: the way forward is showing the cadet's own QR to the staff.
   const toPass = done && !done.ok && done.code === "staff-station" ? passHref : undefined;
-  const leadsAway = Boolean(toNetwork || toPass);
+  // Missions this scan just completed: the board shows them with a celebration, so the way forward is there.
+  const justCompleted = done?.ok ? done.missions.filter((mission) => mission.justCompleted) : [];
+  const toMissions = missionsHref && justCompleted.length > 0 ? `${missionsHref}?completadas=${justCompleted.map((mission) => mission.id).join(",")}` : undefined;
+  const leadsAway = Boolean(toNetwork || toPass || toMissions);
 
   const statusText = state.status === "sending" ? copy.scanner.sending : state.status === "scanning" ? copy.scanner.hint : null;
 
@@ -137,6 +142,7 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
             ) : null}
 
             <div className="gap-space-3 flex flex-col">
+              {toMissions ? <ButtonLink href={toMissions}>{justCompleted.length === 1 ? copy.scanner.viewMission : copy.scanner.viewMissions}</ButtonLink> : null}
               {toNetwork ? <ButtonLink href={toNetwork}>{copy.scanner.toNetwork}</ButtonLink> : null}
               {toPass ? <ButtonLink href={toPass}>{copy.scanner.toPass}</ButtonLink> : null}
               {state.status === "camera-error" ? (

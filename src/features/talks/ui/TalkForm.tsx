@@ -7,7 +7,8 @@ import { interpolate } from "@/shared/lib/format";
 import { Button, ButtonLink, Card, Icon, InlineAlert, SelectField, TextAreaField, TextField } from "@/shared/ui";
 import type { TalkAdminErrorCode } from "../domain/manage";
 import { TALK_DESCRIPTION_MAX, TALK_SPEAKERS_MAX, TALK_TITLE_MAX, suggestTalkId } from "../domain/talk";
-import type { SaveTalkAction, TalkView } from "./admin-actions";
+import type { ProjectTalkAction, SaveTalkAction, TalkView } from "./admin-actions";
+import { useProjectTalk } from "./use-project-talk";
 
 export interface TalkFormProps {
   mode: "create" | "edit";
@@ -20,8 +21,10 @@ export interface TalkFormProps {
   /** Where the speakers are managed (offered when there are none yet). */
   speakersHref?: string;
   listHref: string;
-  /** Edit only: where the talk's QR is projected (absent while the talk is closed: a closed talk has no code). */
-  qrHref?: string;
+  /** Edit only: puts the talk's QR on the stage screen (absent while the talk is closed: a closed talk has no code). */
+  project?: ProjectTalkAction;
+  /** Where the stage is controlled, where `project` leads on success. */
+  stageHref?: string;
 }
 
 const NO_ROOM = "";
@@ -41,10 +44,10 @@ const FIELD_OF: Partial<Record<TalkAdminErrorCode, Field>> = {
 /**
  * Create or edit a talk: title, its speakers (chosen from the edition's), start and end (the venue's wall clock), room
  * and a short description.
- * The server checks everything again; this form only shows the errors next to their field. Editing offers the
- * talk's QR to project.
+ * The server checks everything again; this form only shows the errors next to their field. Editing offers to put the
+ * talk's QR on the stage screen.
  */
-export function TalkForm({ mode, talk, save, rooms, speakers, speakersHref, listHref, qrHref }: TalkFormProps) {
+export function TalkForm({ mode, talk, save, rooms, speakers, speakersHref, listHref, project, stageHref }: TalkFormProps) {
   const t = copy.admin.talks;
   const router = useRouter();
   const [title, setTitle] = useState(talk?.title ?? "");
@@ -56,6 +59,7 @@ export function TalkForm({ mode, talk, save, rooms, speakers, speakersHref, list
   const [idDraft, setIdDraft] = useState<string | null>(null);
   const [error, setError] = useState<TalkAdminErrorCode | null>(null);
   const [pending, setPending] = useState(false);
+  const { projectTalk, projecting, projectError } = useProjectTalk(project ?? (async () => ({ ok: false, text: copy.admin.stage.errors.unknown })), stageHref ?? listHref);
 
   const id = mode === "edit" && talk ? talk.id : (idDraft ?? suggestTalkId(title));
   const field = error ? FIELD_OF[error] : undefined;
@@ -88,13 +92,14 @@ export function TalkForm({ mode, talk, save, rooms, speakers, speakersHref, list
       <h1 className="type-title-xl text-foreground">{mode === "create" ? t.form.createTitle : t.form.editTitle}</h1>
       {error && !field ? <InlineAlert>{t.errors[error]}</InlineAlert> : null}
 
-      {qrHref ? (
+      {project && talk ? (
         <Card className="gap-space-3 flex flex-col">
           <h2 className="type-title text-foreground">{t.form.qrTitle}</h2>
           <p className="type-body-sm text-muted-foreground">{t.form.qrBody}</p>
-          <ButtonLink href={qrHref} variant="secondary">
+          {projectError ? <InlineAlert>{projectError}</InlineAlert> : null}
+          <Button type="button" variant="secondary" loading={projecting === talk.id} disabled={projecting !== null} onClick={() => void projectTalk(talk.id)}>
             {t.project}
-          </ButtonLink>
+          </Button>
         </Card>
       ) : null}
 

@@ -3,6 +3,8 @@ import type { CheckpointId, CheckpointKind } from "../domain/checkpoint";
 
 /** A mission the scan completed, filled in by the app shell (check-ins know nothing about missions). */
 export interface ScanReward {
+  /** The mission's id, so the screen can take the cadet to it on the board. */
+  id: string;
   title: string;
   xpEarned: number;
   creditsEarned: number;

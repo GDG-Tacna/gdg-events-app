@@ -13,6 +13,8 @@ import { FoodRequirementsEditor, requirementsSummary, type LevelOption } from ".
 import type {
   CheckpointView,
   CreateCheckpointAction,
+  DeleteCheckpointAction,
+  DeleteCheckpointActionResult,
   ManageActionResult,
   RenameCheckpointAction,
   SetCheckpointActiveAction,
@@ -24,6 +26,9 @@ export interface CheckpointsAdminViewProps {
   create: CreateCheckpointAction;
   rename: RenameCheckpointAction;
   setActive: SetCheckpointActiveAction;
+  remove: DeleteCheckpointAction;
+  /** Whether the session may delete stations here (a draft edition, or an admin of every edition); the server decides again. */
+  canDelete?: boolean;
   setRequirements: SetFoodRequirementsAction;
   /** The edition's rank ladder, to name the minimum level of a meal. */
   levels: readonly LevelOption[];
@@ -73,7 +78,7 @@ function KindChoice({ value, onChange, disabled }: { value: CheckpointKind; onCh
  * Creating, renaming and the requirements open in a dialog, where a refusal shows too. Nothing is deleted: a closed
  * checkpoint keeps its history. The server decides everything; this view shows the outcome.
  */
-export function CheckpointsAdminView({ checkpoints, create, rename, setActive, setRequirements, levels }: CheckpointsAdminViewProps) {
+export function CheckpointsAdminView({ checkpoints, create, rename, setActive, remove, canDelete = true, setRequirements, levels }: CheckpointsAdminViewProps) {
   const t = copy.admin.checkpoints;
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
@@ -122,6 +127,22 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, s
     setNotice({ kind: "success", text: success(result.checkpoint) });
     router.refresh();
     return true;
+  }
+
+  async function handleDelete(checkpoint: CheckpointView) {
+    if (busy || !window.confirm(interpolate(t.confirmDelete, { name: checkpoint.name }))) return;
+    setBusy(`delete:${checkpoint.id}`);
+    setNotice(null);
+    let result: DeleteCheckpointActionResult;
+    try {
+      result = await remove({ id: checkpoint.id });
+    } catch {
+      result = { ok: false, code: "unknown" };
+    }
+    setBusy(null);
+    if (!result.ok) return setNotice({ kind: "error", text: t.errors[result.code] });
+    setNotice({ kind: "success", text: interpolate(t.deletedDone, { name: result.name }) });
+    router.refresh();
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
@@ -229,6 +250,19 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, s
                     >
                       {toggling ? (checkpoint.active ? t.closing : t.opening) : checkpoint.active ? t.close : t.reopen}
                     </Button>
+                    {canDelete ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy !== null}
+                        loading={busy === `delete:${checkpoint.id}`}
+                        aria-label={`${t.delete}: ${checkpoint.name}`}
+                        onClick={() => void handleDelete(checkpoint)}
+                      >
+                        <Icon name="trash" size={16} />
+                        {t.delete}
+                      </Button>
+                    ) : null}
                   </div>
                 </Card>
               </li>

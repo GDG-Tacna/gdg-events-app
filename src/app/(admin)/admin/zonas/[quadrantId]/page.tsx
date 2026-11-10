@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: copy.admin.map.quadrantForm.editTitle
 
 export default async function AdminEditQuadrantPage({ params }: { params: Promise<{ quadrantId: string }> }) {
   const session = await requireRole(["admin"]);
-  await requireSection(session, "map");
+  await requireSection(session, "zones");
   const { quadrantId } = await params;
 
   const quadrants = await listManagedQuadrants(quadrantAdminDeps, { uid: session.uid, role: session.role });

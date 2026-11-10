@@ -18,6 +18,12 @@ export type SquadAdminErrorCode =
   | "invalid-image"
   | "already-exists"
   | "already-seeded"
+  /** Cadets belong to it: it can only be retired (they keep it). */
+  | "has-members"
+  /** It earned or spent squad credits: that history needs it. */
+  | "has-credits"
+  /** The edition is published or over: only an admin of every edition deletes there. */
+  | "edition-locked"
   | "not-found"
   /** Squads are only retired once the event is over, so nobody loses their team mid-event. */
   | "event-not-finished"
@@ -44,7 +50,11 @@ export interface SquadStore {
   ): Promise<Result<{ before: ManagedSquad; after: ManagedSquad } | null, { code: string }>>;
   /** Saves the display order: the position of each id in the list. */
   setOrder(ids: readonly string[]): Promise<Result<void, { code: string }>>;
+  /** Deletes the squad unless cadets belong to it or it has credit history; the checks and the delete are one transaction. */
+  delete(id: string): Promise<Result<SquadDeletion, { code: string }>>;
 }
+
+export type SquadDeletion = { kind: "deleted"; squad: ManagedSquad } | { kind: "not-found" } | { kind: "has-members" } | { kind: "has-credits" };
 
 /** Whether the active edition is over (the event feature answers it). */
 export interface EventClock {
@@ -52,7 +62,7 @@ export interface EventClock {
 }
 
 export interface SquadAuditEntry {
-  action: "squads.seeded" | "squad.created" | "squad.updated" | "squad.retired" | "squad.reactivated" | "squad.reordered";
+  action: "squads.seeded" | "squad.created" | "squad.updated" | "squad.retired" | "squad.reactivated" | "squad.reordered" | "squad.deleted";
   actorUid: string;
   targetUid: string;
   details: Record<string, string | null>;
@@ -252,6 +262,26 @@ async function setActive(
     });
   }
   return ok(updated.value.after);
+}
+
+/**
+ * Deletes a squad nobody belongs to and that never earned or spent squad credits (a squad with members, or with
+ * history, is only retired). Its logo goes with it. The phase of the edition is checked by the caller.
+ */
+export async function deleteSquad(deps: SquadAdminDeps, actor: SquadAdminActor, input: { id: string }): Promise<Result<void, SquadAdminError>> {
+  if (forbidden(actor)) return err(squadAdminError("forbidden"));
+  if (!isSquadId(input.id)) return err(squadAdminError("not-found"));
+
+  const deleted = await deps.store.delete(input.id);
+  if (!deleted.ok) return err(squadAdminError("unknown"));
+  if (deleted.value.kind === "not-found") return err(squadAdminError("not-found"));
+  if (deleted.value.kind === "has-members") return err(squadAdminError("has-members"));
+  if (deleted.value.kind === "has-credits") return err(squadAdminError("has-credits"));
+
+  const { squad } = deleted.value;
+  await dropReplacedImage(deps.images, squad.logo ?? null, null);
+  await audit(deps, { action: "squad.deleted", actorUid: actor.uid, targetUid: squad.id, details: { name: squad.name } });
+  return ok(undefined);
 }
 
 /** Moves a squad to a place in the list attendees see (clamped to its ends); its own place is a no-op. */

@@ -30,19 +30,22 @@ export default async function MapPage({ searchParams }: PageProps<"/map">) {
   // Visitors go to /login, users without a role go to onboarding, staff and admin go to their own home.
   const session = await requireAttendee();
   const { vista } = await searchParams;
-  // The agenda needs check-ins (talks are proven by scanning their code); anything else shows the plan.
-  const view = !mapOn || (vista === "agenda" && FEATURES.checkins) ? "agenda" : "plano";
-
-  const [galaxy, agenda] = await Promise.all([getGalaxyMap(galaxyDeps), view === "agenda" ? getAgenda(agendaDeps, session.uid) : null]);
+  const galaxy = await getGalaxyMap(galaxyDeps);
   // The route's error boundary shows a retry; the cause is already logged by the adapter.
   if (!galaxy.ok) throw new Error("Could not read the galaxy map");
+  // A plan the admin emptied (an event with one room) has nothing to show: like the map switched off, this is the agenda.
+  const planOn = mapOn && galaxy.value.venue.areas.length > 0;
+  // The agenda needs check-ins (talks are proven by scanning their code); anything else shows the plan.
+  const view = (!planOn || vista === "agenda") && FEATURES.checkins ? "agenda" : "plano";
+
+  const agenda = view === "agenda" ? await getAgenda(agendaDeps, session.uid) : null;
   if (agenda && !agenda.ok) throw new Error("Could not read the agenda");
 
   return (
     <>
       <SpaceBackground />
       <main className="px-space-4 pt-safe-space-6 pb-space-6 min-[760px]:pt-safe-space-8 min-[760px]:pb-space-8 gap-space-5 mx-auto flex w-full max-w-[520px] flex-col min-[760px]:max-w-[880px]">
-        {mapOn && FEATURES.checkins ? (
+        {planOn && FEATURES.checkins ? (
           <nav aria-label={copy.map.views.label} className="bg-surface border-border p-space-1 grid grid-cols-2 rounded-md border">
             {VIEWS.map((option) => (
               <Link

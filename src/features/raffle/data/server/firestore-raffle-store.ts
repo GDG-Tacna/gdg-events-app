@@ -208,7 +208,8 @@ export class FirestoreRaffleStore implements RaffleStore {
       return ok(
         snapshot.docs.flatMap((doc) => {
           const data = doc.data();
-          if (typeof data.alias !== "string") return [];
+          // A blocked cadet holds no tickets.
+          if (typeof data.alias !== "string" || data.banned === true) return [];
           const credits = typeof data.credits === "number" && Number.isFinite(data.credits) && data.credits > 0 ? Math.floor(data.credits) : 0;
           return [{ uid: doc.id, alias: data.alias, squadId: typeof data.squad === "string" && data.squad.length > 0 ? data.squad : null, credits }];
         }),

@@ -5,6 +5,8 @@ vi.mock("@/app-shell/composition/squad-admin.server", () => ({ squadAdminDeps: {
 const catalog = vi.hoisted(() => ({ invalidate: vi.fn() }));
 vi.mock("@/app-shell/composition/squads.server", () => ({ squadCatalog: catalog }));
 
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
@@ -16,6 +18,7 @@ const server = vi.hoisted(() => ({
   retireSquad: vi.fn(),
   reactivateSquad: vi.fn(),
   moveSquad: vi.fn(),
+  deleteSquad: vi.fn(),
 }));
 vi.mock("@/features/squads/server", () => server);
 
@@ -35,12 +38,14 @@ describe.each([
   ["retireSquadAction", () => actions.retireSquadAction({ id: "gemini" }), server.retireSquad],
   ["reactivateSquadAction", () => actions.reactivateSquadAction({ id: "gemini" }), server.reactivateSquad],
   ["moveSquadAction", () => actions.moveSquadAction({ id: "gemini", to: 0 }), server.moveSquad],
+  ["deleteSquadAction", () => actions.deleteSquadAction({ id: "gemini" }), server.deleteSquad],
 ] as const)("%s", (_name, call, useCase) => {
   beforeEach(() => {
     vi.clearAllMocks();
     features.FEATURES.admin = true;
     features.FEATURES.squads = true;
     guards.getSession.mockResolvedValue(session("admin"));
+    deletion.mayDeleteItems.mockResolvedValue(true);
   });
 
   it.each([["admin"], ["squads"]] as const)("does nothing when the %s feature is switched off", async (flag) => {
@@ -103,5 +108,29 @@ describe("squad action input", () => {
     expect(server.updateSquad).not.toHaveBeenCalled();
     expect(server.moveSquad).not.toHaveBeenCalled();
     expect(server.retireSquad).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteSquadAction (the phase of the edition)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    features.FEATURES.admin = true;
+    features.FEATURES.squads = true;
+    guards.getSession.mockResolvedValue(session("admin"));
+    deletion.mayDeleteItems.mockResolvedValue(true);
+  });
+
+  it("refuses to delete once the edition is published, unless the admin is allowed to, and keeps the cache", async () => {
+    deletion.mayDeleteItems.mockResolvedValue(false);
+
+    expect(await actions.deleteSquadAction({ id: "gemini" })).toEqual({ ok: false, code: "edition-locked" });
+
+    expect(server.deleteSquad).not.toHaveBeenCalled();
+    expect(catalog.invalidate).not.toHaveBeenCalled();
+  });
+
+  it("deletes only with a well-formed input", async () => {
+    expect(await actions.deleteSquadAction({ id: 7 } as never)).toEqual({ ok: false, code: "not-found" });
+    expect(server.deleteSquad).not.toHaveBeenCalled();
   });
 });

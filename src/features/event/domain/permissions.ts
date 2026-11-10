@@ -12,6 +12,7 @@ export const ADMIN_SECTIONS = [
   "checkpoints",
   "talks",
   "missions",
+  "zones",
   "map",
   "ranks",
   "odyssey",
@@ -20,6 +21,7 @@ export const ADMIN_SECTIONS = [
   "economy",
   "squads",
   "squadCredits",
+  "cadets",
   "stage",
   "raffle",
   "polls",
@@ -55,6 +57,9 @@ export function parsePermissions(data: unknown): EditionPermissions {
   const organizer = { ...DEFAULT_PERMISSIONS.organizer };
   if (stored.organizer && typeof stored.organizer === "object") {
     for (const [section, level] of Object.entries(stored.organizer)) if (isAdminSection(section) && isAccessLevel(level)) organizer[section] = level;
+    // Zones used to share the map's level: an edition saved before they had their own keeps what it had.
+    const saved = stored.organizer as Record<string, unknown>;
+    if (!("zones" in saved) && isAccessLevel(saved.map)) organizer.zones = saved.map;
   }
   const staffStations = Array.isArray(stored.staffStations) ? STAFF_STATIONS.filter((kind) => (stored.staffStations as unknown[]).includes(kind)) : DEFAULT_PERMISSIONS.staffStations;
   return { organizer, staffStations };

@@ -61,7 +61,7 @@ describe("useScanner", () => {
   });
 
   it("keeps the missions, talk credits and badges the server reported", async () => {
-    const missions = [{ title: "Charla", xpEarned: 50, creditsEarned: 5, justCompleted: true }];
+    const missions = [{ id: "charla", title: "Charla", xpEarned: 50, creditsEarned: 5, justCompleted: true }];
     const achievements = [{ id: "primer-salto", name: "Primer salto", tone: "cyan" }];
     const t = mount(vi.fn(async () => ({ ...success, missions, talkCredits: 10, achievements })));
 

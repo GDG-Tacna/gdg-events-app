@@ -9,6 +9,12 @@ export type AchievementAdminErrorCode =
   | "unknown-mission"
   | "already-exists"
   | "already-seeded"
+  /** Some cadet already earned it: it can only be deactivated (they keep it). */
+  | "has-awards"
+  /** The edition keeps at least one saved badge: with none, the bundled set would be offered again. */
+  | "last-badge"
+  /** The edition is published or over: only an admin of every edition deletes there. */
+  | "edition-locked"
   | "not-found"
   | "invalid-image"
   | "unauthenticated"
@@ -39,7 +45,11 @@ export interface BadgeStore {
   create(badge: Badge): Promise<Result<void, { code: "already-exists" | "unknown" }>>;
   update(id: string, patch: BadgePatch): Promise<Result<{ before: Badge; after: Badge } | null, { code: string }>>;
   setOrder(ids: readonly string[]): Promise<Result<void, { code: string }>>;
+  /** Deletes the badge unless some cadet earned it; the check and the delete are one transaction. */
+  delete(id: string): Promise<Result<BadgeDeletion, { code: string }>>;
 }
+
+export type BadgeDeletion = { kind: "deleted"; badge: Badge } | { kind: "not-found" } | { kind: "has-awards" };
 
 /** The edition's quadrants and missions a rule may point at (the quadrants and missions features answer). */
 export interface AchievementDirectory {
@@ -48,7 +58,7 @@ export interface AchievementDirectory {
 }
 
 export interface AchievementAuditEntry {
-  action: "badges.seeded" | "badge.created" | "badge.updated" | "badge.activated" | "badge.deactivated" | "badge.reordered";
+  action: "badges.seeded" | "badge.created" | "badge.updated" | "badge.activated" | "badge.deactivated" | "badge.reordered" | "badge.deleted";
   actorUid: string;
   targetUid: string;
   details: Record<string, string | null>;
@@ -181,6 +191,31 @@ export async function setBadgeActive(deps: AchievementAdminDeps, actor: Achievem
     });
   }
   return ok(updated.value.after);
+}
+
+/**
+ * Deletes a badge nobody has earned. Once a cadet has it (earned and kept) it can only be deactivated. Never the last
+ * saved badge: the edition would go back to offering the bundled set. Its picture goes with it. The phase of the
+ * edition is checked by the caller.
+ */
+export async function deleteBadge(deps: AchievementAdminDeps, actor: AchievementAdminActor, input: { id: string }): Promise<Result<void, AchievementAdminError>> {
+  if (forbidden(actor)) return err(adminError("forbidden"));
+  if (!isSlug(input.id)) return err(adminError("not-found"));
+
+  const listed = await deps.store.list();
+  if (!listed.ok) return err(adminError("unknown"));
+  if (!listed.value.some((badge) => badge.id === input.id)) return err(adminError("not-found"));
+  if (listed.value.length === 1) return err(adminError("last-badge"));
+
+  const deleted = await deps.store.delete(input.id);
+  if (!deleted.ok) return err(adminError("unknown"));
+  if (deleted.value.kind === "not-found") return err(adminError("not-found"));
+  if (deleted.value.kind === "has-awards") return err(adminError("has-awards"));
+
+  const { badge } = deleted.value;
+  await dropReplacedImage(deps.images, badge.image ?? null, null);
+  await audit(deps, { action: "badge.deleted", actorUid: actor.uid, targetUid: badge.id, details: { name: badge.name, rule: badge.rule.type } });
+  return ok(undefined);
 }
 
 export async function moveBadge(deps: AchievementAdminDeps, actor: AchievementAdminActor, input: { id: string; to: number }): Promise<Result<readonly string[], AchievementAdminError>> {

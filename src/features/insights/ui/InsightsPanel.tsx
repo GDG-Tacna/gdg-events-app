@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { Card, Icon, type IconName } from "@/shared/ui";
@@ -5,6 +6,8 @@ import type { InsightsOverview } from "../domain/stats";
 
 export interface InsightsPanelProps {
   overview: InsightsOverview;
+  /** Where the registered cadets are listed; the «Cadetes registrados» tile links there when given (absent without access). */
+  cadetsHref?: string;
 }
 
 /** "62 %": a share of a whole, or `null` when the whole is 0. */
@@ -12,8 +15,8 @@ export function share(part: number, whole: number): string | null {
   return whole > 0 ? `${Math.round((part / whole) * 100)} %` : null;
 }
 
-function StatTile({ icon, label, value, hint }: { icon: IconName; label: string; value: number; hint?: string | null }) {
-  return (
+function StatTile({ icon, label, value, hint, href }: { icon: IconName; label: string; value: number; hint?: string | null; href?: string }) {
+  const tile = (
     <div className="bg-surface border-border gap-space-3 p-space-4 flex items-center rounded-lg border">
       <span aria-hidden="true" className="border-cyan/40 text-cyan bg-bg-deep grid size-11 shrink-0 place-items-center rounded-md border">
         <Icon name={icon} size={20} />
@@ -25,13 +28,20 @@ function StatTile({ icon, label, value, hint }: { icon: IconName; label: string;
       </span>
     </div>
   );
+  return href ? (
+    <Link href={href} aria-label={`${label}: ${formatNumber(value)}`} className="hover:[&>div]:border-cyan focus-visible:ring-ring block rounded-lg focus-visible:ring-[3px] focus-visible:outline-none">
+      {tile}
+    </Link>
+  ) : (
+    tile
+  );
 }
 
 /**
  * How the edition is going: the main counts as tiles, the rations per meal, and each earlier edition in short. Only
  * shows; the numbers arrive ready.
  */
-export function InsightsPanel({ overview }: InsightsPanelProps) {
+export function InsightsPanel({ overview, cadetsHref }: InsightsPanelProps) {
   const t = copy.admin.home;
   const { current } = overview;
   const attendedShare = share(current.attended, current.registered);
@@ -43,7 +53,7 @@ export function InsightsPanel({ overview }: InsightsPanelProps) {
           {interpolate(t.editionTitle, { id: current.eventId })}
         </h2>
         <ul aria-label={t.stats.label} className="gap-space-3 grid grid-cols-1 min-[560px]:grid-cols-2 min-[1024px]:grid-cols-3">
-          <li><StatTile icon="users" label={t.stats.registered} value={current.registered} /></li>
+          <li><StatTile icon="users" label={t.stats.registered} value={current.registered} href={cadetsHref} /></li>
           <li>
             <StatTile icon="login" label={t.stats.attended} value={current.attended} hint={attendedShare ? interpolate(t.stats.attendedShare, { pct: attendedShare }) : null} />
           </li>

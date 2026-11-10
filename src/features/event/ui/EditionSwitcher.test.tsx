@@ -13,8 +13,8 @@ const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const t = copy.editions;
-const LIVE: EditionChoice = { id: "devfest-2026", name: "DevFest Tacna 2026", isPublic: true, stage: "live" };
-const DRAFT: EditionChoice = { id: "meetup-nov", name: "Meetup noviembre", isPublic: false, stage: "draft" };
+const LIVE: EditionChoice = { id: "devfest-2026", name: "DevFest Tacna 2026", isPublic: true, stage: "live", lifecycle: "published" };
+const DRAFT: EditionChoice = { id: "meetup-nov", name: "Meetup noviembre", isPublic: false, stage: "draft", lifecycle: "draft" };
 
 describe("EditionSwitcher", () => {
   beforeEach(() => vi.clearAllMocks());

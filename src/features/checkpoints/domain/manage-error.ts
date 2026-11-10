@@ -8,6 +8,12 @@ export type ManageErrorCode =
   /** Only catering checkpoints have a food gate. */
   | "not-catering"
   | "already-exists"
+  /** Cadets already checked in there: it can only be closed (the history needs it). */
+  | "has-check-ins"
+  /** A mission points at it: those change or go first. */
+  | "has-missions"
+  /** The edition is published or over: only an admin of every edition deletes there. */
+  | "edition-locked"
   | "not-found"
   | "unauthenticated"
   | "forbidden"

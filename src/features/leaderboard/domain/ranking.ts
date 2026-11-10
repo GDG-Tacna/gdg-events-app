@@ -151,9 +151,12 @@ export async function getFleetBoard(deps: LeaderboardDeps): Promise<Result<Fleet
   });
 }
 
-/** A participant document as the ranking reads it (XP 0 included), or `null` when it has no alias or no valid XP. */
+/**
+ * A participant document as the ranking reads it (XP 0 included), or `null` when it has no alias or no valid XP, or when
+ * an admin blocked the cadet (a blocked cadet does not rank, in the top or in a squad's members).
+ */
 export function participantEntry(uid: string, data: Record<string, unknown> | undefined): RankingEntry | null {
-  if (!data || typeof data.alias !== "string" || typeof data.xp !== "number" || !Number.isFinite(data.xp) || data.xp < 0) return null;
+  if (!data || data.banned === true || typeof data.alias !== "string" || typeof data.xp !== "number" || !Number.isFinite(data.xp) || data.xp < 0) return null;
   const raw = data.xpReachedAt as { toDate?: () => Date } | Date | undefined;
   const reachedAt = raw instanceof Date ? raw : raw && typeof raw.toDate === "function" ? raw.toDate() : null;
   return { uid, alias: data.alias, squadId: typeof data.squad === "string" && data.squad.length > 0 ? data.squad : null, xp: data.xp, reachedAt };

@@ -84,8 +84,8 @@ describe("FirestoreEditionCatalog", () => {
     expect(listed).toEqual({
       ok: true,
       value: [
-        { id: "devfest-2027", name: "DevFest 2027", venue: "UNJBG", startsAt: START, endsAt: END, status: "draft" },
-        { id: "devfest-2026", name: null, venue: null, startsAt: null, endsAt: null, status: "draft" },
+        { id: "devfest-2027", name: "DevFest 2027", venue: "UNJBG", startsAt: START, endsAt: END, status: "draft", publishedAt: null },
+        { id: "devfest-2026", name: null, venue: null, startsAt: null, endsAt: null, status: "draft", publishedAt: null },
       ],
     });
   });
@@ -121,7 +121,34 @@ describe("FirestoreEditionCatalog", () => {
 
     expect(await new FirestoreEditionCatalog(() => fake.db).publish("meetup-nov")).toEqual({ ok: true, value: { previous: "devfest-2026" } });
     expect(fake.store.get("config/app")).toMatchObject({ activeEventId: "meetup-nov", other: true });
+    // Both remember they were public, for good (see the lifecycle).
+    expect(fake.store.get("events/meetup-nov")).toMatchObject({ publishedAt: expect.any(Date) });
+    expect(fake.store.get("events/devfest-2026")).toMatchObject({ publishedAt: expect.any(Date) });
     expect(await new FirestoreEditionCatalog(() => fakeFirestore({}).db).publish("meetup-nov")).toEqual({ ok: true, value: { previous: "devfest-2026" } });
+  });
+
+  it("keeps the date an edition was first published, however many times it changes hands", async () => {
+    const first = new Date("2026-10-01T00:00:00Z");
+    const fake = fakeFirestore({ "config/app": { activeEventId: "devfest-2026" }, "events/devfest-2026": { publishedAt: first }, "events/meetup-nov": { name: "Meetup" } });
+    const catalog = new FirestoreEditionCatalog(() => fake.db);
+
+    await catalog.publish("meetup-nov");
+    await catalog.publish("devfest-2026");
+
+    expect(fake.store.get("events/devfest-2026")).toMatchObject({ publishedAt: first });
+    expect(fake.store.get("events/meetup-nov")).toMatchObject({ name: "Meetup", publishedAt: expect.any(Date) });
+  });
+
+  it("reads when an edition was first published, and nothing for one that never was", async () => {
+    const published = new Date("2026-10-01T00:00:00Z");
+    const fake = fakeFirestore({ "events/e1": { name: "A", publishedAt: Timestamp.fromDate(published) }, "events/e2": { name: "B" } });
+
+    const listed = await new FirestoreEditionCatalog(() => fake.db).list();
+
+    expect(listed.ok && listed.value.map((edition) => [edition.id, edition.publishedAt])).toEqual([
+      ["e1", published],
+      ["e2", null],
+    ]);
   });
 
   it("turns failures into an unknown error", async () => {

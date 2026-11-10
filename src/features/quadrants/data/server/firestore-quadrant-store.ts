@@ -3,10 +3,10 @@ import { imageRefOf } from "@/features/media/server";
 import type { Firestore } from "firebase-admin/firestore";
 import { getActiveEventId, type ActiveEventResolver } from "@/shared/lib/firebase/active-event";
 import { getAdminFirestore } from "@/shared/lib/firebase/admin";
-import { QUADRANTS_COLLECTION, VENUE_COLLECTION, VENUE_MAP_DOC, eventCollection } from "@/shared/lib/firebase/collections";
+import { MISSIONS_COLLECTION, QUADRANTS_COLLECTION, VENUE_COLLECTION, VENUE_MAP_DOC, eventCollection } from "@/shared/lib/firebase/collections";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
-import type { QuadrantAdminStore, QuadrantPatch } from "../../domain/manage";
+import type { QuadrantAdminStore, QuadrantDeletion, QuadrantPatch } from "../../domain/manage";
 import type { EditionLayout, QuadrantSource } from "../../domain/ports";
 import { isQuadrantId, isQuadrantPlanet, type Quadrant } from "../../domain/quadrant";
 import { parseVenueMap, type VenueMap } from "../../domain/venue";
@@ -107,6 +107,28 @@ export class FirestoreQuadrantStore implements QuadrantSource, QuadrantAdminStor
       });
     } catch (cause) {
       logServerError("quadrants.store.update", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async deleteQuadrant(id: string): Promise<Result<QuadrantDeletion, { code: string }>> {
+    try {
+      const db = this.getDb();
+      const eventId = await this.getEventId();
+      const ref = eventCollection(db, eventId, QUADRANTS_COLLECTION).doc(id);
+      const missions = eventCollection(db, eventId, MISSIONS_COLLECTION).where("quadrantId", "==", id).limit(1);
+
+      // Reading the missions inside the transaction makes one created at the same moment retry the delete.
+      return await db.runTransaction(async (tx): Promise<Result<QuadrantDeletion, { code: string }>> => {
+        const [snapshot, assigned] = await Promise.all([tx.get(ref), tx.get(missions)]);
+        const quadrant = snapshot.exists ? toQuadrant(id, snapshot.data()) : null;
+        if (!quadrant) return ok({ kind: "not-found" });
+        if (!assigned.empty) return ok({ kind: "has-missions" });
+        tx.delete(ref);
+        return ok({ kind: "deleted", quadrant });
+      });
+    } catch (cause) {
+      logServerError("quadrants.store.delete", cause);
       return err({ code: "unknown" });
     }
   }

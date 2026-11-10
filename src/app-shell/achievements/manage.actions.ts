@@ -2,11 +2,13 @@
 
 import { z } from "zod";
 import { achievementAdminDeps, badgeSource } from "@/app-shell/composition/achievements.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { getSession } from "@/app-shell/guards";
 import type { AchievementAdminActionResult, BadgeDraft } from "@/features/achievements";
 import {
   DEFAULT_BADGES,
   createBadge,
+  deleteBadge,
   moveBadge,
   seedBadges,
   setBadgeActive,
@@ -81,6 +83,17 @@ export async function setBadgeActiveAction(input: { id: string; active: boolean 
   const parsed = activeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "not-found" };
   return done(await setBadgeActive(achievementAdminDeps, actor, parsed.data));
+}
+
+export async function deleteBadgeAction(input: { id: string }): Promise<AchievementAdminActionResult> {
+  const actor = await adminActor();
+  if (isResult(actor)) return actor;
+  const parsed = z.object({ id: z.string().max(60) }).safeParse(input);
+  if (!parsed.success) return { ok: false, code: "not-found" };
+  // A published edition keeps its badges: only an admin of every edition may delete there.
+  const session = await getSession();
+  if (!session || !(await mayDeleteItems(session))) return { ok: false, code: "edition-locked" };
+  return done(await deleteBadge(achievementAdminDeps, actor, parsed.data));
 }
 
 export async function moveBadgeAction(input: { id: string; to: number }): Promise<AchievementAdminActionResult> {

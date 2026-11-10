@@ -7,6 +7,7 @@ import { moduleSwitches } from "@/app-shell/modules.server";
 import { sectionLevels } from "@/app-shell/permissions.server";
 import { InsightsPanel } from "@/features/insights";
 import { getInsights } from "@/features/insights/server";
+import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { Icon, InlineAlert, ScreenEnter } from "@/shared/ui";
 
@@ -25,7 +26,7 @@ export default async function AdminHomePage() {
           <p className="type-body text-muted-foreground">{copy.admin.home.intro}</p>
         </header>
 
-        {insights.ok ? <InsightsPanel overview={insights.value} /> : <InlineAlert>{copy.admin.home.error}</InlineAlert>}
+        {insights.ok ? <InsightsPanel overview={insights.value} cadetsHref={levels.cadets !== "none" ? ROUTES.adminCadets : undefined} /> : <InlineAlert>{copy.admin.home.error}</InlineAlert>}
 
         <section aria-labelledby="admin-shortcuts" className="gap-space-3 flex flex-col">
           <h2 id="admin-shortcuts" className="type-pixel-heading text-cyan">

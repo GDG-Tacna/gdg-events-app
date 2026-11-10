@@ -2,6 +2,8 @@ import { isValidElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 vi.mock("@/app-shell/composition/squad-admin.server", () => ({ squadAdminDeps: { marker: "squads" } }));
 vi.mock("@/app-shell/composition/event.server", () => ({ eventDeps: { marker: "event" } }));
 vi.mock("@/app-shell/squads/manage.actions", () => ({
@@ -10,6 +12,7 @@ vi.mock("@/app-shell/squads/manage.actions", () => ({
   updateSquadAction: async () => ({ ok: true }),
   retireSquadAction: async () => ({ ok: true }),
   reactivateSquadAction: async () => ({ ok: true }),
+  deleteSquadAction: async () => ({ ok: true }),
   moveSquadAction: async () => ({ ok: true }),
 }));
 
@@ -81,6 +84,8 @@ describe("admin squad pages", () => {
       seed: actions.seedSquadsAction,
       retire: actions.retireSquadAction,
       reactivate: actions.reactivateSquadAction,
+      remove: actions.deleteSquadAction,
+      canDelete: true,
       move: actions.moveSquadAction,
     });
     // Plain text only: a client component cannot receive functions from a server page (it fails with a 500).

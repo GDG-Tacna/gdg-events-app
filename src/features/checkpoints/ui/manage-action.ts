@@ -13,6 +13,9 @@ export interface CheckpointView {
 /** What the management actions answer to the admin screen. Plain data: it crosses the client boundary. */
 export type ManageActionResult = { ok: true; checkpoint: CheckpointView } | { ok: false; code: ManageErrorCode };
 
+/** Deleting answers with the name of what was deleted, for the message. */
+export type DeleteCheckpointActionResult = { ok: true; name: string } | { ok: false; code: ManageErrorCode };
+export type DeleteCheckpointAction = (input: { id: string }) => Promise<DeleteCheckpointActionResult>;
 export type CreateCheckpointAction = (input: { name: string; id: string; kind: string }) => Promise<ManageActionResult>;
 export type RenameCheckpointAction = (input: { id: string; name: string }) => Promise<ManageActionResult>;
 export type SetFoodRequirementsAction = (input: { id: string; minLevel: number | null; minTalks: number | null }) => Promise<ManageActionResult>;

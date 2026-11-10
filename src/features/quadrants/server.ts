@@ -7,6 +7,7 @@ export type { Quadrant, QuadrantError } from "./domain/quadrant";
 export { parseVenueMap, type VenueArea, type VenueMap } from "./domain/venue";
 export {
   createQuadrant,
+  deleteQuadrant,
   getVenueForEdit,
   listManagedQuadrants,
   moveQuadrant,

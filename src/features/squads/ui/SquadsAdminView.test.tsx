@@ -22,12 +22,13 @@ const squad = (id: string, order: number, active = true): SquadView => ({
 const SQUADS = [squad("angular", 0), squad("cloud", 1, false), squad("gemini", 2)];
 const hrefs = { create: "/admin/escuadrones/nuevo", editBase: "/admin/escuadrones", event: "/admin/eventos" };
 
-function setup(props: { squads?: SquadView[]; eventFinished?: boolean; results?: Partial<Record<"seed" | "retire" | "reactivate" | "move", SquadAdminActionResult>> } = {}) {
+function setup(props: { squads?: SquadView[]; eventFinished?: boolean; canDelete?: boolean; results?: Partial<Record<"seed" | "retire" | "reactivate" | "move" | "remove", SquadAdminActionResult>> } = {}) {
   const results = props.results ?? {};
   const seed = vi.fn<SeedSquadsAction>(async () => results.seed ?? { ok: true });
   const retire = vi.fn<SquadIdAction>(async () => results.retire ?? { ok: true });
   const reactivate = vi.fn<SquadIdAction>(async () => results.reactivate ?? { ok: true });
   const move = vi.fn<MoveSquadAction>(async () => results.move ?? { ok: true });
+  const remove = vi.fn<SquadIdAction>(async () => results.remove ?? { ok: true });
   const view = render(
     <SquadsAdminView
       squads={props.squads ?? SQUADS}
@@ -36,10 +37,12 @@ function setup(props: { squads?: SquadView[]; eventFinished?: boolean; results?:
       retire={retire}
       reactivate={reactivate}
       move={move}
+      remove={remove}
+      canDelete={props.canDelete}
       hrefs={hrefs}
     />,
   );
-  return { seed, retire, reactivate, move, user: userEvent.setup(), ...view };
+  return { seed, retire, reactivate, move, remove, user: userEvent.setup(), ...view };
 }
 
 describe("SquadsAdminView", () => {
@@ -53,6 +56,36 @@ describe("SquadsAdminView", () => {
     expect(items[1]).toHaveTextContent(copy.admin.squads.retired);
     expect(screen.getByRole("link", { name: `${copy.admin.squads.edit}: Escuadrón gemini` })).toHaveAttribute("href", "/admin/escuadrones/gemini");
     expect(screen.getByRole("link", { name: copy.admin.squads.create })).toHaveAttribute("href", "/admin/escuadrones/nuevo");
+  });
+
+  it("deletes a squad after confirming, says so and refreshes", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { remove, user } = setup();
+
+    await user.click(screen.getByRole("button", { name: `${copy.admin.squads.delete}: Escuadrón gemini` }));
+
+    expect(remove).toHaveBeenCalledWith({ id: "gemini" });
+    expect(await screen.findByText("El escuadrón «Escuadrón gemini» se eliminó.")).toHaveAttribute("role", "status");
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("does nothing when the confirmation is declined, and explains a refusal", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { remove, user } = setup({ results: { remove: { ok: false, code: "has-members" } } });
+
+    await user.click(screen.getByRole("button", { name: `${copy.admin.squads.delete}: Escuadrón gemini` }));
+    expect(remove).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    await user.click(screen.getByRole("button", { name: `${copy.admin.squads.delete}: Escuadrón gemini` }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.squads.errors["has-members"]);
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it("offers no delete button when the session may not delete here", () => {
+    setup({ canDelete: false });
+
+    expect(screen.queryByRole("button", { name: `${copy.admin.squads.delete}: Escuadrón gemini` })).not.toBeInTheDocument();
   });
 
   it("does not move the first squad further up", async () => {

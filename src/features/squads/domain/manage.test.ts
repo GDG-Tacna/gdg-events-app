@@ -3,6 +3,7 @@ import { err, ok, type Result } from "@/shared/lib/result";
 import type { PixelSpriteData } from "@/shared/types/pixel";
 import {
   createSquad,
+  deleteSquad,
   listManagedSquads,
   moveSquad,
   reactivateSquad,
@@ -12,6 +13,7 @@ import {
   updateSquad,
   type ManagedSquad,
   type SquadAdminDeps,
+  type SquadDeletion,
   type SquadStore,
 } from "./manage";
 import type { Squad } from "./squad";
@@ -31,7 +33,10 @@ const squad = (id: string, order: number, active = true): ManagedSquad => ({
   order,
 });
 
-function setup(stored: ManagedSquad[] = [squad("angular", 0), squad("firebase", 1), squad("gemini", 2)], options: { finished?: Result<boolean, { code: string }>; auditFails?: boolean } = {}) {
+function setup(
+  stored: ManagedSquad[] = [squad("angular", 0), squad("firebase", 1), squad("gemini", 2)],
+  options: { finished?: Result<boolean, { code: string }>; auditFails?: boolean; blocked?: Record<string, "has-members" | "has-credits"> } = {},
+) {
   let current = [...stored];
   const store: SquadStore = {
     list: vi.fn(async () => ok([...current].sort((a, b) => a.order - b.order))),
@@ -50,6 +55,14 @@ function setup(stored: ManagedSquad[] = [squad("angular", 0), squad("firebase", 
     setOrder: vi.fn(async (ids: readonly string[]) => {
       current = current.map((existing) => ({ ...existing, order: ids.indexOf(existing.id) }));
       return ok(undefined);
+    }),
+    delete: vi.fn(async (id: string): Promise<Result<SquadDeletion, { code: string }>> => {
+      const found = current.find((existing) => existing.id === id);
+      if (!found) return ok({ kind: "not-found" });
+      const blocked = options.blocked?.[id];
+      if (blocked) return ok({ kind: blocked });
+      current = current.filter((existing) => existing.id !== id);
+      return ok({ kind: "deleted", squad: found });
     }),
   };
   const clock = { hasFinished: vi.fn(async () => options.finished ?? ok(true)) };
@@ -108,6 +121,61 @@ describe("retireSquad", () => {
 
     await retireSquad(t.deps, ADMIN, { id: "cloud" });
 
+    expect(t.audit.append).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteSquad", () => {
+  it("deletes a squad nobody belongs to, drops its logo and audits it", async () => {
+    const withLogo: ManagedSquad = { ...squad("gemini", 2), logo: { path: "events/e1/squad-logo/g.png", url: "https://cdn/g.png" } };
+    const t = setup([squad("angular", 0), withLogo]);
+
+    expect(await deleteSquad(t.deps, ADMIN, { id: "gemini" })).toEqual(ok(undefined));
+
+    expect(t.current().map((s) => s.id)).toEqual(["angular"]);
+    expect(t.images.remove).toHaveBeenCalledWith("events/e1/squad-logo/g.png");
+    expect(t.audit.append).toHaveBeenCalledWith({ action: "squad.deleted", actorUid: "a1", targetUid: "gemini", details: { name: "Escuadrón gemini" }, at: NOW });
+  });
+
+  it("works before the event is over: it is not retiring", async () => {
+    const t = setup(undefined, { finished: ok(false) });
+
+    expect(await deleteSquad(t.deps, ADMIN, { id: "gemini" })).toEqual(ok(undefined));
+    expect(t.clock.hasFinished).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["cadets belong to it", "has-members"],
+    ["it moved squad credits", "has-credits"],
+  ] as const)("refuses when %s, and changes nothing", async (_why, code) => {
+    const t = setup(undefined, { blocked: { gemini: code } });
+
+    expect(await deleteSquad(t.deps, ADMIN, { id: "gemini" })).toEqual(err(squadAdminError(code)));
+
+    expect(t.current()).toHaveLength(3);
+    expect(t.images.remove).not.toHaveBeenCalled();
+    expect(t.audit.append).not.toHaveBeenCalled();
+  });
+
+  it("is not found for an unknown or malformed squad", async () => {
+    const t = setup();
+
+    expect(await deleteSquad(t.deps, ADMIN, { id: "ghost" })).toEqual(err(squadAdminError("not-found")));
+    expect(await deleteSquad(t.deps, ADMIN, { id: "No Valid" })).toEqual(err(squadAdminError("not-found")));
+  });
+
+  it.each(NOT_ADMINS)("refuses %o", async (actor) => {
+    const t = setup();
+
+    expect(await deleteSquad(t.deps, actor, { id: "gemini" })).toEqual(err(squadAdminError("forbidden")));
+    expect(t.store.delete).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed delete", async () => {
+    const t = setup();
+    vi.mocked(t.store.delete).mockResolvedValueOnce(err({ code: "x" }));
+
+    expect(await deleteSquad(t.deps, ADMIN, { id: "gemini" })).toEqual(err(squadAdminError("unknown")));
     expect(t.audit.append).not.toHaveBeenCalled();
   });
 });

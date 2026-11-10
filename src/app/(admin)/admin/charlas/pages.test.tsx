@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const composition = vi.hoisted(() => ({ talkAdminDeps: { marker: "talks" }, talkRooms: vi.fn(), talkSpeakers: vi.fn() }));
 vi.mock("@/app-shell/composition/talks.server", () => composition);
-vi.mock("@/app-shell/talks/manage.actions", () => ({ createTalkAction: vi.fn(), updateTalkAction: vi.fn(), setTalkActiveAction: vi.fn() }));
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
+vi.mock("@/app-shell/talks/manage.actions", () => ({ createTalkAction: vi.fn(), updateTalkAction: vi.fn(), setTalkActiveAction: vi.fn(), deleteTalkAction: vi.fn() }));
+vi.mock("@/app-shell/talks/project.action", () => ({ projectTalkAction: vi.fn() }));
 
 const guards = { requireRole: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
@@ -21,6 +24,7 @@ vi.mock("@/features/talks/server", async (importOriginal) => ({ ...(await import
 
 const { TalkForm, TalksAdminView } = await import("@/features/talks");
 const actions = await import("@/app-shell/talks/manage.actions");
+const projecting = await import("@/app-shell/talks/project.action");
 const { default: AdminTalksPage } = await import("./page");
 const { default: AdminNewTalkPage } = await import("./nueva/page");
 const { default: AdminEditTalkPage } = await import("./[talkId]/page");
@@ -61,13 +65,13 @@ describe("admin Charlas pages", () => {
     server.listManagedTalks.mockResolvedValue({ ok: true, value: [KEYNOTE, { ...KEYNOTE, id: "cerrada", active: false }] });
   });
 
-  it("lists the talks as plain data with the venue's times, and the links to create, edit and project", async () => {
+  it("lists the talks as plain data with the venue's times, and the links to create and edit, and the stage to project on", async () => {
     const view = findElement(await AdminTalksPage(), TalksAdminView);
 
     expect(guards.requireRole).toHaveBeenCalledWith(["admin"]);
     expect(server.listManagedTalks).toHaveBeenCalledWith({ marker: "talks" }, { uid: "a1", role: "admin" });
     expect((view?.props.talks as Array<{ startsAt: string; endsAt: string }>)[0]).toMatchObject({ id: "keynote", speaker: "Ana Torres", startsAt: "2026-10-24T09:00", endsAt: "2026-10-24T09:45" });
-    expect(view?.props).toMatchObject({ rooms: ROOMS, setActive: actions.setTalkActiveAction, hrefs: { create: "/admin/charlas/nueva", editBase: "/admin/charlas", projectBase: "/admin/qr" } });
+    expect(view?.props).toMatchObject({ rooms: ROOMS, setActive: actions.setTalkActiveAction, remove: actions.deleteTalkAction, canDelete: true, project: projecting.projectTalkAction, hrefs: { create: "/admin/charlas/nueva", editBase: "/admin/charlas", stage: "/admin/escenario" } });
   });
 
   it("surfaces a failed read through the error boundary", async () => {
@@ -82,12 +86,12 @@ describe("admin Charlas pages", () => {
     expect(form?.props).toMatchObject({ mode: "create", save: actions.createTalkAction, rooms: ROOMS, speakers: SPEAKERS, speakersHref: "/admin/speakers", listHref: "/admin/charlas" });
   });
 
-  it("edits a talk, offering its QR only while it is open", async () => {
+  it("edits a talk, offering to show its QR on the stage only while it is open", async () => {
     const open = findElement(await AdminEditTalkPage({ params: Promise.resolve({ talkId: "keynote" }) } as never), TalkForm);
-    expect(open?.props).toMatchObject({ mode: "edit", save: actions.updateTalkAction, qrHref: "/admin/qr/keynote", talk: { id: "keynote", startsAt: "2026-10-24T09:00" } });
+    expect(open?.props).toMatchObject({ mode: "edit", save: actions.updateTalkAction, project: projecting.projectTalkAction, stageHref: "/admin/escenario", talk: { id: "keynote", startsAt: "2026-10-24T09:00" } });
 
     const closed = findElement(await AdminEditTalkPage({ params: Promise.resolve({ talkId: "cerrada" }) } as never), TalkForm);
-    expect(closed?.props.qrHref).toBeUndefined();
+    expect(closed?.props.project).toBeUndefined();
   });
 
   it("is not found for an unknown talk", async () => {

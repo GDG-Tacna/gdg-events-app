@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
 import { CheckpointsAdminView } from "./CheckpointsAdminView";
-import type { CheckpointView, CreateCheckpointAction, ManageActionResult, RenameCheckpointAction, SetCheckpointActiveAction, SetFoodRequirementsAction } from "./manage-action";
+import type { CheckpointView, CreateCheckpointAction, DeleteCheckpointAction, ManageActionResult, RenameCheckpointAction, SetCheckpointActiveAction, SetFoodRequirementsAction } from "./manage-action";
 
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
@@ -21,15 +21,16 @@ const LEVELS = [
 ];
 
 
-function setup(checkpoints: CheckpointView[] = [LUNCH, STAND, GATE], results: Partial<Record<"create" | "rename" | "setActive" | "setRequirements", ManageActionResult>> = {}) {
+function setup(checkpoints: CheckpointView[] = [LUNCH, STAND, GATE], results: Partial<Record<"create" | "rename" | "setActive" | "setRequirements", ManageActionResult>> = {}, extra: { remove?: DeleteCheckpointAction; canDelete?: boolean } = {}) {
   const create = vi.fn<CreateCheckpointAction>(async () => results.create ?? { ok: true, checkpoint: LUNCH });
   const rename = vi.fn<RenameCheckpointAction>(async () => results.rename ?? { ok: true, checkpoint: { ...LUNCH, name: "Nuevo" } });
   const setActive = vi.fn<SetCheckpointActiveAction>(async () => results.setActive ?? { ok: true, checkpoint: { ...LUNCH, active: false } });
   const setRequirements = vi.fn<SetFoodRequirementsAction>(async (input) => results.setRequirements ?? { ok: true, checkpoint: { ...LUNCH, requirements: { minLevel: input.minLevel, minTalks: input.minTalks } } });
+  const remove = extra.remove ?? vi.fn<DeleteCheckpointAction>(async (input) => ({ ok: true, name: input.id }));
   const view = render(
-    <CheckpointsAdminView checkpoints={checkpoints} create={create} rename={rename} setActive={setActive} setRequirements={setRequirements} levels={LEVELS} />,
+    <CheckpointsAdminView checkpoints={checkpoints} create={create} rename={rename} setActive={setActive} remove={remove} canDelete={extra.canDelete} setRequirements={setRequirements} levels={LEVELS} />,
   );
-  return { create, rename, setActive, setRequirements, user: userEvent.setup(), ...view };
+  return { create, rename, setActive, remove, setRequirements, user: userEvent.setup(), ...view };
 }
 
 const row = (name: string) =>
@@ -91,6 +92,46 @@ describe("CheckpointsAdminView open and close", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.checkpoints.errors["not-found"]);
     expect(router.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("CheckpointsAdminView delete", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("deletes a station after confirming, says which one and refreshes the list", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { remove, user } = setup(undefined, undefined, { remove: vi.fn<DeleteCheckpointAction>(async () => ({ ok: true, name: "Almuerzo" })) });
+
+    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+
+    expect(remove).toHaveBeenCalledWith({ id: "lunch-1" });
+    expect(await screen.findByText("El puesto «Almuerzo» se eliminó.")).toHaveAttribute("role", "status");
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("does nothing when the confirmation is declined, and explains a refusal without refreshing", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const remove = vi.fn<DeleteCheckpointAction>(async () => ({ ok: false, code: "has-check-ins" }));
+    const { user } = setup(undefined, undefined, { remove });
+
+    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    expect(remove).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.checkpoints.errors["has-check-ins"]);
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it("survives a thrown action, and offers no delete button when the session may not delete here", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { user, unmount } = setup(undefined, undefined, { remove: vi.fn<DeleteCheckpointAction>(async () => { throw new Error("offline"); }) });
+    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.checkpoints.errors.unknown);
+    unmount();
+
+    setup(undefined, undefined, { canDelete: false });
+    expect(screen.queryByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` })).not.toBeInTheDocument();
   });
 });
 
@@ -208,7 +249,7 @@ describe("CheckpointsAdminView create", () => {
   it("blocks the form while the change is in flight", async () => {
     let finish!: (value: ManageActionResult) => void;
     const create = vi.fn<CreateCheckpointAction>(() => new Promise((resolve) => (finish = resolve)));
-    render(<CheckpointsAdminView checkpoints={[]} create={create} rename={vi.fn()} setActive={vi.fn()} setRequirements={vi.fn()} levels={LEVELS} />);
+    render(<CheckpointsAdminView checkpoints={[]} create={create} rename={vi.fn()} setActive={vi.fn()} remove={vi.fn()} setRequirements={vi.fn()} levels={LEVELS} />);
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: copy.admin.checkpoints.createTitle }));
 

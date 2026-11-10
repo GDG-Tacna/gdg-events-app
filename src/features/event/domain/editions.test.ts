@@ -200,6 +200,12 @@ describe("listEditionChoices", () => {
       ["closed", "finished"],
       ["old", "finished"],
     ]);
+    expect(all.ok && all.value.map((choice) => [choice.id, choice.lifecycle])).toEqual([
+      ["devfest-2026", "published"],
+      ["next", "draft"],
+      ["closed", "finished"],
+      ["old", "finished"],
+    ]);
     const some = await listEditionChoices(deps, ["next", "ghost"]);
     expect(some.ok && some.value.map((choice) => choice.id)).toEqual(["next"]);
   });

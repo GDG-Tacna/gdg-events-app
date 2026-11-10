@@ -4,12 +4,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/composition/achievements.server", () => ({ achievementAdminDeps: { marker: "admin" } }));
 vi.mock("@/app-shell/media/upload.action", () => ({ uploadImageAction: async () => ({ ok: false, code: "unknown" }) }));
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 vi.mock("@/app-shell/achievements/manage.actions", () => ({
   seedBadgesAction: async () => ({ ok: true }),
   createBadgeAction: async () => ({ ok: true }),
   updateBadgeAction: async () => ({ ok: true }),
   setBadgeActiveAction: async () => ({ ok: true }),
   moveBadgeAction: async () => ({ ok: true }),
+  deleteBadgeAction: async () => ({ ok: true }),
 }));
 const formOptions = vi.hoisted(() => ({
   loadAchievementFormOptions: vi.fn(),
@@ -85,6 +88,8 @@ describe("admin Logros pages", () => {
       seed: actions.seedBadgesAction,
       setActive: actions.setBadgeActiveAction,
       move: actions.moveBadgeAction,
+      remove: actions.deleteBadgeAction,
+      canDelete: true,
       hrefs: { create: "/admin/logros/nueva", editBase: "/admin/logros" },
     });
   });

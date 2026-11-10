@@ -50,6 +50,8 @@ const GALAXY = {
   quadrants: [{ id: "ai", name: "AI", tagline: "Lema", planet: "ai", order: 0, active: true, stands: [] }],
 };
 
+const page = (completadas?: string | string[]) => MissionsPage({ searchParams: Promise.resolve(completadas === undefined ? {} : { completadas }) } as never);
+
 describe("missions page", () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -62,19 +64,19 @@ describe("missions page", () => {
   it("checks the attendee before reading anything, and lets the guard's redirect through", async () => {
     guards.requireAttendee.mockRejectedValue(new NotFound("staff"));
 
-    await expect(MissionsPage()).rejects.toBeInstanceOf(NotFound);
+    await expect(page()).rejects.toBeInstanceOf(NotFound);
     expect(missionsServer.getMissionBoard).not.toHaveBeenCalled();
   });
 
   it("is not found when missions are switched off, without reading the session", async () => {
     features.FEATURES.missions = false;
 
-    await expect(MissionsPage()).rejects.toBeInstanceOf(NotFound);
+    await expect(page()).rejects.toBeInstanceOf(NotFound);
     expect(guards.requireAttendee).not.toHaveBeenCalled();
   });
 
   it("shows the signed-in attendee's board with the quadrants' names and planets", async () => {
-    const view = findElement(await MissionsPage(), MissionBoardView);
+    const view = findElement(await page(), MissionBoardView);
 
     expect(missionsServer.getMissionBoard).toHaveBeenCalledWith({ marker: "missions" }, "u1");
     expect(view?.props).toMatchObject({ board: BOARD, quadrants: [{ id: "ai", name: "AI", planet: "ai" }] });
@@ -83,10 +85,18 @@ describe("missions page", () => {
     expect(view?.props.odysseyTitle).toBe("Odisea de Código");
   });
 
+  it("celebrates the missions the scanner sent in the address, keeping only well-formed ids", async () => {
+    expect(findElement(await page(), MissionBoardView)?.props.celebrate).toEqual([]);
+    expect(findElement(await page("ai-quiz,cloud-stand"), MissionBoardView)?.props.celebrate).toEqual(["ai-quiz", "cloud-stand"]);
+    expect(findElement(await page(["a-one", "b-two"]), MissionBoardView)?.props.celebrate).toEqual(["a-one", "b-two"]);
+    expect(findElement(await page("ok-one,NOT VALID,<script>,,x"), MissionBoardView)?.props.celebrate).toEqual(["ok-one"]);
+    expect(findElement(await page(Array.from({ length: 12 }, (_, i) => `m-${i}`).join(",")), MissionBoardView)?.props.celebrate).toHaveLength(8);
+  });
+
   it("leaves out the story link and its title with the story switched off", async () => {
     features.FEATURES.odyssey = false;
 
-    const view = findElement(await MissionsPage(), MissionBoardView);
+    const view = findElement(await page(), MissionBoardView);
     expect(view?.props.odysseyHref).toBeUndefined();
     expect(view?.props.odysseyTitle).toBeNull();
     features.FEATURES.odyssey = true;
@@ -95,23 +105,23 @@ describe("missions page", () => {
   it("still lists the missions when the quadrants cannot be read", async () => {
     quadrantsServer.getGalaxyMap.mockResolvedValue({ ok: false, error: { code: "unknown" } });
 
-    expect(findElement(await MissionsPage(), MissionBoardView)?.props.quadrants).toEqual([]);
+    expect(findElement(await page(), MissionBoardView)?.props.quadrants).toEqual([]);
   });
 
   it("surfaces a failed read of the missions through the error boundary", async () => {
     missionsServer.getMissionBoard.mockResolvedValue({ ok: false, error: { code: "unknown" } });
 
-    await expect(MissionsPage()).rejects.toThrow("Could not read the missions");
+    await expect(page()).rejects.toThrow("Could not read the missions");
   });
 
   it("tags the missions whose mini-game the edition has on, and reads no settings with mini-games off", async () => {
     const games = new Set(["circuits"]);
     minigames.enabledMinigames.mockResolvedValue(games);
-    expect(findElement(await MissionsPage(), MissionBoardView)?.props.enabledGames).toBe(games);
+    expect(findElement(await page(), MissionBoardView)?.props.enabledGames).toBe(games);
 
     features.FEATURES.minigames = false;
     minigames.enabledMinigames.mockClear();
-    expect(findElement(await MissionsPage(), MissionBoardView)?.props.enabledGames).toBeUndefined();
+    expect(findElement(await page(), MissionBoardView)?.props.enabledGames).toBeUndefined();
     expect(minigames.enabledMinigames).not.toHaveBeenCalled();
     features.FEATURES.minigames = true;
   });

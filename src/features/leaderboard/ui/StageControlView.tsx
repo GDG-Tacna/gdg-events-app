@@ -123,6 +123,8 @@ export function StageControlView({ stage, live, run, screenHref, squadsOn = true
         ? t.now.reveal
         : stage.display === "raffle" && stage.raffle
           ? interpolate(t.now.raffle, { prize: stage.raffle.prizeName })
+          : stage.display === "talk-qr" && stage.talk
+          ? interpolate(t.now.talkQr, { name: stage.talk.name })
           : stage.display === "poll"
           ? t.now.poll
           : stage.frozen

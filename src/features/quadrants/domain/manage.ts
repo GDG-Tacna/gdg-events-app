@@ -15,6 +15,14 @@ export type QuadrantAdminErrorCode =
   | "unknown-quadrant"
   | "already-exists"
   | "already-seeded"
+  /** A mission is assigned to the zone: it can only be deactivated. */
+  | "has-missions"
+  /** A talk, transmission, badge or plan stand still points at the zone (an admin of every edition may delete anyway). */
+  | "in-use"
+  /** An edition keeps at least one zone: its missions need one. */
+  | "last-quadrant"
+  /** The edition is published or over: only an admin of every edition deletes there. */
+  | "edition-locked"
   | "not-found"
   | "unauthenticated"
   | "forbidden"
@@ -37,9 +45,19 @@ export interface QuadrantAdminStore {
   /** `null` when the quadrant does not exist. */
   updateQuadrant(id: string, patch: QuadrantPatch): Promise<Result<{ before: Quadrant; after: Quadrant } | null, { code: string }>>;
   setQuadrantOrder(ids: readonly string[]): Promise<Result<void, { code: string }>>;
+  /** Deletes the zone unless a mission is assigned to it; the check and the delete are one transaction. */
+  deleteQuadrant(id: string): Promise<Result<QuadrantDeletion, { code: string }>>;
   /** The plan the edition saved, or `null` while it has none (or it cannot be drawn). */
   loadVenue(): Promise<Result<VenueMap | null, { code: string }>>;
   saveVenue(venue: VenueMap): Promise<Result<void, { code: string }>>;
+}
+
+export type QuadrantDeletion = { kind: "deleted"; quadrant: Quadrant } | { kind: "not-found" } | { kind: "has-missions" };
+
+/** What still points at a zone besides missions: the talks held in it, the transmissions, badges and stands that name it. */
+export interface QuadrantReferences {
+  /** Names of the records that use the zone; empty when nothing does. */
+  to(quadrantId: string): Promise<Result<readonly string[], { code: string }>>;
 }
 
 /**
@@ -51,7 +69,7 @@ export interface StandCheckpoints {
 }
 
 export interface QuadrantAuditEntry {
-  action: "layout.seeded" | "quadrant.created" | "quadrant.updated" | "quadrant.activated" | "quadrant.deactivated" | "quadrant.reordered" | "venue.saved";
+  action: "layout.seeded" | "quadrant.created" | "quadrant.updated" | "quadrant.activated" | "quadrant.deactivated" | "quadrant.reordered" | "quadrant.deleted" | "venue.saved";
   actorUid: string;
   targetUid: string;
   details: Record<string, string | null>;
@@ -66,6 +84,7 @@ export interface QuadrantAdminDeps {
   store: QuadrantAdminStore;
   stands: StandCheckpoints;
   images: RecordImages;
+  references: QuadrantReferences;
   audit: QuadrantAudit;
   /** The bundled quadrants and plan, served (and editable as a starting point) until the edition saves its own. */
   defaults: { quadrants: readonly Quadrant[]; venue: VenueMap };
@@ -214,6 +233,46 @@ export async function setQuadrantActive(
     });
   }
   return ok(updated.value.after);
+}
+
+/**
+ * Deletes a zone. Never while a mission is assigned to it (those must move or go first), and never the edition's last
+ * zone. While talks, transmissions, badges or stands of the plan still name it, an organizer is refused; an admin of
+ * every edition may go on (`overrideReferences`), and what pointed at it keeps reading it as "no zone". The phase of the
+ * edition is checked by the caller.
+ */
+export async function deleteQuadrant(
+  deps: QuadrantAdminDeps,
+  actor: QuadrantAdminActor,
+  input: { id: string; overrideReferences?: boolean },
+): Promise<Result<void, QuadrantAdminError>> {
+  if (forbidden(actor)) return err(quadrantAdminError("forbidden"));
+  if (!isQuadrantId(input.id)) return err(quadrantAdminError("not-found"));
+
+  const [listed, venue] = await Promise.all([deps.store.listQuadrants(), deps.store.loadVenue()]);
+  if (!listed.ok || !venue.ok) return err(quadrantAdminError("unknown"));
+  if (!listed.value.some((quadrant) => quadrant.id === input.id)) return err(quadrantAdminError("not-found"));
+  if (listed.value.length === 1) return err(quadrantAdminError("last-quadrant"));
+
+  if (!input.overrideReferences) {
+    const used = await deps.references.to(input.id);
+    if (!used.ok) return err(quadrantAdminError("unknown"));
+    const standsHere = (venue.value?.areas ?? []).filter((area) => area.kind === "stand" && area.quadrantId === input.id);
+    if (used.value.length > 0 || standsHere.length > 0) return err(quadrantAdminError("in-use"));
+  }
+
+  const deleted = await deps.store.deleteQuadrant(input.id);
+  if (!deleted.ok) return err(quadrantAdminError("unknown"));
+  if (deleted.value.kind === "not-found") return err(quadrantAdminError("not-found"));
+  if (deleted.value.kind === "has-missions") return err(quadrantAdminError("has-missions"));
+
+  await audit(deps, {
+    action: "quadrant.deleted",
+    actorUid: actor.uid,
+    targetUid: input.id,
+    details: { name: deleted.value.quadrant.name, overridden: input.overrideReferences ? "yes" : null },
+  });
+  return ok(undefined);
 }
 
 export async function moveQuadrant(

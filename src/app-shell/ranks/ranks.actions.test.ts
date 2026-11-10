@@ -5,6 +5,8 @@ vi.mock("@/app-shell/composition/ranks.server", () => ({ rankDeps: { marker: "ra
 const cache = { revalidatePath: vi.fn() };
 vi.mock("next/cache", () => cache);
 
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
@@ -24,6 +26,7 @@ describe("saveRanksAction", () => {
     vi.resetAllMocks();
     features.FEATURES.admin = true;
     guards.getSession.mockResolvedValue(session("admin"));
+    deletion.mayDeleteItems.mockResolvedValue(true);
     server.saveRanks.mockResolvedValue({ ok: true, value: [] });
   });
 
@@ -40,8 +43,17 @@ describe("saveRanksAction", () => {
 
   it("saves with the actor of the session and refreshes the dashboard", async () => {
     expect(await saveRanksAction(RANKS)).toEqual({ ok: true });
-    expect(server.saveRanks).toHaveBeenCalledWith({ marker: "ranks" }, { uid: "a1", role: "admin" }, RANKS);
+    expect(server.saveRanks).toHaveBeenCalledWith({ marker: "ranks" }, { uid: "a1", role: "admin" }, RANKS, { mayRemove: true });
     expect(cache.revalidatePath).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("tells the use case that taking ranks out is not allowed once the edition is published, unless the admin may", async () => {
+    deletion.mayDeleteItems.mockResolvedValue(false);
+
+    await saveRanksAction(RANKS);
+
+    expect(deletion.mayDeleteItems).toHaveBeenCalledWith(session("admin"));
+    expect(server.saveRanks).toHaveBeenCalledWith({ marker: "ranks" }, { uid: "a1", role: "admin" }, RANKS, { mayRemove: false });
   });
 
   it("rejects input that is not a ladder, and passes refusals through", async () => {

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
 import type { Badge } from "../domain/badge";
-import type { MoveBadgeAction, SaveBadgeAction, SeedBadgesAction, SetBadgeActiveAction } from "./admin-actions";
+import type { DeleteBadgeAction, MoveBadgeAction, SaveBadgeAction, SeedBadgesAction, SetBadgeActiveAction } from "./admin-actions";
 import type { UploadImageAction } from "@/features/media";
 import { BadgeForm } from "./BadgeForm";
 import { BadgesAdminView } from "./BadgesAdminView";
@@ -35,11 +35,12 @@ beforeEach(() => {
 });
 
 describe("BadgesAdminView", () => {
-  const setup = (badges: Badge[] = [FIRST, AI], overrides: { seed?: SeedBadgesAction; setActive?: SetBadgeActiveAction; move?: MoveBadgeAction } = {}) => {
+  const setup = (badges: Badge[] = [FIRST, AI], overrides: { seed?: SeedBadgesAction; setActive?: SetBadgeActiveAction; move?: MoveBadgeAction; remove?: DeleteBadgeAction; canDelete?: boolean } = {}) => {
     const props = {
       seed: vi.fn<SeedBadgesAction>(async () => ({ ok: true })),
       setActive: vi.fn<SetBadgeActiveAction>(async () => ({ ok: true })),
       move: vi.fn<MoveBadgeAction>(async () => ({ ok: true })),
+      remove: vi.fn<DeleteBadgeAction>(async () => ({ ok: true })),
       ...overrides,
     };
     const view = render(<BadgesAdminView badges={badges} names={NAMES} defaultsCount={9} hrefs={{ create: "/admin/logros/nueva", editBase: "/admin/logros" }} {...props} />);
@@ -73,6 +74,37 @@ describe("BadgesAdminView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: `${t.activate}: Maestro de la IA` }));
     expect(await screen.findByText("«Maestro de la IA» vuelve a otorgarse.")).toBeInTheDocument();
+  });
+
+  it("deletes a badge after confirming, says so and refreshes", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { remove } = setup();
+
+    fireEvent.click(screen.getByRole("button", { name: `${t.delete}: Primer salto` }));
+
+    await vi.waitFor(() => expect(remove).toHaveBeenCalledWith({ id: "primer-salto" }));
+    expect(await screen.findByText("La insignia «Primer salto» se eliminó.")).toHaveAttribute("role", "status");
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("does nothing when the confirmation is declined, and explains a refusal", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { remove } = setup(undefined, { remove: vi.fn<DeleteBadgeAction>(async () => ({ ok: false, code: "has-awards" })) });
+
+    fireEvent.click(screen.getByRole("button", { name: `${t.delete}: Primer salto` }));
+    expect(remove).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: `${t.delete}: Primer salto` }));
+    expect(await screen.findByText(t.errors["has-awards"])).toBeInTheDocument();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it("offers no delete button when the session may not delete here", () => {
+    setup(undefined, { canDelete: false });
+
+    expect(screen.queryByRole("button", { name: `${t.delete}: Primer salto` })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `${t.deactivate}: Primer salto` })).toBeInTheDocument();
   });
 
   it("explains a refusal or a dropped connection", async () => {

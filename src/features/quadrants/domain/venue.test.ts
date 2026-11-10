@@ -29,12 +29,16 @@ describe("parseVenueMap", () => {
     });
   });
 
+  it("reads a plan with no areas: an event with a single room can take its last area out", () => {
+    expect(parseVenueMap(plan([]))).toEqual({ width: 100, height: 100, areas: [] });
+    expect(parseVenueMap({ width: 100, height: 100, areas: "x" })).toBeNull();
+  });
+
   it.each([
     ["not an object", null],
     ["a plan too small", plan([area("a", 0, 0, { rect: { x: 0, y: 0, width: 1, height: 1 } })], { width: 9 })],
     ["a plan too large", plan([area("a", 0, 0)], { height: 401 })],
     ["a size that is not a whole number", plan([area("a", 0, 0)], { width: 50.5 })],
-    ["no areas", plan([])],
     ["too many areas", plan(Array.from({ length: VENUE_MAX_AREAS + 1 }, (_, i) => area(`a${i}`, i % 10 * 10, Math.floor(i / 10) * 10)), { height: 400 })],
     ["an area past the right edge", plan([area("a", 91, 0)])],
     ["an area past the bottom edge", plan([area("a", 0, 91)])],

@@ -5,6 +5,8 @@ vi.mock("server-only", () => ({}));
 const media = vi.hoisted(() => ({ uploadImageAction: async () => ({ ok: false as const, code: "unknown" as const }) }));
 vi.mock("@/app-shell/media/upload.action", () => media);
 vi.mock("@/app-shell/composition/mission-admin.server", () => ({ missionAdminDeps: { marker: "admin" } }));
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 vi.mock("@/app-shell/composition/quadrants.server", () => ({ galaxyDeps: { marker: "galaxy" } }));
 vi.mock("@/app-shell/missions/manage.actions", () => ({
   seedMissionsAction: async () => ({ ok: true }),
@@ -93,9 +95,16 @@ describe("admin mission pages", () => {
       setActive: actions.setMissionActiveAction,
       move: actions.moveMissionAction,
       remove: actions.deleteMissionAction,
+      canDelete: true,
       // Plain text only: a client component cannot receive functions from a server page.
       hrefs: { create: "/admin/misiones/nueva", editBase: "/admin/misiones", suggest: "/admin/misiones/sugerir" },
     });
+  });
+
+  it("hides the delete buttons from a session that may not delete in this edition", async () => {
+    deletion.mayDeleteItems.mockResolvedValueOnce(false);
+
+    expect(findElement(await AdminMissionsPage(), MissionsAdminView)?.props.canDelete).toBe(false);
   });
 
   it("still lists the missions when the quadrants cannot be read", async () => {

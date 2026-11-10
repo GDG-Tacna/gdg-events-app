@@ -5,4 +5,5 @@ export type AchievementAdminActionResult = { ok: true } | { ok: false; code: Ach
 export type SeedBadgesAction = () => Promise<AchievementAdminActionResult>;
 export type SaveBadgeAction = (input: { id: string; draft: BadgeDraft }) => Promise<AchievementAdminActionResult>;
 export type SetBadgeActiveAction = (input: { id: string; active: boolean }) => Promise<AchievementAdminActionResult>;
+export type DeleteBadgeAction = (input: { id: string }) => Promise<AchievementAdminActionResult>;
 export type MoveBadgeAction = (input: { id: string; to: number }) => Promise<AchievementAdminActionResult>;

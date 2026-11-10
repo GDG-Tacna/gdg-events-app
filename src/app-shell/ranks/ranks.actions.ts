@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { rankDeps } from "@/app-shell/composition/ranks.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { getSession } from "@/app-shell/guards";
 import type { SaveRanksActionResult } from "@/features/attendee";
 import { saveRanks } from "@/features/attendee/server";
@@ -25,7 +26,8 @@ export async function saveRanksAction(ranks: Array<{ id: string; name: string; m
 
   const parsed = ranksSchema.safeParse(ranks);
   if (!parsed.success) return { ok: false, code: "invalid-ranks" };
-  const result = await saveRanks(rankDeps, { uid: session.uid, role: session.role }, parsed.data);
+  // Taking a rank out of a published edition's ladder is deleting it: only an admin of every edition may.
+  const result = await saveRanks(rankDeps, { uid: session.uid, role: session.role }, parsed.data, { mayRemove: await mayDeleteItems(session) });
   if (!result.ok) return { ok: false, code: result.error.code };
 
   // Every attendee's rank changes with the ladder: drop any cached render of the dashboard.

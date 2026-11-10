@@ -6,5 +6,6 @@ export type { ChooseEditionAction, ChooseEditionResult, CopyEditionAction, CopyE
 export { EditionSwitcher, WorkingEditionNotice, type EditionSwitcherProps, type WorkingEditionNoticeProps } from "./ui/EditionSwitcher";
 export { MyEditionsView, type MyEditionsViewProps } from "./ui/MyEditionsView";
 export { COPY_NEEDS, COPY_PARTS, withNeeds, type CopyErrorCode, type CopyPart } from "./domain/copy";
+export { lifecycleOf, mayDelete, type EditionLifecycle } from "./domain/lifecycle";
 export { EDITION_MODULES, MODULE_NEEDS, effectiveModules, type EditionModule, type ModuleSwitches, type ModulesErrorCode } from "./domain/modules";
 export { ACCESS_LEVELS, ADMIN_SECTIONS, DEFAULT_PERMISSIONS, STAFF_STATIONS, type AccessLevel, type AdminSection, type EditionPermissions, type PermissionsErrorCode, type StaffStation } from "./domain/permissions";

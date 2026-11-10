@@ -3,5 +3,6 @@ export { QR_LIFETIME_SECONDS } from "./domain/qr-code";
 export type { EphemeralQrError, EphemeralQrErrorCode } from "./domain/qr-error";
 export type { IssueQrAction, IssueQrActionResult, QrView } from "./ui/action";
 export { QrCodeSvg, type QrCodeSvgProps } from "./ui/QrCodeSvg";
+export { StageQr, type StageQrProps } from "./ui/StageQr";
 export { QrDisplay, formatCountdown, type QrDisplayProps } from "./ui/QrDisplay";
 export { useRenewingCode, type RenewingState, type TimedCode } from "./ui/use-renewing-code";

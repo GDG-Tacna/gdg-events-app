@@ -16,6 +16,9 @@ export interface SquadsAdminViewProps {
   seed: SeedSquadsAction;
   retire: SquadIdAction;
   reactivate: SquadIdAction;
+  remove: SquadIdAction;
+  /** Whether the session may delete squads here (a draft edition, or an admin of every edition); the server decides again. */
+  canDelete?: boolean;
   move: MoveSquadAction;
   /** Plain paths (a client component cannot receive functions from the server): a squad is edited at `${editBase}/${id}`. */
   hrefs: { create: string; editBase: string; event: string };
@@ -30,7 +33,7 @@ const chip = "type-caption border-line-strong text-foreground px-space-3 rounded
  * handle to drag it to another place and buttons to edit, retire (only once the event is over) and reactivate. An empty edition offers to
  * load DevFest's squads. Nothing is ever deleted; the server decides everything.
  */
-export function SquadsAdminView({ squads, eventFinished, seed, retire, reactivate, move, hrefs }: SquadsAdminViewProps) {
+export function SquadsAdminView({ squads, eventFinished, seed, retire, reactivate, move, remove, canDelete = true, hrefs }: SquadsAdminViewProps) {
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -146,6 +149,22 @@ export function SquadsAdminView({ squads, eventFinished, seed, retire, reactivat
                           {rowBusy && busy?.startsWith("reactivate") ? copy.admin.squads.reactivating : copy.admin.squads.reactivate}
                         </Button>
                       )}
+                      {canDelete ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy !== null}
+                          loading={rowBusy && busy?.startsWith("delete")}
+                          aria-label={`${copy.admin.squads.delete}: ${squad.name}`}
+                          onClick={() => {
+                            if (!window.confirm(interpolate(copy.admin.squads.confirmDelete, { name: squad.name }))) return;
+                            void run(`delete:${squad.id}`, () => remove({ id: squad.id }), interpolate(copy.admin.squads.deletedDone, { name: squad.name }));
+                          }}
+                        >
+                          <Icon name="trash" size={16} />
+                          {copy.admin.squads.delete}
+                        </Button>
+                      ) : null}
                     </div>
                   </Card>
               );

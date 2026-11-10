@@ -23,6 +23,8 @@ export type MissionAdminErrorCode =
   | "already-seeded"
   /** Some cadet already has a record with the mission (done, failed or half way): it can only be deactivated. */
   | "has-completions"
+  /** The edition is published or over: only an admin of every edition deletes there. */
+  | "edition-locked"
   /** A communication unlocks with it or a badge asks for it: those change first. */
   | "in-use"
   | "not-found"

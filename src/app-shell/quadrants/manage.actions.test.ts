@@ -5,6 +5,8 @@ vi.mock("@/app-shell/composition/quadrant-admin.server", () => ({ quadrantAdminD
 const source = { invalidate: vi.fn() };
 vi.mock("@/app-shell/composition/quadrants.server", () => ({ quadrantSource: source }));
 
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
@@ -14,6 +16,7 @@ const server = {
   updateQuadrant: vi.fn(),
   setQuadrantActive: vi.fn(),
   moveQuadrant: vi.fn(),
+  deleteQuadrant: vi.fn(),
   saveVenue: vi.fn(),
 };
 vi.mock("@/features/quadrants/server", () => server);
@@ -34,7 +37,8 @@ describe("map admin actions", () => {
     features.FEATURES.admin = true;
     features.FEATURES.map = true;
     guards.getSession.mockResolvedValue(session("admin"));
-    for (const name of ["createQuadrant", "updateQuadrant", "setQuadrantActive", "moveQuadrant"] as const) server[name].mockResolvedValue({ ok: true, value: null });
+    deletion.mayDeleteItems.mockResolvedValue(true);
+    for (const name of ["createQuadrant", "updateQuadrant", "setQuadrantActive", "moveQuadrant", "deleteQuadrant"] as const) server[name].mockResolvedValue({ ok: true, value: null });
     server.seedLayout.mockResolvedValue({ ok: true, value: { quadrants: 5, standQrs: ["stand-a"] } });
     server.saveVenue.mockResolvedValue({ ok: true, value: { venue: VENUE, standQrs: ["stand-ai-1"], failedQrs: ["stand-x"] } });
   });
@@ -45,6 +49,7 @@ describe("map admin actions", () => {
     ["update", () => actions.updateQuadrantAction(QUADRANT)],
     ["activate", () => actions.setQuadrantActiveAction({ id: "ai", active: true })],
     ["move", () => actions.moveQuadrantAction({ id: "ai", to: 0 })],
+    ["delete", () => actions.deleteQuadrantAction({ id: "ai" })],
     ["save venue", () => actions.saveVenueAction(VENUE as never)],
   ] as const;
 
@@ -86,6 +91,38 @@ describe("map admin actions", () => {
     expect(server.setQuadrantActive).toHaveBeenCalledWith({ marker: "admin" }, ADMIN, { id: "ai", active: false });
     expect(server.moveQuadrant).toHaveBeenCalledWith({ marker: "admin" }, ADMIN, { id: "ai", to: 2 });
     expect(source.invalidate).toHaveBeenCalledTimes(4);
+  });
+
+  it("deletes a zone with the actor of the session and drops the attendees' cached map", async () => {
+    expect(await actions.deleteQuadrantAction({ id: "ai" })).toEqual({ ok: true });
+
+    expect(server.deleteQuadrant).toHaveBeenCalledWith({ marker: "admin" }, ADMIN, { id: "ai", overrideReferences: false });
+    expect(source.invalidate).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets only an admin of every edition go past what still points at the zone", async () => {
+    guards.getSession.mockResolvedValue({ ...session("admin"), adminScope: "global" });
+
+    await actions.deleteQuadrantAction({ id: "ai" });
+
+    expect(server.deleteQuadrant).toHaveBeenCalledWith({ marker: "admin" }, ADMIN, { id: "ai", overrideReferences: true });
+  });
+
+  it("refuses to delete once the edition is published, unless the admin is allowed to, and keeps the cache", async () => {
+    deletion.mayDeleteItems.mockResolvedValue(false);
+
+    expect(await actions.deleteQuadrantAction({ id: "ai" })).toEqual({ ok: false, code: "edition-locked" });
+
+    expect(server.deleteQuadrant).not.toHaveBeenCalled();
+    expect(source.invalidate).not.toHaveBeenCalled();
+  });
+
+  it("deletes only with a well-formed input, and passes a refusal through", async () => {
+    expect(await actions.deleteQuadrantAction({ id: 7 } as never)).toEqual({ ok: false, code: "not-found" });
+    server.deleteQuadrant.mockResolvedValue({ ok: false, error: { code: "has-missions" } });
+
+    expect(await actions.deleteQuadrantAction({ id: "ai" })).toEqual({ ok: false, code: "has-missions" });
+    expect(source.invalidate).not.toHaveBeenCalled();
   });
 
   it("saves the plan and reports created and failed stand QR codes", async () => {

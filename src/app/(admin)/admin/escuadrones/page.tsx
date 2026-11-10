@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { eventDeps } from "@/app-shell/composition/event.server";
 import { squadAdminDeps } from "@/app-shell/composition/squad-admin.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { requireRole } from "@/app-shell/guards";
 import {
   moveSquadAction,
+  deleteSquadAction,
   reactivateSquadAction,
   retireSquadAction,
   seedSquadsAction,
@@ -39,6 +41,8 @@ export default async function AdminSquadsPage() {
         retire={retireSquadAction}
         reactivate={reactivateSquadAction}
         move={moveSquadAction}
+        remove={deleteSquadAction}
+        canDelete={await mayDeleteItems(session)}
         hrefs={{
           create: `${ROUTES.adminSquads}/nuevo`,
           editBase: ROUTES.adminSquads,

@@ -8,7 +8,7 @@ import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
 import { Button, ButtonLink, Card, Icon, InlineAlert, PixelPlanet, SortableList } from "@/shared/ui";
 import type { Quadrant } from "../domain/quadrant";
-import type { MoveQuadrantAction, SeedLayoutAction, SetQuadrantActiveAction } from "./admin-actions";
+import type { DeleteQuadrantAction, MoveQuadrantAction, SeedLayoutAction, SetQuadrantActiveAction } from "./admin-actions";
 
 export interface QuadrantsAdminViewProps {
   quadrants: readonly Quadrant[];
@@ -16,6 +16,9 @@ export interface QuadrantsAdminViewProps {
   defaultsCount: number;
   seed: SeedLayoutAction;
   setActive: SetQuadrantActiveAction;
+  remove: DeleteQuadrantAction;
+  /** Whether the session may delete zones here (a draft edition, or an admin of every edition); the server decides again. */
+  canDelete?: boolean;
   move: MoveQuadrantAction;
   /** Plain paths (a client component cannot receive functions from the server): a quadrant is edited at `${editBase}/${id}`. */
   hrefs: { create: string; editBase: string; plan: string };
@@ -29,7 +32,7 @@ const chip = "type-caption border-line-strong text-foreground px-space-3 rounded
  * and the way into the plan editor. While the edition has no quadrants it offers to load the bundled
  * quadrants and plan (which also creates each stand's QR). Nothing is deleted; the server decides.
  */
-export function QuadrantsAdminView({ quadrants, defaultsCount, seed, setActive, move, hrefs }: QuadrantsAdminViewProps) {
+export function QuadrantsAdminView({ quadrants, defaultsCount, seed, setActive, move, remove, canDelete = true, hrefs }: QuadrantsAdminViewProps) {
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -146,6 +149,22 @@ export function QuadrantsAdminView({ quadrants, defaultsCount, seed, setActive, 
                       >
                         {quadrant.active ? copy.admin.map.deactivate : copy.admin.map.activate}
                       </Button>
+                      {canDelete ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy !== null}
+                          loading={busy === `delete:${quadrant.id}`}
+                          aria-label={label(copy.admin.map.delete)}
+                          onClick={() => {
+                            if (!window.confirm(interpolate(copy.admin.map.confirmDelete, { name: quadrant.name }))) return;
+                            void run(`delete:${quadrant.id}`, () => remove({ id: quadrant.id }), () => interpolate(copy.admin.map.deletedDone, { name: quadrant.name }));
+                          }}
+                        >
+                          <Icon name="trash" size={16} />
+                          {copy.admin.map.delete}
+                        </Button>
+                      ) : null}
                     </div>
                   </Card>
               );

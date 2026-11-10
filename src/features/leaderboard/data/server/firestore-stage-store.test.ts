@@ -49,10 +49,19 @@ describe("FirestoreStageStore", () => {
       raffle: null,
       background: { path: "public/e1/stage-background/abcdef123456.webp", url: "/media/public/e1/stage-background/abcdef123456.webp" },
       poll: null,
+      talk: null,
     };
     await store.save(state);
 
     expect(fake.store.get(PATH)).toMatchObject({ display: "reveal", view: "cadets", frozen: { at: AT }, updatedAt: expect.any(Date) });
+    expect(await store.read()).toEqual(ok(state));
+  });
+
+  it("saves and reads back a talk QR with its name", async () => {
+    const state: StageState = { ...DEFAULT_STAGE, display: "talk-qr", talk: { talkId: "keynote", name: "Keynote" } };
+    await store.save(state);
+
+    expect(fake.store.get(PATH)).toMatchObject({ display: "talk-qr", talk: { talkId: "keynote", name: "Keynote" } });
     expect(await store.read()).toEqual(ok(state));
   });
 

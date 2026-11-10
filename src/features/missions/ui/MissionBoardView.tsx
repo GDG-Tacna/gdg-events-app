@@ -3,8 +3,10 @@ import Link from "next/link";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { ButtonLink, Card, Icon, PixelPlanet, ProgressBar, type PlanetKind } from "@/shared/ui";
+import { ButtonLink, Card, Icon, PixelPlanet, type PlanetKind } from "@/shared/ui";
 import type { BoardMission, MissionBoard } from "../domain/use-cases";
+import { BoardSummary } from "./BoardSummary";
+import { CelebratedCard, CelebratedSummary } from "./MissionCelebration";
 import { MISSION_TYPE_ICON, MissionTags } from "./MissionTags";
 
 /** A quadrant as the board needs it (the page reads it from the galaxy map). */
@@ -26,6 +28,8 @@ export interface MissionBoardViewProps {
   odysseyTitle?: string | null;
   /** The mini-games the edition has on: a mission offering one of them gets the "XP x2" tag. */
   enabledGames?: ReadonlySet<string>;
+  /** Ids of missions the cadet just completed with a scan (from the address): they are celebrated once. Ids that are not completed here are ignored. */
+  celebrate?: readonly string[];
 }
 
 interface Group {
@@ -47,8 +51,12 @@ function groupByQuadrant(missions: readonly BoardMission[], quadrants: readonly 
  * The attendee's missions: overall progress, then the missions grouped by quadrant with their type,
  * XP and status. It only shows; answering and scanning happen in their own screens (module 3).
  */
-export function MissionBoardView({ board, quadrants, missionHref, odysseyHref, odysseyTitle, enabledGames }: MissionBoardViewProps) {
+export function MissionBoardView({ board, quadrants, missionHref, odysseyHref, odysseyTitle, enabledGames, celebrate = [] }: MissionBoardViewProps) {
   const groups = groupByQuadrant(board.missions, quadrants);
+  const celebrated = board.missions.filter((mission) => mission.status === "completed" && celebrate.includes(mission.id));
+  const celebratedIds = new Set(celebrated.map((mission) => mission.id));
+  // In the order the board shows them: the first one is scrolled to and carries the glow.
+  const firstCelebrated = groups.flatMap((group) => group.missions).find((mission) => celebratedIds.has(mission.id))?.id ?? null;
 
   return (
     <div className="gap-space-6 flex flex-col">
@@ -70,33 +78,26 @@ export function MissionBoardView({ board, quadrants, missionHref, odysseyHref, o
       ) : (
         <>
           <Card className="gap-space-3 flex flex-col">
-            <div className="gap-space-3 flex flex-wrap items-center justify-between">
-              <p className="type-label text-foreground">
-                {interpolate(copy.missions.summary, { done: String(board.completed), total: String(board.total) })}
-              </p>
-              <p className="gap-space-3 flex items-center">
-                <span className="type-pixel-tag text-accent">
-                  <span className="sr-only">{copy.missions.earned}: </span>
-                  {interpolate(copy.missions.xp, { xp: formatNumber(board.xpEarned) })}
-                </span>
-                {board.creditsEarned > 0 ? (
-                  <span className="type-pixel-tag text-gold">
-                    <span className="sr-only">{copy.missions.earnedCredits}: </span>
-                    {interpolate(copy.missions.credits, { n: formatNumber(board.creditsEarned) })}
-                  </span>
-                ) : null}
-              </p>
-            </div>
-            <ProgressBar
-              value={board.completed}
-              max={board.total}
-              label={copy.missions.summaryLabel}
-              valueText={interpolate(copy.missions.summary, { done: String(board.completed), total: String(board.total) })}
-            />
+            {celebrated.length > 0 ? (
+              <CelebratedSummary
+                done={board.completed}
+                total={board.total}
+                xp={board.xpEarned}
+                credits={board.creditsEarned}
+                gained={{
+                  missions: celebrated.length,
+                  xp: celebrated.reduce((sum, mission) => sum + mission.xpEarned, 0),
+                  credits: celebrated.reduce((sum, mission) => sum + mission.creditsEarned, 0),
+                }}
+                titles={celebrated.map((mission) => mission.title)}
+              />
+            ) : (
+              <BoardSummary done={board.completed} total={board.total} xp={board.xpEarned} credits={board.creditsEarned} />
+            )}
           </Card>
 
           {groups.map((group) => (
-            <QuadrantSection key={group.key} group={group} missionHref={missionHref} enabledGames={enabledGames} />
+            <QuadrantSection key={group.key} group={group} missionHref={missionHref} enabledGames={enabledGames} celebratedIds={celebratedIds} firstCelebrated={firstCelebrated} />
           ))}
         </>
       )}
@@ -104,7 +105,19 @@ export function MissionBoardView({ board, quadrants, missionHref, odysseyHref, o
   );
 }
 
-function QuadrantSection({ group, missionHref, enabledGames }: { group: Group; missionHref: (id: string) => string; enabledGames?: ReadonlySet<string> }) {
+function QuadrantSection({
+  group,
+  missionHref,
+  enabledGames,
+  celebratedIds,
+  firstCelebrated,
+}: {
+  group: Group;
+  missionHref: (id: string) => string;
+  enabledGames?: ReadonlySet<string>;
+  celebratedIds: ReadonlySet<string>;
+  firstCelebrated: string | null;
+}) {
   const headingId = `missions-${group.key}`;
   const done = group.missions.filter((mission) => mission.status === "completed").length;
   return (
@@ -119,11 +132,10 @@ function QuadrantSection({ group, missionHref, enabledGames }: { group: Group; m
         </span>
       </div>
       <ul className="gap-space-3 grid min-[760px]:grid-cols-2">
-        {group.missions.map((mission) => (
-          <li key={mission.id}>
-            <MissionCard mission={mission} quadrant={group.quadrant} minigame={mission.minigame !== null && Boolean(enabledGames?.has(mission.minigame))} href={missionHref(mission.id)} />
-          </li>
-        ))}
+        {group.missions.map((mission) => {
+          const card = <MissionCard mission={mission} quadrant={group.quadrant} minigame={mission.minigame !== null && Boolean(enabledGames?.has(mission.minigame))} href={missionHref(mission.id)} />;
+          return <li key={mission.id}>{celebratedIds.has(mission.id) ? <CelebratedCard first={mission.id === firstCelebrated}>{card}</CelebratedCard> : card}</li>;
+        })}
       </ul>
     </section>
   );

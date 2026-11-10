@@ -95,6 +95,7 @@ describe("admin layout", () => {
       "/admin",
       "/admin/eventos",
       "/admin/team",
+      "/admin/cadetes",
       "/admin/charlas",
       "/admin/speakers",
       "/admin/puestos",

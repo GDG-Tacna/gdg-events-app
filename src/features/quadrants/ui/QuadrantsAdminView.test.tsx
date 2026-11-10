@@ -22,6 +22,7 @@ function renderView(quadrants: readonly Quadrant[] = QUADRANTS, overrides: Parti
     seed: vi.fn(async () => ({ ok: true as const, standQrs: ["stand-a", "stand-b"], failedQrs: [] })),
     setActive: vi.fn(async () => ({ ok: true as const })),
     move: vi.fn(async () => ({ ok: true as const })),
+    remove: vi.fn(async () => ({ ok: true as const })),
     hrefs: { create: "/admin/mapa/cuadrantes/nuevo", editBase: "/admin/mapa/cuadrantes", plan: "/admin/mapa/plano" },
     ...overrides,
   };
@@ -39,6 +40,37 @@ describe("QuadrantsAdminView", () => {
     expect(screen.getByRole("link", { name: m.editPlan })).toHaveAttribute("href", "/admin/mapa/plano");
     expect(screen.getByRole("link", { name: m.createQuadrant })).toHaveAttribute("href", "/admin/mapa/cuadrantes/nuevo");
     expect(screen.getByRole("link", { name: `${m.edit}: Android` })).toHaveAttribute("href", "/admin/mapa/cuadrantes/android");
+  });
+
+  it("deletes a zone after confirming, says so and refreshes", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { props } = renderView();
+
+    fireEvent.click(screen.getByRole("button", { name: `${m.delete}: Google Cloud` }));
+
+    await waitFor(() => expect(props.remove).toHaveBeenCalledWith({ id: "cloud" }));
+    expect(await screen.findByText(`La zona «Google Cloud» se eliminó.`)).toHaveAttribute("role", "status");
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("does nothing when the confirmation is declined, and explains a refusal", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const { props } = renderView(QUADRANTS, { remove: vi.fn(async () => ({ ok: false as const, code: "has-missions" as const })) });
+
+    fireEvent.click(screen.getByRole("button", { name: `${m.delete}: Google Cloud` }));
+    expect(props.remove).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: `${m.delete}: Google Cloud` }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(m.errors["has-missions"]);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("offers no delete button when the session may not delete here", () => {
+    renderView(QUADRANTS, { canDelete: false });
+
+    expect(screen.queryByRole("button", { name: `${m.delete}: Google Cloud` })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `${m.deactivate}: Google Cloud` })).toBeInTheDocument();
   });
 
   it("moves, deactivates and activates, saying what happened", async () => {

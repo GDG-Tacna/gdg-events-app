@@ -3,6 +3,7 @@ import { err, ok, type Result } from "@/shared/lib/result";
 import type { Badge } from "./badge";
 import {
   createBadge,
+  deleteBadge,
   listManagedBadges,
   moveBadge,
   seedBadges,
@@ -10,6 +11,7 @@ import {
   updateBadge,
   type AchievementAdminActor,
   type AchievementAdminDeps,
+  type BadgeDeletion,
   type BadgeDraft,
 } from "./manage";
 
@@ -39,6 +41,7 @@ interface Setup {
   create?: (badge: Badge) => Result<void, { code: "already-exists" | "unknown" }>;
   update?: Result<{ before: Badge; after: Badge } | null, { code: string }>;
   setOrder?: Result<void, { code: string }>;
+  remove?: Result<BadgeDeletion, { code: string }>;
   quadrants?: Result<ReadonlySet<string>, { code: string }>;
   missions?: Result<ReadonlySet<string>, { code: string }>;
 }
@@ -48,11 +51,12 @@ function setup({
   create = () => ok(undefined),
   update = ok({ before: A, after: A }),
   setOrder = ok(undefined),
+  remove = ok({ kind: "deleted", badge: A } as BadgeDeletion),
   quadrants = ok(new Set(["ai", "cloud"])),
   missions = ok(new Set(["ai-quiz"])),
 }: Setup = {}) {
   const deps: AchievementAdminDeps = {
-    store: { list: vi.fn(async () => list), create: vi.fn(async (value) => create(value)), update: vi.fn(async () => update), setOrder: vi.fn(async () => setOrder) },
+    store: { list: vi.fn(async () => list), create: vi.fn(async (value) => create(value)), update: vi.fn(async () => update), setOrder: vi.fn(async () => setOrder), delete: vi.fn(async () => remove) },
     directory: { quadrantIds: vi.fn(async () => quadrants), missionIds: vi.fn(async () => missions) },
     images: { ref: vi.fn((path: string, purpose: string) => (path.includes(`/${purpose}/`) ? { path, url: `https://cdn/${path}` } : null)), remove: vi.fn(async () => {}) },
     audit: { append: vi.fn(async () => ok(undefined)) },
@@ -238,6 +242,47 @@ describe("setBadgeActive", () => {
     expect(await setBadgeActive(setup(), ADMIN, { id: "../x", active: false })).toEqual(err({ code: "not-found" }));
     expect(await setBadgeActive(setup({ update: ok(null) }), ADMIN, { id: "alpha", active: false })).toEqual(err({ code: "not-found" }));
     expect(await setBadgeActive(setup({ update: err({ code: "unknown" }) }), ADMIN, { id: "alpha", active: false })).toEqual(err({ code: "unknown" }));
+  });
+});
+
+describe("deleteBadge", () => {
+  it("deletes a badge nobody earned, drops its picture and audits it", async () => {
+    const withImage = badge("alpha", 0, { image: { path: "events/e1/badge/a.png", url: "https://cdn/a.png" } });
+    const deps = setup({ remove: ok({ kind: "deleted", badge: withImage }) });
+
+    expect(await deleteBadge(deps, ADMIN, { id: "alpha" })).toEqual(ok(undefined));
+
+    expect(deps.store.delete).toHaveBeenCalledWith("alpha");
+    expect(deps.images.remove).toHaveBeenCalledWith("events/e1/badge/a.png");
+    expect(deps.audit.append).toHaveBeenCalledWith({ action: "badge.deleted", actorUid: "a1", targetUid: "alpha", details: { name: "Insignia alpha", rule: "missions-completed" }, at: NOW });
+  });
+
+  it("refuses when a cadet earned it, and changes nothing", async () => {
+    const deps = setup({ remove: ok({ kind: "has-awards" }) });
+
+    expect(await deleteBadge(deps, ADMIN, { id: "alpha" })).toEqual(err({ code: "has-awards" }));
+
+    expect(deps.images.remove).not.toHaveBeenCalled();
+    expect(deps.audit.append).not.toHaveBeenCalled();
+  });
+
+  it("never deletes the last saved badge (the bundled set would come back)", async () => {
+    const deps = setup({ list: ok([A]) });
+
+    expect(await deleteBadge(deps, ADMIN, { id: "alpha" })).toEqual(err({ code: "last-badge" }));
+    expect(deps.store.delete).not.toHaveBeenCalled();
+  });
+
+  it("is not found for an unknown or malformed badge, and refuses everyone but admins", async () => {
+    expect(await deleteBadge(setup(), ADMIN, { id: "zeta" })).toEqual(err({ code: "not-found" }));
+    expect(await deleteBadge(setup(), ADMIN, { id: "No Valid" })).toEqual(err({ code: "not-found" }));
+    expect(await deleteBadge(setup({ remove: ok({ kind: "not-found" }) }), ADMIN, { id: "alpha" })).toEqual(err({ code: "not-found" }));
+    expect(await deleteBadge(setup(), STAFF, { id: "alpha" })).toEqual(err({ code: "forbidden" }));
+  });
+
+  it("reports failed reads and a failed delete", async () => {
+    expect(await deleteBadge(setup({ list: err({ code: "x" }) }), ADMIN, { id: "alpha" })).toEqual(err({ code: "unknown" }));
+    expect(await deleteBadge(setup({ remove: err({ code: "x" }) }), ADMIN, { id: "alpha" })).toEqual(err({ code: "unknown" }));
   });
 });
 

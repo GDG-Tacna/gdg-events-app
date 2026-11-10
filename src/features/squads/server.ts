@@ -7,6 +7,7 @@ export { createRandomPicker } from "./domain/picker";
 export { assignSquad, listSquads, type AssignSquadDeps } from "./domain/use-cases";
 export {
   createSquad,
+  deleteSquad,
   listManagedSquads,
   moveSquad,
   reactivateSquad,

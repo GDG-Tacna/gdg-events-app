@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: copy.admin.map.quadrantForm.createTit
 
 export default async function AdminNewQuadrantPage() {
   const session = await requireRole(["admin"]);
-  await requireSection(session, "map");
+  await requireSection(session, "zones");
 
   return (
     <ScreenEnter>

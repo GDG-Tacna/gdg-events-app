@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { loadAchievementFormOptions, ruleNamesOf } from "@/app-shell/achievements/form-options.server";
-import { moveBadgeAction, seedBadgesAction, setBadgeActiveAction } from "@/app-shell/achievements/manage.actions";
+import { deleteBadgeAction, moveBadgeAction, seedBadgesAction, setBadgeActiveAction } from "@/app-shell/achievements/manage.actions";
 import { achievementAdminDeps } from "@/app-shell/composition/achievements.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { requireRole } from "@/app-shell/guards";
 import { BadgesAdminView } from "@/features/achievements";
 import { DEFAULT_BADGES, listManagedBadges } from "@/features/achievements/server";
@@ -28,6 +29,8 @@ export default async function AdminAchievementsPage() {
         seed={seedBadgesAction}
         setActive={setBadgeActiveAction}
         move={moveBadgeAction}
+        remove={deleteBadgeAction}
+        canDelete={await mayDeleteItems(session)}
         hrefs={{ create: `${ROUTES.adminAchievements}/nueva`, editBase: ROUTES.adminAchievements }}
       />
     </ScreenEnter>

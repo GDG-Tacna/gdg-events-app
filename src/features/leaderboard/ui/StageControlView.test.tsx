@@ -142,6 +142,15 @@ describe("StageControlView", () => {
     expect((await axe(container)).violations).toEqual([]);
   });
 
+  it("says which talk's QR is on screen and lets the admin take it off", async () => {
+    const run = vi.fn<UpdateStageAction>(async () => ({ ok: true }));
+    render(<StageControlView stage={{ ...DEFAULT_STAGE, display: "talk-qr", talk: { talkId: "keynote", name: "Keynote de apertura" } }} live={LIVE} run={run} />);
+
+    expect(screen.getByText("QR de la charla: Keynote de apertura")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: t.showRanking }));
+    await waitFor(() => expect(run).toHaveBeenCalledWith({ type: "show", display: "ranking" }));
+  });
+
   it("puts an opened poll's results on screen, marks the one shown, and says when there is none to show", async () => {
     const run = vi.fn<UpdateStageAction>(async () => ({ ok: true }));
     const polls = [

@@ -2,9 +2,10 @@
 
 import { z } from "zod";
 import { checkpointAdminDeps } from "@/app-shell/composition/checkpoint-admin.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { getSession } from "@/app-shell/guards";
-import type { ManageActionResult } from "@/features/checkpoints";
-import { createCheckpoint, renameCheckpoint, setCheckpointActive, setFoodRequirements, type ManageActor } from "@/features/checkpoints/server";
+import type { DeleteCheckpointActionResult, ManageActionResult } from "@/features/checkpoints";
+import { createCheckpoint, deleteCheckpoint, renameCheckpoint, setCheckpointActive, setFoodRequirements, type ManageActor } from "@/features/checkpoints/server";
 import { FEATURES } from "@/shared/config/features";
 import { mayEdit } from "@/app-shell/permissions.server";
 
@@ -59,6 +60,20 @@ export async function setCheckpointActiveAction(input: { id: string; active: boo
 
   const result = await setCheckpointActive(checkpointAdminDeps, actor, parsed.data);
   return result.ok ? { ok: true, checkpoint: result.value } : { ok: false, code: result.error.code };
+}
+
+export async function deleteCheckpointAction(input: { id: string }): Promise<DeleteCheckpointActionResult> {
+  const actor = await adminActor();
+  if (isResult(actor)) return { ok: false, code: actor.ok ? "unknown" : actor.code };
+
+  const parsed = z.object({ id: z.string().max(60) }).safeParse(input);
+  if (!parsed.success) return { ok: false, code: "not-found" };
+  // A published edition keeps its stations: only an admin of every edition may delete there.
+  const session = await getSession();
+  if (!session || !(await mayDeleteItems(session))) return { ok: false, code: "edition-locked" };
+
+  const result = await deleteCheckpoint(checkpointAdminDeps, actor, parsed.data);
+  return result.ok ? { ok: true, name: result.value.name } : { ok: false, code: result.error.code };
 }
 
 export async function setFoodRequirementsAction(input: { id: string; minLevel: number | null; minTalks: number | null }): Promise<ManageActionResult> {

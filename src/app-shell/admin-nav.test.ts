@@ -37,6 +37,18 @@ describe("admin navigation", () => {
     const hrefs = adminNavItems((module) => module !== "map").map((item) => item.href);
     expect(hrefs).toContain("/admin/zonas");
     expect(hrefs).not.toContain("/admin/mapa");
-    expect(readOnlyAreas({ map: "view" })).toEqual(["/admin/zonas", "/admin/mapa"]);
+    expect(readOnlyAreas({ map: "view" })).toEqual(["/admin/mapa"]);
+  });
+
+  it("gives the zones their own permission, apart from the plan's", () => {
+    // An organizer who may not see the plan still sees the zones (a one-room event hides the plan and keeps its zones).
+    const hrefs = adminNavItems(undefined, { map: "none" }).map((item) => item.href);
+    expect(hrefs).toContain("/admin/zonas");
+    expect(hrefs).not.toContain("/admin/mapa");
+
+    const zonesHidden = adminNavItems(undefined, { zones: "none" }).map((item) => item.href);
+    expect(zonesHidden).not.toContain("/admin/zonas");
+    expect(zonesHidden).toContain("/admin/mapa");
+    expect(readOnlyAreas({ zones: "view" })).toEqual(["/admin/zonas"]);
   });
 });

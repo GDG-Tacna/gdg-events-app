@@ -5,12 +5,15 @@ vi.mock("server-only", () => ({}));
 const media = vi.hoisted(() => ({ uploadImageAction: async () => ({ ok: false as const, code: "unknown" as const }) }));
 vi.mock("@/app-shell/media/upload.action", () => media);
 vi.mock("@/app-shell/composition/quadrant-admin.server", () => ({ quadrantAdminDeps: { marker: "admin" } }));
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 vi.mock("@/app-shell/quadrants/manage.actions", () => ({
   seedLayoutAction: async () => ({ ok: true }),
   createQuadrantAction: async () => ({ ok: true }),
   updateQuadrantAction: async () => ({ ok: true }),
   setQuadrantActiveAction: async () => ({ ok: true }),
   moveQuadrantAction: async () => ({ ok: true }),
+  deleteQuadrantAction: async () => ({ ok: true }),
   saveVenueAction: async () => ({ ok: true }),
 }));
 
@@ -81,6 +84,8 @@ describe("admin map pages", () => {
       seed: actions.seedLayoutAction,
       setActive: actions.setQuadrantActiveAction,
       move: actions.moveQuadrantAction,
+      remove: actions.deleteQuadrantAction,
+      canDelete: true,
       // Plain text only: a client component cannot receive functions from a server page.
       hrefs: { create: "/admin/zonas/nueva", editBase: "/admin/zonas", plan: "/admin/mapa" },
     });

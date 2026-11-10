@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const media = vi.hoisted(() => ({ uploadImageAction: async () => ({ ok: false as const, code: "unknown" as const }) }));
 vi.mock("@/app-shell/media/upload.action", () => media);
+const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
+vi.mock("@/app-shell/deletion.server", () => deletion);
 vi.mock("@/app-shell/composition/ranks.server", () => ({ rankDeps: { marker: "ranks" } }));
 vi.mock("@/app-shell/ranks/ranks.actions", () => ({ saveRanksAction: async () => ({ ok: true }) }));
 
@@ -37,6 +39,7 @@ describe("admin ranks page", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     guards.requireRole.mockResolvedValue({ uid: "a1", role: "admin", displayName: null, photoUrl: null });
+    deletion.mayDeleteItems.mockResolvedValue(true);
     server.getRanksForEdit.mockResolvedValue({ ok: true, value: { ranks: RANKS, isDefault: true } });
   });
 
@@ -52,7 +55,7 @@ describe("admin ranks page", () => {
     const editor = findElement(await AdminRanksPage(), RanksEditor);
 
     expect(server.getRanksForEdit).toHaveBeenCalledWith({ marker: "ranks" }, { uid: "a1", role: "admin" });
-    expect(editor?.props).toEqual({ ranks: RANKS, isDefault: true, save: saveRanksAction, upload: media.uploadImageAction });
+    expect(editor?.props).toEqual({ ranks: RANKS, isDefault: true, save: saveRanksAction, upload: media.uploadImageAction, canRemove: true });
   });
 
   it("surfaces a failed read through the error boundary", async () => {

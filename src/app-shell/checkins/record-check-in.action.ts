@@ -51,7 +51,7 @@ export async function recordCheckInAction(payload: string): Promise<RecordCheckI
   let missions: ScanReward[] = [];
   if ((await moduleOn("missions")) && MISSION_KINDS.has(result.value.kind)) {
     const completed = await completeByCheckpoint(missionDeps, session.uid, result.value.checkpointId);
-    if (completed.ok) missions = completed.value.map(({ title, xpEarned, creditsEarned, justCompleted }) => ({ title, xpEarned, creditsEarned, justCompleted }));
+    if (completed.ok) missions = completed.value.map(({ id, title, xpEarned, creditsEarned, justCompleted }) => ({ id, title, xpEarned, creditsEarned, justCompleted }));
   }
 
   // Attending a talk pays G-Credits once per talk (a repeated scan retries a reward that failed).
@@ -84,7 +84,7 @@ async function meetSpeaker(uid: string, payload: string): Promise<RecordCheckInA
   if (await moduleOn("missions")) {
     const completed = await completeBySpeaker(missionDeps, uid, verified.speakerId);
     if (!completed.ok && completed.error.code === "not-registered") return { ok: false, code: "not-registered" };
-    if (completed.ok) missions = completed.value.map(({ title, xpEarned, creditsEarned, justCompleted }) => ({ title, xpEarned, creditsEarned, justCompleted }));
+    if (completed.ok) missions = completed.value.map(({ id, title, xpEarned, creditsEarned, justCompleted }) => ({ id, title, xpEarned, creditsEarned, justCompleted }));
   }
   const achievements = await unlockAchievements(uid);
   return { ok: true, checkpointId: verified.speakerId, kind: "speaker", recorded: true, firstEntrance: false, missions, talkCredits: 0, achievements };

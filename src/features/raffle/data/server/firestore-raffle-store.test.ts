@@ -146,6 +146,8 @@ describe("FirestoreRaffleStore", () => {
     fake.store.set("events/e1/participants/u1", { alias: "Nova", squad: "firebase", credits: 12.9 });
     fake.store.set("events/e1/participants/u2", { alias: "Cero" });
     fake.store.set("events/e1/participants/broken", { credits: 5 });
+    // A blocked cadet holds no tickets, however many G-Credits they had.
+    fake.store.set("events/e1/participants/banned", { alias: "Vetado", credits: 40, banned: true });
 
     expect(await store.draws()).toMatchObject({ ok: true, value: [{ id: "polera-1", at: AT, voided: false }] });
     expect(await store.entrants()).toEqual(

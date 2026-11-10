@@ -9,7 +9,7 @@ import { ROUTES } from "@/shared/config/routes";
  * is the one place that knows both: the page (server) cannot create a camera, and the feature does not
  * know which server action records a check-in. The page says which modules are on (it reads them on the server).
  */
-export function ScannerScreen({ achievementsOn, networkOn }: { achievementsOn: boolean; networkOn: boolean }) {
+export function ScannerScreen({ achievementsOn, networkOn, missionsOn }: { achievementsOn: boolean; networkOn: boolean; missionsOn: boolean }) {
   return (
     <ScannerView
       camera={QrCodeCamera}
@@ -18,6 +18,7 @@ export function ScannerScreen({ achievementsOn, networkOn }: { achievementsOn: b
       achievementsHref={achievementsOn ? ROUTES.achievements : undefined}
       networkHref={networkOn ? ROUTES.network : undefined}
       passHref={ROUTES.pass}
+      missionsHref={missionsOn ? ROUTES.missions : undefined}
     />
   );
 }

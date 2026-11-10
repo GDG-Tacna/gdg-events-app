@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { createCheckpointAction, renameCheckpointAction, setCheckpointActiveAction, setFoodRequirementsAction } from "@/app-shell/checkpoints/manage.actions";
+import { createCheckpointAction, deleteCheckpointAction, renameCheckpointAction, setCheckpointActiveAction, setFoodRequirementsAction } from "@/app-shell/checkpoints/manage.actions";
 import { checkpointAdminDeps } from "@/app-shell/composition/checkpoint-admin.server";
 import { rankDeps } from "@/app-shell/composition/ranks.server";
+import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { requireRole } from "@/app-shell/guards";
 import { CheckpointsAdminView } from "@/features/checkpoints";
 import { getEditionLadder } from "@/features/attendee/server";
@@ -29,6 +30,8 @@ export default async function AdminCheckpointsPage() {
         create={createCheckpointAction}
         rename={renameCheckpointAction}
         setActive={setCheckpointActiveAction}
+        remove={deleteCheckpointAction}
+        canDelete={await mayDeleteItems(session)}
         setRequirements={setFoodRequirementsAction}
         levels={ladder.map((rank) => ({ level: rank.level, name: rankName(rank.id, rank.level, rank.name) }))}
       />

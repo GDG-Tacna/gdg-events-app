@@ -23,6 +23,11 @@ function fakeFirestore(initial: Record<string, Doc>) {
   const db = {
     collection: withEventScope((name: string) => ({
       get: async () => ({ docs: [...store.keys()].filter((key) => key.startsWith(`${name}/`)).map(docSnapshot) }),
+      where: (field: string, _op: string, value: unknown) => {
+        const matches = () => [...store.keys()].filter((key) => key.startsWith(`${name}/`) && store.get(key)?.[field] === value).map(docSnapshot);
+        const query = { isQuery: true, matches, limit: () => query };
+        return query;
+      },
       doc: (id: string) => ({
         path: `${name}/${id}`,
         create: async (data: Doc) => {
@@ -34,7 +39,12 @@ function fakeFirestore(initial: Record<string, Doc>) {
     runTransaction: async <T,>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
       const pending: Array<() => void> = [];
       const tx = {
-        get: async (ref: { path: string }) => docSnapshot(ref.path),
+        get: async (ref: { path: string; isQuery?: boolean; matches?: () => unknown[] }) => {
+          if (!ref.isQuery) return docSnapshot(ref.path);
+          const docs = ref.matches!();
+          return { empty: docs.length === 0, docs };
+        },
+        delete: (ref: { path: string }) => pending.push(() => store.delete(ref.path)),
         update: (ref: { path: string }, data: Doc) => {
           pending.push(() => {
             store.set(ref.path, { ...store.get(ref.path), ...data });
@@ -145,6 +155,39 @@ describe("FirestoreSquadStore", () => {
     expect(await next.list()).toEqual({ ok: true, value: [] });
   });
 
+  it("deletes a squad nobody belongs to and with no credit history, and reports it", async () => {
+    fake.store.set("events/e1/participants/u1", { squad: "angular" });
+    fake.store.set("events/e1/squadLedger/bonus_1", { squadId: "angular" });
+
+    const result = await store.delete("gemini");
+
+    expect(result.ok && result.value.kind).toBe("deleted");
+    expect(fake.store.has("events/e1/squads/gemini")).toBe(false);
+    expect(fake.store.has("events/e1/squads/angular")).toBe(true);
+  });
+
+  it("keeps a squad any cadet belongs to", async () => {
+    fake.store.set("events/e1/participants/u1", { squad: "gemini" });
+
+    expect(await store.delete("gemini")).toEqual({ ok: true, value: { kind: "has-members" } });
+    expect(fake.store.has("events/e1/squads/gemini")).toBe(true);
+  });
+
+  it("keeps a squad that earned or spent squad credits", async () => {
+    fake.store.set("events/e1/squadLedger/bonus_1", { squadId: "gemini" });
+    expect(await store.delete("gemini")).toEqual({ ok: true, value: { kind: "has-credits" } });
+
+    fake.store.delete("events/e1/squadLedger/bonus_1");
+    fake.store.set("events/e1/squadRedemptions/op_1", { squadId: "gemini" });
+    expect(await store.delete("gemini")).toEqual({ ok: true, value: { kind: "has-credits" } });
+    expect(fake.store.has("events/e1/squads/gemini")).toBe(true);
+  });
+
+  it("answers not-found for a squad that does not exist or cannot be drawn", async () => {
+    expect(await store.delete("ghost")).toEqual({ ok: true, value: { kind: "not-found" } });
+    expect(await store.delete("broken")).toEqual({ ok: true, value: { kind: "not-found" } });
+  });
+
   it("turns unexpected failures into an unknown error", async () => {
     const broken = new FirestoreSquadStore(() => {
       throw new Error("boom");
@@ -154,5 +197,6 @@ describe("FirestoreSquadStore", () => {
     expect(await broken.create({ id: "x-1", name: "X", tagline: "x", sprite: LOGO, active: true, order: 0 })).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.update("x-1", { active: false })).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.setOrder(["x-1"])).toEqual({ ok: false, error: { code: "unknown" } });
+    expect(await broken.delete("x-1")).toEqual({ ok: false, error: { code: "unknown" } });
   });
 });

@@ -8,7 +8,7 @@ import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
 import { Button, ButtonLink, Card, Icon, InlineAlert, MedalArt, SortableList } from "@/shared/ui";
 import type { Badge } from "../domain/badge";
-import type { AchievementAdminActionResult, MoveBadgeAction, SeedBadgesAction, SetBadgeActiveAction } from "./admin-actions";
+import type { AchievementAdminActionResult, DeleteBadgeAction, MoveBadgeAction, SeedBadgesAction, SetBadgeActiveAction } from "./admin-actions";
 import { ruleText, type RuleNames } from "./rule-text";
 
 export interface BadgesAdminViewProps {
@@ -18,6 +18,9 @@ export interface BadgesAdminViewProps {
   defaultsCount: number;
   seed: SeedBadgesAction;
   setActive: SetBadgeActiveAction;
+  remove: DeleteBadgeAction;
+  /** Whether the session may delete badges here (a draft edition, or an admin of every edition); the server decides again. */
+  canDelete?: boolean;
   move: MoveBadgeAction;
   /** Plain paths (a client component cannot receive functions from the server). */
   hrefs: { create: string; editBase: string };
@@ -29,7 +32,7 @@ const chip = "type-caption border-line-strong text-foreground px-space-3 rounded
  * The Logros screen: every badge of the edition in order, with its medal, rule and state, a handle to
  * drag it to another place, and buttons to edit and activate or deactivate it. An empty edition offers the bundled set.
  */
-export function BadgesAdminView({ badges, names, defaultsCount, seed, setActive, move, hrefs }: BadgesAdminViewProps) {
+export function BadgesAdminView({ badges, names, defaultsCount, seed, setActive, move, remove, canDelete = true, hrefs }: BadgesAdminViewProps) {
   const t = copy.admin.achievements;
   const router = useRouter();
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
@@ -127,6 +130,22 @@ export function BadgesAdminView({ badges, names, defaultsCount, seed, setActive,
                     >
                       {badge.active ? t.deactivate : t.activate}
                     </Button>
+                    {canDelete ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy !== null}
+                        loading={busy === `delete:${badge.id}`}
+                        aria-label={label(t.delete)}
+                        onClick={() => {
+                          if (!window.confirm(interpolate(t.confirmDelete, { name: badge.name }))) return;
+                          void run(`delete:${badge.id}`, () => remove({ id: badge.id }), interpolate(t.deletedDone, { name: badge.name }));
+                        }}
+                      >
+                        <Icon name="trash" size={16} />
+                        {t.delete}
+                      </Button>
+                    ) : null}
                   </div>
                 </Card>
             );
