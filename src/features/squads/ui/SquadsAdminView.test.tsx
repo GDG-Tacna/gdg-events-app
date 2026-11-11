@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
+import { answerConfirm } from "@/test-utils/confirm";
 import type { MoveSquadAction, SeedSquadsAction, SquadAdminActionResult, SquadIdAction, SquadView } from "./admin-actions";
 import { SquadsAdminView } from "./SquadsAdminView";
 
@@ -59,10 +60,10 @@ describe("SquadsAdminView", () => {
   });
 
   it("deletes a squad after confirming, says so and refreshes", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { remove, user } = setup();
 
     await user.click(screen.getByRole("button", { name: `${copy.admin.squads.delete}: Escuadrón gemini` }));
+    await answerConfirm("confirm");
 
     expect(remove).toHaveBeenCalledWith({ id: "gemini" });
     expect(await screen.findByText("El escuadrón «Escuadrón gemini» se eliminó.")).toHaveAttribute("role", "status");
@@ -70,14 +71,14 @@ describe("SquadsAdminView", () => {
   });
 
   it("does nothing when the confirmation is declined, and explains a refusal", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { remove, user } = setup({ results: { remove: { ok: false, code: "has-members" } } });
 
     await user.click(screen.getByRole("button", { name: `${copy.admin.squads.delete}: Escuadrón gemini` }));
+    await answerConfirm("cancel");
     expect(remove).not.toHaveBeenCalled();
 
-    confirm.mockReturnValue(true);
     await user.click(screen.getByRole("button", { name: `${copy.admin.squads.delete}: Escuadrón gemini` }));
+    await answerConfirm("confirm");
     expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.squads.errors["has-members"]);
     expect(router.refresh).not.toHaveBeenCalled();
   });

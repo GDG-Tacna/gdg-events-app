@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
+import { answerConfirm } from "@/test-utils/confirm";
 import type { BanCadetAction, CadetDetailData, CadetRow, ChangeCadetSquadAction, DeleteCadetAction, RenameCadetAction, UnbanCadetAction } from "./actions";
 import { CadetDetailView } from "./CadetDetailView";
 import { CadetsListView } from "./CadetsListView";
@@ -99,7 +100,6 @@ describe("CadetDetailView", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   it("shows who the cadet is and what they did, with the account's email", () => {
@@ -169,18 +169,22 @@ describe("CadetDetailView", () => {
     await user.type(screen.getByLabelText(t.reasonLabel), "Cuenta falsa");
     await user.click(submit);
 
-    expect(window.confirm).toHaveBeenCalledWith("¿Bloquear a Nova? No podrá entrar a la app hasta que lo desbloquees.");
+    expect(await screen.findByRole("dialog", { name: "¿Bloquear a Nova?" })).toHaveTextContent(t.confirmBan);
+    expect(ban).not.toHaveBeenCalled();
+    await answerConfirm("confirm");
+
+    await waitFor(() => expect(ban).toHaveBeenCalled());
     expect(ban).toHaveBeenCalledWith({ uid: "cadet-0001", reason: "Cuenta falsa" });
     expect(await screen.findByText("Nova quedó bloqueado.")).toBeInTheDocument();
     expect(router.refresh).toHaveBeenCalled();
   });
 
   it("does not block when the confirmation is declined", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
     const { ban, user } = renderDetail();
 
     await user.type(screen.getByLabelText(t.reasonLabel), "Cuenta falsa");
     await user.click(screen.getByRole("button", { name: t.ban }));
+    await answerConfirm("cancel");
 
     expect(ban).not.toHaveBeenCalled();
   });

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, ButtonLink, Card, Icon, InlineAlert } from "@/shared/ui";
+import { Button, ButtonLink, Card, Icon, InlineAlert, useConfirm } from "@/shared/ui";
 import type { DeleteTalkAction, DeleteTalkActionResult, ProjectTalkAction, SetTalkActiveAction, TalkAdminActionResult, TalkView } from "./admin-actions";
 import { useProjectTalk } from "./use-project-talk";
 
@@ -49,6 +49,7 @@ export function TalksAdminView({ talks, rooms, setActive, remove, canDelete = tr
   const router = useRouter();
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
   const { projectTalk, projecting, projectError } = useProjectTalk(project, hrefs.stage);
   const roomName = (id: string | null) => (id ? (rooms.find((room) => room.id === id)?.name ?? t.noRoom) : t.noRoom);
 
@@ -68,7 +69,9 @@ export function TalksAdminView({ talks, rooms, setActive, remove, canDelete = tr
   }
 
   async function handleDelete(talk: TalkView) {
-    if (busy !== null || !window.confirm(interpolate(t.confirmDelete, { title: talk.title }))) return;
+    if (busy !== null) return;
+    const yes = await confirm({ title: interpolate(t.confirmDeleteTitle, { title: talk.title }), description: t.confirmDelete, confirmLabel: t.delete });
+    if (!yes) return;
     setBusy(talk.id);
     setNotice(null);
     let result: DeleteTalkActionResult;
@@ -147,6 +150,7 @@ export function TalksAdminView({ talks, rooms, setActive, remove, canDelete = tr
           })}
         </ul>
       )}
+      {dialog}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
+import { answerConfirm } from "@/test-utils/confirm";
 import { CheckpointsAdminView } from "./CheckpointsAdminView";
 import type { CheckpointView, CreateCheckpointAction, DeleteCheckpointAction, ManageActionResult, RenameCheckpointAction, SetCheckpointActiveAction, SetFoodRequirementsAction } from "./manage-action";
 
@@ -99,10 +100,10 @@ describe("CheckpointsAdminView delete", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("deletes a station after confirming, says which one and refreshes the list", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { remove, user } = setup(undefined, undefined, { remove: vi.fn<DeleteCheckpointAction>(async () => ({ ok: true, name: "Almuerzo" })) });
 
     await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    await answerConfirm("confirm");
 
     expect(remove).toHaveBeenCalledWith({ id: "lunch-1" });
     expect(await screen.findByText("El puesto «Almuerzo» se eliminó.")).toHaveAttribute("role", "status");
@@ -110,23 +111,23 @@ describe("CheckpointsAdminView delete", () => {
   });
 
   it("does nothing when the confirmation is declined, and explains a refusal without refreshing", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const remove = vi.fn<DeleteCheckpointAction>(async () => ({ ok: false, code: "has-check-ins" }));
     const { user } = setup(undefined, undefined, { remove });
 
     await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    await answerConfirm("cancel");
     expect(remove).not.toHaveBeenCalled();
 
-    confirm.mockReturnValue(true);
     await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    await answerConfirm("confirm");
     expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.checkpoints.errors["has-check-ins"]);
     expect(router.refresh).not.toHaveBeenCalled();
   });
 
   it("survives a thrown action, and offers no delete button when the session may not delete here", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { user, unmount } = setup(undefined, undefined, { remove: vi.fn<DeleteCheckpointAction>(async () => { throw new Error("offline"); }) });
     await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    await answerConfirm("confirm");
     expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.checkpoints.errors.unknown);
     unmount();
 

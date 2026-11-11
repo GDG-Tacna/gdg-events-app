@@ -6,7 +6,7 @@ import { useState } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, ButtonLink, Card, Icon, InlineAlert, MedalArt, SortableList } from "@/shared/ui";
+import { Button, ButtonLink, Card, Icon, InlineAlert, MedalArt, SortableList, useConfirm } from "@/shared/ui";
 import type { Badge } from "../domain/badge";
 import type { AchievementAdminActionResult, DeleteBadgeAction, MoveBadgeAction, SeedBadgesAction, SetBadgeActiveAction } from "./admin-actions";
 import { ruleText, type RuleNames } from "./rule-text";
@@ -37,6 +37,7 @@ export function BadgesAdminView({ badges, names, defaultsCount, seed, setActive,
   const router = useRouter();
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   async function run(key: string, action: () => Promise<AchievementAdminActionResult>, success?: string) {
     setBusy(key);
@@ -137,9 +138,9 @@ export function BadgesAdminView({ badges, names, defaultsCount, seed, setActive,
                         disabled={busy !== null}
                         loading={busy === `delete:${badge.id}`}
                         aria-label={label(t.delete)}
-                        onClick={() => {
-                          if (!window.confirm(interpolate(t.confirmDelete, { name: badge.name }))) return;
-                          void run(`delete:${badge.id}`, () => remove({ id: badge.id }), interpolate(t.deletedDone, { name: badge.name }));
+                        onClick={async () => {
+                          const yes = await confirm({ title: interpolate(t.confirmDeleteTitle, { name: badge.name }), description: t.confirmDelete, confirmLabel: t.delete });
+                          if (yes) void run(`delete:${badge.id}`, () => remove({ id: badge.id }), interpolate(t.deletedDone, { name: badge.name }));
                         }}
                       >
                         <Icon name="trash" size={16} />
@@ -152,6 +153,7 @@ export function BadgesAdminView({ badges, names, defaultsCount, seed, setActive,
           }}
         />
       )}
+      {dialog}
     </div>
   );
 }

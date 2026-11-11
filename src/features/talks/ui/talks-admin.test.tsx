@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
+import { answerConfirm } from "@/test-utils/confirm";
 import type { DeleteTalkAction, ProjectTalkAction, SaveTalkAction, SetTalkActiveAction, TalkView } from "./admin-actions";
 import { TalkForm } from "./TalkForm";
 import { TalksAdminView, formatSlot } from "./TalksAdminView";
@@ -69,10 +70,10 @@ describe("TalksAdminView", () => {
   });
 
   it("deletes a talk after confirming, says which one and refreshes the list", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { remove, user } = renderView(undefined, undefined, undefined, { remove: vi.fn<DeleteTalkAction>(async () => ({ ok: true, title: "Keynote" })) });
 
     await user.click(screen.getByRole("button", { name: `${t.delete}: Keynote` }));
+    await answerConfirm("confirm");
 
     expect(remove).toHaveBeenCalledWith({ id: "keynote" });
     expect(await screen.findByText("La charla «Keynote» se eliminó.")).toHaveAttribute("role", "status");
@@ -80,23 +81,23 @@ describe("TalksAdminView", () => {
   });
 
   it("does nothing when the confirmation is declined, and explains a refusal without refreshing", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const remove = vi.fn<DeleteTalkAction>(async () => ({ ok: false, code: "has-check-ins" }));
     const { user } = renderView(undefined, undefined, undefined, { remove });
 
     await user.click(screen.getByRole("button", { name: `${t.delete}: Keynote` }));
+    await answerConfirm("cancel");
     expect(remove).not.toHaveBeenCalled();
 
-    confirm.mockReturnValue(true);
     await user.click(screen.getByRole("button", { name: `${t.delete}: Keynote` }));
+    await answerConfirm("confirm");
     expect(await screen.findByRole("alert")).toHaveTextContent(t.errors["has-check-ins"]);
     expect(router.refresh).not.toHaveBeenCalled();
   });
 
   it("survives a thrown delete, and offers no delete button when the session may not delete here", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const first = renderView(undefined, undefined, undefined, { remove: vi.fn<DeleteTalkAction>(async () => { throw new Error("offline"); }) });
     await first.user.click(screen.getByRole("button", { name: `${t.delete}: Keynote` }));
+    await answerConfirm("confirm");
     expect(await screen.findByRole("alert")).toHaveTextContent(t.errors.unknown);
     first.unmount();
 

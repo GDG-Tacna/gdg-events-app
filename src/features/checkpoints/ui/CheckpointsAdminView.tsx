@@ -6,7 +6,7 @@ import { isCheckpointId, type CheckpointKind } from "@/features/checkins";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, Card, FormDialog, Icon, InlineAlert, TextField, type IconName } from "@/shared/ui";
+import { Button, Card, FormDialog, Icon, InlineAlert, TextField, useConfirm, type IconName } from "@/shared/ui";
 import { normalizeName, suggestId } from "../domain/manage";
 import { STATION_KINDS } from "../domain/serve";
 import { FoodRequirementsEditor, requirementsSummary, type LevelOption } from "./FoodRequirementsEditor";
@@ -83,6 +83,7 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
@@ -130,7 +131,9 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
   }
 
   async function handleDelete(checkpoint: CheckpointView) {
-    if (busy || !window.confirm(interpolate(t.confirmDelete, { name: checkpoint.name }))) return;
+    if (busy) return;
+    const yes = await confirm({ title: interpolate(t.confirmDeleteTitle, { name: checkpoint.name }), description: t.confirmDelete, confirmLabel: t.delete });
+    if (!yes) return;
     setBusy(`delete:${checkpoint.id}`);
     setNotice(null);
     let result: DeleteCheckpointActionResult;
@@ -346,6 +349,7 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
           </div>
         ) : null}
       </FormDialog>
+      {confirmDialog}
     </div>
   );
 }

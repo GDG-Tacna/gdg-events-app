@@ -5,7 +5,7 @@ import { useState } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, ButtonLink, Card, InlineAlert } from "@/shared/ui";
+import { Button, ButtonLink, Card, InlineAlert, useConfirm } from "@/shared/ui";
 import type { Poll, PollReward } from "../domain/poll";
 import type { PollActionResult, PollStateAction } from "./actions";
 
@@ -31,11 +31,12 @@ export function rewardLabel(reward: PollReward): string {
 export function PollsAdminView({ polls, change, hrefs }: PollsAdminViewProps) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const anotherOpen = polls.some((poll) => poll.status === "open");
 
   async function run(poll: Poll, action: "open" | "close" | "delete") {
-    if (action === "delete" && !window.confirm(t.confirmRemove)) return;
+    if (action === "delete" && !(await confirm({ title: t.confirmRemove, description: t.confirmRemoveBody, confirmLabel: t.remove }))) return;
     setBusy(`${action}:${poll.id}`);
     setNotice(null);
     let result: PollActionResult;
@@ -113,6 +114,7 @@ export function PollsAdminView({ polls, change, hrefs }: PollsAdminViewProps) {
           ))}
         </ul>
       )}
+      {dialog}
     </div>
   );
 }

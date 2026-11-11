@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
+import { answerConfirm } from "@/test-utils/confirm";
 import type { Mission } from "../domain/mission";
 import { MissionsAdminView } from "./MissionsAdminView";
 
@@ -64,13 +65,15 @@ describe("MissionsAdminView", () => {
   });
 
   it("deletes a mission after confirming, and refreshes", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { props } = renderView();
 
     fireEvent.click(screen.getByRole("button", { name: `${copy.admin.missions.delete}: Misión ai-quiz` }));
+    // The dialog names the mission and what deleting means before anything is sent.
+    expect(await screen.findByRole("dialog", { name: "¿Eliminar la misión «Misión ai-quiz»?" })).toHaveTextContent(copy.admin.missions.confirmDelete);
+    expect(props.remove).not.toHaveBeenCalled();
+    await answerConfirm("confirm");
 
     await waitFor(() => expect(props.remove).toHaveBeenCalledWith({ id: "ai-quiz" }));
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining("Misión ai-quiz"));
     expect(await screen.findByText("«Misión ai-quiz» se eliminó.")).toHaveAttribute("role", "status");
     expect(refresh).toHaveBeenCalled();
   });
@@ -82,20 +85,21 @@ describe("MissionsAdminView", () => {
     expect(screen.getByRole("button", { name: `${copy.admin.missions.deactivate}: Misión ai-quiz` })).toBeInTheDocument();
   });
 
-  it("does nothing when the confirmation is declined", () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  it("does nothing when the confirmation is declined, and the dialog goes away", async () => {
     const { props } = renderView();
 
     fireEvent.click(screen.getByRole("button", { name: `${copy.admin.missions.delete}: Misión ai-quiz` }));
+    await answerConfirm("cancel");
 
     expect(props.remove).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("explains why a mission cannot be deleted", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     renderView(MISSIONS, { remove: vi.fn(async () => ({ ok: false as const, code: "has-completions" as const })) });
 
     fireEvent.click(screen.getByRole("button", { name: `${copy.admin.missions.delete}: Misión ai-quiz` }));
+    await answerConfirm("confirm");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.missions.errors["has-completions"]);
     expect(refresh).not.toHaveBeenCalled();

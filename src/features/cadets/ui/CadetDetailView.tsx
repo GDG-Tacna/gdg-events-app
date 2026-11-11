@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
-import { Button, ButtonLink, Card, InlineAlert, SelectField, TextAreaField, TextField } from "@/shared/ui";
+import { Button, ButtonLink, Card, InlineAlert, SelectField, TextAreaField, TextField, useConfirm } from "@/shared/ui";
 import { BAN_REASON_MAX } from "../domain/manage";
 import type { BanCadetAction, CadetActionResult, CadetDetailData, ChangeCadetSquadAction, DeleteCadetAction, RenameCadetAction, UnbanCadetAction } from "./actions";
 
@@ -46,6 +46,7 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban
   const [reason, setReason] = useState("");
   const [confirmAlias, setConfirmAlias] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
   const [notice, setNotice] = useState<Notice>(null);
 
   async function run(key: string, action: () => Promise<CadetActionResult>, success: string): Promise<boolean> {
@@ -77,7 +78,9 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban
   };
   const submitBan = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy !== null || !window.confirm(interpolate(t.confirmBan, { alias: cadet.alias }))) return;
+    if (busy !== null) return;
+    const yes = await confirm({ title: interpolate(t.confirmBanTitle, { alias: cadet.alias }), description: t.confirmBan, confirmLabel: t.ban });
+    if (!yes) return;
     if (await run("ban", () => ban({ uid: cadet.uid, reason }), interpolate(t.bannedDone, { alias: cadet.alias }))) setReason("");
   };
   async function submitDelete(event: FormEvent) {
@@ -227,6 +230,7 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban
           </form>
         </Card>
       ) : null}
+      {dialog}
     </div>
   );
 }

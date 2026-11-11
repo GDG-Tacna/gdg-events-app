@@ -6,7 +6,7 @@ import { useState } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, ButtonLink, Card, Icon, InlineAlert, SortableList, SquadArt } from "@/shared/ui";
+import { Button, ButtonLink, Card, Icon, InlineAlert, SortableList, SquadArt, useConfirm } from "@/shared/ui";
 import type { MoveSquadAction, SeedSquadsAction, SquadAdminActionResult, SquadIdAction, SquadView } from "./admin-actions";
 
 export interface SquadsAdminViewProps {
@@ -37,6 +37,7 @@ export function SquadsAdminView({ squads, eventFinished, seed, retire, reactivat
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   async function run(key: string, action: () => Promise<SquadAdminActionResult>, success?: string) {
     setBusy(key);
@@ -156,9 +157,13 @@ export function SquadsAdminView({ squads, eventFinished, seed, retire, reactivat
                           disabled={busy !== null}
                           loading={rowBusy && busy?.startsWith("delete")}
                           aria-label={`${copy.admin.squads.delete}: ${squad.name}`}
-                          onClick={() => {
-                            if (!window.confirm(interpolate(copy.admin.squads.confirmDelete, { name: squad.name }))) return;
-                            void run(`delete:${squad.id}`, () => remove({ id: squad.id }), interpolate(copy.admin.squads.deletedDone, { name: squad.name }));
+                          onClick={async () => {
+                            const yes = await confirm({
+                              title: interpolate(copy.admin.squads.confirmDeleteTitle, { name: squad.name }),
+                              description: copy.admin.squads.confirmDelete,
+                              confirmLabel: copy.admin.squads.delete,
+                            });
+                            if (yes) void run(`delete:${squad.id}`, () => remove({ id: squad.id }), interpolate(copy.admin.squads.deletedDone, { name: squad.name }));
                           }}
                         >
                           <Icon name="trash" size={16} />
@@ -184,6 +189,7 @@ export function SquadsAdminView({ squads, eventFinished, seed, retire, reactivat
           </Card>
         </>
       )}
+      {dialog}
     </div>
   );
 }

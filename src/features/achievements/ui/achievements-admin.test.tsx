@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
+import { answerConfirm } from "@/test-utils/confirm";
 import type { Badge } from "../domain/badge";
 import type { DeleteBadgeAction, MoveBadgeAction, SaveBadgeAction, SeedBadgesAction, SetBadgeActiveAction } from "./admin-actions";
 import type { UploadImageAction } from "@/features/media";
@@ -77,10 +78,10 @@ describe("BadgesAdminView", () => {
   });
 
   it("deletes a badge after confirming, says so and refreshes", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { remove } = setup();
 
     fireEvent.click(screen.getByRole("button", { name: `${t.delete}: Primer salto` }));
+    await answerConfirm("confirm");
 
     await vi.waitFor(() => expect(remove).toHaveBeenCalledWith({ id: "primer-salto" }));
     expect(await screen.findByText("La insignia «Primer salto» se eliminó.")).toHaveAttribute("role", "status");
@@ -88,14 +89,14 @@ describe("BadgesAdminView", () => {
   });
 
   it("does nothing when the confirmation is declined, and explains a refusal", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { remove } = setup(undefined, { remove: vi.fn<DeleteBadgeAction>(async () => ({ ok: false, code: "has-awards" })) });
 
     fireEvent.click(screen.getByRole("button", { name: `${t.delete}: Primer salto` }));
+    await answerConfirm("cancel");
     expect(remove).not.toHaveBeenCalled();
 
-    confirm.mockReturnValue(true);
     fireEvent.click(screen.getByRole("button", { name: `${t.delete}: Primer salto` }));
+    await answerConfirm("confirm");
     expect(await screen.findByText(t.errors["has-awards"])).toBeInTheDocument();
     expect(router.refresh).not.toHaveBeenCalled();
   });

@@ -3,13 +3,14 @@ import { cn } from "@/shared/lib/utils";
 import { Button as Primitive } from "./primitives/button";
 import { Icon, type IconName } from "./Icon";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary: "bg-primary text-primary-foreground hover:bg-primary/90",
   secondary: "bg-transparent text-foreground border border-input hover:bg-secondary",
   ghost: "bg-transparent text-muted-foreground hover:bg-secondary hover:text-foreground",
+  danger: "bg-danger text-on-accent hover:bg-danger/90",
 };
 
 const SIZE_CLASSES: Record<Size, string> = {

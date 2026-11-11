@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
+import { answerConfirm } from "@/test-utils/confirm";
 import type { Quadrant } from "../domain/quadrant";
 import { QuadrantsAdminView } from "./QuadrantsAdminView";
 
@@ -43,10 +44,10 @@ describe("QuadrantsAdminView", () => {
   });
 
   it("deletes a zone after confirming, says so and refreshes", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const { props } = renderView();
 
     fireEvent.click(screen.getByRole("button", { name: `${m.delete}: Google Cloud` }));
+    await answerConfirm("confirm");
 
     await waitFor(() => expect(props.remove).toHaveBeenCalledWith({ id: "cloud" }));
     expect(await screen.findByText(`La zona «Google Cloud» se eliminó.`)).toHaveAttribute("role", "status");
@@ -54,14 +55,14 @@ describe("QuadrantsAdminView", () => {
   });
 
   it("does nothing when the confirmation is declined, and explains a refusal", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     const { props } = renderView(QUADRANTS, { remove: vi.fn(async () => ({ ok: false as const, code: "has-missions" as const })) });
 
     fireEvent.click(screen.getByRole("button", { name: `${m.delete}: Google Cloud` }));
+    await answerConfirm("cancel");
     expect(props.remove).not.toHaveBeenCalled();
 
-    confirm.mockReturnValue(true);
     fireEvent.click(screen.getByRole("button", { name: `${m.delete}: Google Cloud` }));
+    await answerConfirm("confirm");
     expect(await screen.findByRole("alert")).toHaveTextContent(m.errors["has-missions"]);
     expect(refresh).not.toHaveBeenCalled();
   });

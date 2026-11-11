@@ -3,6 +3,7 @@ export const copy = {
   /** Words shared by several screens. */
   common: {
     close: "Cerrar",
+    cancel: "Cancelar",
     modalHint: "Pulsa Escape o Cerrar para volver a la lista.",
     dialogHint: "Pulsa Escape o Cerrar para salir sin guardar.",
     appliesToEdition: "Se aplica a la edición {id}",
@@ -775,6 +776,7 @@ export const copy = {
       closedDone: "«{question}» se cerró. Sus resultados quedan guardados.",
       removedDone: "«{question}» se eliminó.",
       confirmRemove: "¿Eliminar este borrador?",
+      confirmRemoveBody: "Se borra para siempre.",
       form: {
         createTitle: "Nueva encuesta",
         editTitle: "Editar encuesta",
@@ -1303,7 +1305,8 @@ export const copy = {
       deactivatedDone: "«{name}» ya no se muestra ni se otorga; quien la ganó la conserva.",
       delete: "Eliminar",
       /** Placeholder: {name}. */
-      confirmDelete: "¿Eliminar la insignia «{name}»? Se borra para siempre. Solo se puede si ningún cadete la ha ganado.",
+      confirmDeleteTitle: "¿Eliminar la insignia «{name}»?",
+      confirmDelete: "Se borra para siempre. Solo se puede si ningún cadete la ha ganado.",
       deletedDone: "La insignia «{name}» se eliminó.",
       form: {
         createTitle: "Nueva insignia",
@@ -1445,7 +1448,8 @@ export const copy = {
       reasonLabel: "Motivo del bloqueo",
       ban: "Bloquear cadete",
       /** Placeholder: {alias}. */
-      confirmBan: "¿Bloquear a {alias}? No podrá entrar a la app hasta que lo desbloquees.",
+      confirmBanTitle: "¿Bloquear a {alias}?",
+      confirmBan: "No podrá entrar a la app, a ninguna edición, hasta que lo desbloquees.",
       bannedDone: "{alias} quedó bloqueado.",
       /** Placeholder: {when}. */
       bannedSince: "Bloqueado desde {when}.",
@@ -1494,7 +1498,8 @@ export const copy = {
       deactivatedDone: "«{name}» ya no se muestra. Sus stands quedan como stands sin zona y sus misiones en «Otras misiones».",
       delete: "Eliminar",
       /** Placeholder: {name}. */
-      confirmDelete: "¿Eliminar la zona «{name}»? Se borra para siempre. Solo se puede si ninguna misión está asignada a ella.",
+      confirmDeleteTitle: "¿Eliminar la zona «{name}»?",
+      confirmDelete: "Se borra para siempre. Solo se puede si ninguna misión está asignada a ella.",
       deletedDone: "La zona «{name}» se eliminó.",
       planets: { cloud: "Google Cloud", firebase: "Firebase", android: "Android", ai: "AI", gdg: "Comunidad GDG" },
       quadrantForm: {
@@ -1626,7 +1631,8 @@ export const copy = {
       deactivatedDone: "«{title}» ya no se muestra a los cadetes. El XP que ganaron con ella se mantiene.",
       delete: "Eliminar",
       /** Placeholder: {title}. */
-      confirmDelete: "¿Eliminar «{title}»? Se borra para siempre. Solo se puede si ningún cadete la ha empezado.",
+      confirmDeleteTitle: "¿Eliminar la misión «{title}»?",
+      confirmDelete: "Se borra para siempre. Solo se puede si ningún cadete la ha empezado.",
       deletedDone: "«{title}» se eliminó.",
       xp: "{xp} XP",
       /** Placeholder: {name}. */
@@ -1935,7 +1941,8 @@ export const copy = {
       reactivatedDone: "«{name}» vuelve a ofrecerse.",
       delete: "Eliminar",
       /** Placeholder: {name}. */
-      confirmDelete: "¿Eliminar el escuadrón «{name}»? Se borra para siempre. Solo se puede si ningún cadete pertenece a él y nunca movió créditos.",
+      confirmDeleteTitle: "¿Eliminar el escuadrón «{name}»?",
+      confirmDelete: "Se borra para siempre. Solo se puede si ningún cadete pertenece a él y nunca movió créditos.",
       deletedDone: "El escuadrón «{name}» se eliminó.",
       form: {
         newTitle: "Nuevo escuadrón",
@@ -2129,7 +2136,8 @@ export const copy = {
       closedDone: "«{name}» está cerrado: ya no acepta escaneos.",
       delete: "Eliminar",
       /** Placeholder: {name}. */
-      confirmDelete: "¿Eliminar el puesto «{name}»? Se borra para siempre. Solo se puede si nadie hizo check-in allí y ninguna misión lo usa.",
+      confirmDeleteTitle: "¿Eliminar el puesto «{name}»?",
+      confirmDelete: "Se borra para siempre. Solo se puede si nadie hizo check-in allí y ninguna misión lo usa.",
       deletedDone: "El puesto «{name}» se eliminó.",
       /** Placeholder: {name}. */
       openedDone: "«{name}» está abierto.",
@@ -2173,7 +2181,8 @@ export const copy = {
       deactivatedDone: "«{title}» está cerrada: su QR ya no registra asistencia.",
       delete: "Eliminar",
       /** Placeholder: {title}. */
-      confirmDelete: "¿Eliminar la charla «{title}»? Se borra para siempre. Solo se puede si nadie registró asistencia y ninguna misión la usa.",
+      confirmDeleteTitle: "¿Eliminar la charla «{title}»?",
+      confirmDelete: "Se borra para siempre. Solo se puede si nadie registró asistencia y ninguna misión la usa.",
       deletedDone: "La charla «{title}» se eliminó.",
       form: {
         back: "Volver a las charlas",

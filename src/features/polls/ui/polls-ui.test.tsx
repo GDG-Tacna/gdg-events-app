@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
+import { answerConfirm } from "@/test-utils/confirm";
 import type { Poll } from "../domain/poll";
 import type { CadetPoll } from "../domain/vote";
 import type { PollResultsAction, PollStateAction, SavePollAction, VoteAction } from "./actions";
@@ -71,13 +72,15 @@ describe("PollsAdminView", () => {
 
   it("deletes a draft only after confirming", async () => {
     const { change, user } = renderList([poll("poll-draft")]);
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
 
     await user.click(screen.getByRole("button", { name: `${t.remove}: Pregunta poll-draft` }));
+    await answerConfirm("cancel");
     expect(change).not.toHaveBeenCalled();
+
     await user.click(screen.getByRole("button", { name: `${t.remove}: Pregunta poll-draft` }));
-    expect(change).toHaveBeenCalledWith({ id: "poll-draft", action: "delete" });
-    confirm.mockRestore();
+    expect(await screen.findByRole("dialog", { name: t.confirmRemove })).toHaveTextContent(t.confirmRemoveBody);
+    await answerConfirm("confirm");
+    await waitFor(() => expect(change).toHaveBeenCalledWith({ id: "poll-draft", action: "delete" }));
   });
 
   it("says when there are none, and has no detectable accessibility violations", async () => {

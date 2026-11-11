@@ -48,6 +48,7 @@ export { TerminalCard, type TerminalCardProps } from "./TerminalCard";
 export { ActionMenu, type ActionMenuProps } from "./ActionMenu";
 export { RouteModal, type RouteModalProps } from "./RouteModal";
 export { FormDialog, type FormDialogProps } from "./FormDialog";
+export { ConfirmDialog, useConfirm, type ConfirmDialogProps, type ConfirmOptions } from "./ConfirmDialog";
 export { SortableList, type SortableListProps } from "./SortableList";
 export { EditionTag } from "./EditionTag";
 export { MedalArt, type MedalArtProps } from "./MedalArt";

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, ButtonLink, Card, Icon, InlineAlert, PixelPlanet, SortableList } from "@/shared/ui";
+import { Button, ButtonLink, Card, Icon, InlineAlert, PixelPlanet, SortableList, useConfirm } from "@/shared/ui";
 import type { Quadrant } from "../domain/quadrant";
 import type { DeleteQuadrantAction, MoveQuadrantAction, SeedLayoutAction, SetQuadrantActiveAction } from "./admin-actions";
 
@@ -36,6 +36,7 @@ export function QuadrantsAdminView({ quadrants, defaultsCount, seed, setActive, 
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   async function run(key: string, action: () => Promise<{ ok: true } | { ok: false; code: keyof typeof copy.admin.map.errors }>, success?: (result: unknown) => string) {
     setBusy(key);
@@ -156,9 +157,13 @@ export function QuadrantsAdminView({ quadrants, defaultsCount, seed, setActive, 
                           disabled={busy !== null}
                           loading={busy === `delete:${quadrant.id}`}
                           aria-label={label(copy.admin.map.delete)}
-                          onClick={() => {
-                            if (!window.confirm(interpolate(copy.admin.map.confirmDelete, { name: quadrant.name }))) return;
-                            void run(`delete:${quadrant.id}`, () => remove({ id: quadrant.id }), () => interpolate(copy.admin.map.deletedDone, { name: quadrant.name }));
+                          onClick={async () => {
+                            const yes = await confirm({
+                              title: interpolate(copy.admin.map.confirmDeleteTitle, { name: quadrant.name }),
+                              description: copy.admin.map.confirmDelete,
+                              confirmLabel: copy.admin.map.delete,
+                            });
+                            if (yes) void run(`delete:${quadrant.id}`, () => remove({ id: quadrant.id }), () => interpolate(copy.admin.map.deletedDone, { name: quadrant.name }));
                           }}
                         >
                           <Icon name="trash" size={16} />
@@ -172,6 +177,7 @@ export function QuadrantsAdminView({ quadrants, defaultsCount, seed, setActive, 
           />
         )}
       </section>
+      {dialog}
     </div>
   );
 }

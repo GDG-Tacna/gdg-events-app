@@ -7,7 +7,7 @@ import { useState } from "react";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, ButtonLink, Card, Icon, InlineAlert, SortableList, type IconName } from "@/shared/ui";
+import { Button, ButtonLink, Card, Icon, InlineAlert, SortableList, useConfirm, type IconName } from "@/shared/ui";
 import type { Mission, MissionType } from "../domain/mission";
 import type { AdminOption, DeleteMissionAction, MissionAdminActionResult, MoveMissionAction, SeedMissionsAction, SetMissionActiveAction } from "./admin-actions";
 
@@ -49,6 +49,7 @@ export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, se
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
   const quadrantName = (id: string) => quadrants.find((quadrant) => quadrant.id === id)?.name ?? copy.admin.missions.otherQuadrant;
 
   async function run(key: string, action: () => Promise<MissionAdminActionResult>, success?: string) {
@@ -177,9 +178,13 @@ export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, se
                       disabled={busy !== null}
                       loading={busy === `delete:${mission.id}`}
                       aria-label={label(copy.admin.missions.delete)}
-                      onClick={() => {
-                        if (!window.confirm(interpolate(copy.admin.missions.confirmDelete, { title: mission.title }))) return;
-                        void run(`delete:${mission.id}`, () => remove({ id: mission.id }), interpolate(copy.admin.missions.deletedDone, { title: mission.title }));
+                      onClick={async () => {
+                        const yes = await confirm({
+                          title: interpolate(copy.admin.missions.confirmDeleteTitle, { title: mission.title }),
+                          description: copy.admin.missions.confirmDelete,
+                          confirmLabel: copy.admin.missions.delete,
+                        });
+                        if (yes) void run(`delete:${mission.id}`, () => remove({ id: mission.id }), interpolate(copy.admin.missions.deletedDone, { title: mission.title }));
                       }}
                     >
                       <Icon name="trash" size={16} />
@@ -192,6 +197,7 @@ export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, se
           }}
         />
       )}
+      {dialog}
     </div>
   );
 }
