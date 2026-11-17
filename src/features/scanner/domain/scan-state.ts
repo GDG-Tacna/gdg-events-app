@@ -1,4 +1,4 @@
-import type { CheckInErrorCode, ScanKind, ScanReward } from "@/features/checkins";
+import type { CheckInErrorCode, ScanContact, ScanKind, ScanReward } from "@/features/checkins";
 import type { CameraErrorCode } from "./camera";
 
 /** The scanned puesto as the cadet sees it: its name, description and image address. */
@@ -20,6 +20,8 @@ export type ScanOutcome =
       achievements: ReadonlyArray<{ id: string; name: string; tone: string; imageUrl?: string | null }>;
       /** Absent or null for a speaker's code. */
       checkpoint?: ScannedPlace | null;
+      /** The other cadet, for a contact code. */
+      contact?: ScanContact | null;
     }
   | { ok: false; code: CheckInErrorCode };
 

@@ -23,7 +23,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   {
     ...base("cloud-stand", "cloud", 10),
     title: "Visita el stand de Google Cloud",
-    description: "Escanea el QR impreso del Stand Google Cloud 1.",
+    description: "Escanea el QR que muestra la pantalla del Stand Google Cloud 1.",
     xp: DEFAULT_XP.stand,
     config: { type: "stand", checkpointId: "stand-cloud-1" },
   },
@@ -50,7 +50,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   {
     ...base("firebase-stand", "firebase", 20),
     title: "Visita el stand de Firebase",
-    description: "Escanea el QR impreso del Stand Firebase 1.",
+    description: "Escanea el QR que muestra la pantalla del Stand Firebase 1.",
     xp: DEFAULT_XP.stand,
     config: { type: "stand", checkpointId: "stand-firebase-1" },
   },
@@ -77,7 +77,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   {
     ...base("android-stand", "android", 30),
     title: "Visita el stand de Android",
-    description: "Escanea el QR impreso del Stand Android 1.",
+    description: "Escanea el QR que muestra la pantalla del Stand Android 1.",
     xp: DEFAULT_XP.stand,
     config: { type: "stand", checkpointId: "stand-android-1" },
   },
@@ -104,7 +104,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   {
     ...base("ai-stand", "ai", 40),
     title: "Visita el stand de AI",
-    description: "Escanea el QR impreso del Stand AI 1.",
+    description: "Escanea el QR que muestra la pantalla del Stand AI 1.",
     xp: DEFAULT_XP.stand,
     config: { type: "stand", checkpointId: "stand-ai-1" },
   },
@@ -131,7 +131,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   {
     ...base("community-stand", "community", 50),
     title: "Visita el stand de la comunidad",
-    description: "Escanea el QR impreso del Stand Comunidad GDG 1.",
+    description: "Escanea el QR que muestra la pantalla del Stand Comunidad GDG 1.",
     xp: DEFAULT_XP.stand,
     config: { type: "stand", checkpointId: "stand-community-1" },
   },

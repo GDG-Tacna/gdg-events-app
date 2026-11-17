@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import type { RecordCheckInAction } from "@/features/checkins";
+import { useEffect, useRef, type ReactNode } from "react";
+import type { RecordCheckInAction, ScanContact } from "@/features/checkins";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { Button, ButtonLink, Card, Icon, PixelCoin, Thumbnail, UnlockedBadges } from "@/shared/ui";
@@ -24,6 +24,8 @@ export interface ScannerViewProps {
   passHref?: string;
   /** The missions board, offered when the scan completed a mission (absent when missions are off). */
   missionsHref?: string;
+  /** How the other cadet is shown when a contact code was scanned (the network feature draws it; absent: just the alias). */
+  renderContact?: (contact: ScanContact) => ReactNode;
 }
 
 interface Message {
@@ -34,6 +36,7 @@ interface Message {
 /** The words for an outcome. A repeat is not an error: the attendee already had this checkpoint. */
 export function messageFor(outcome: ScanOutcome): Message {
   if (!outcome.ok) return copy.scanner.errors[outcome.code];
+  if (outcome.kind === "contact") return outcome.recorded ? copy.scanner.success.contact : copy.scanner.alreadyContact;
   if (!outcome.recorded) return copy.scanner.already;
   if (outcome.kind === "entrance") return outcome.firstEntrance ? copy.scanner.success.firstEntrance : copy.scanner.success.entrance;
   return copy.scanner.success[outcome.kind];
@@ -44,7 +47,7 @@ export function messageFor(outcome: ScanOutcome): Message {
  * of the last code with what to do next. Everything about the code is decided by the server; this
  * screen only shows the camera and the answer.
  */
-export function ScannerView({ camera: Camera, record, homeHref, achievementsHref, networkHref, passHref, missionsHref }: ScannerViewProps) {
+export function ScannerView({ camera: Camera, record, homeHref, achievementsHref, networkHref, passHref, missionsHref, renderContact }: ScannerViewProps) {
   const { state, camera, cameraKey, start, scanAgain } = useScanner(record);
   const resultRef = useRef<HTMLHeadingElement>(null);
 
@@ -56,8 +59,8 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
   const done = state.status === "done" ? state.outcome : null;
   const message = done ? messageFor(done) : state.status === "camera-error" ? copy.scanner.cameraErrors[state.code] : null;
   const succeeded = done?.ok === true;
-  // Another cadet's contact code: the way forward is the Red, so scanning again steps back.
-  const toNetwork = done && !done.ok && (done.code === "contact-code" || done.code === "pass-code") ? networkHref : undefined;
+  // Another cadet's pass (only staff scan it) or a contact just made: the way forward is the Red, so scanning again steps back.
+  const toNetwork = done && ((!done.ok && done.code === "pass-code") || (done.ok && done.kind === "contact")) ? networkHref : undefined;
   // A printed station code: the way forward is showing the cadet's own QR to the staff.
   const toPass = done && !done.ok && done.code === "staff-station" ? passHref : undefined;
   // Missions this scan just completed: the board shows them with a celebration, so the way forward is there.
@@ -123,6 +126,8 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
               </div>
             ) : null}
 
+            {done?.ok && done.contact ? (renderContact ? renderContact(done.contact) : <p className="type-label text-foreground">{done.contact.card.alias}</p>) : null}
+
             {done?.ok ? <UnlockedBadges badges={done.achievements} href={achievementsHref} /> : null}
 
             {done?.ok && done.talkCredits > 0 ? (
@@ -155,7 +160,7 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
 
             <div className="gap-space-3 flex flex-col">
               {toMissions ? <ButtonLink href={toMissions}>{justCompleted.length === 1 ? copy.scanner.viewMission : copy.scanner.viewMissions}</ButtonLink> : null}
-              {toNetwork ? <ButtonLink href={toNetwork}>{copy.scanner.toNetwork}</ButtonLink> : null}
+              {toNetwork ? <ButtonLink href={toNetwork}>{done?.ok ? copy.scanner.toContacts : copy.scanner.toNetwork}</ButtonLink> : null}
               {toPass ? <ButtonLink href={toPass}>{copy.scanner.toPass}</ButtonLink> : null}
               {state.status === "camera-error" ? (
                 <Button onClick={() => void start()}>{copy.scanner.retry}</Button>
