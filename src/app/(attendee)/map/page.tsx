@@ -44,7 +44,7 @@ export default async function MapPage({ searchParams }: PageProps<"/map">) {
   return (
     <>
       <SpaceBackground />
-      <main className="px-space-4 pt-safe-space-6 pb-space-6 min-[760px]:pt-safe-space-8 min-[760px]:pb-space-8 gap-space-5 mx-auto flex w-full max-w-[520px] flex-col min-[760px]:max-w-[880px]">
+      <main className="px-space-4 pt-space-4 pb-space-6 min-[760px]:pt-space-4 min-[760px]:pb-space-8 gap-space-5 mx-auto flex w-full max-w-[520px] flex-col min-[760px]:max-w-[880px]">
         {planOn && FEATURES.checkins ? (
           <nav aria-label={copy.map.views.label} className="bg-surface border-border p-space-1 grid grid-cols-2 rounded-md border">
             {VIEWS.map((option) => (

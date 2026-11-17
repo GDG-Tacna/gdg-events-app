@@ -1,9 +1,7 @@
 import type { ReactNode } from "react";
 import type { AvatarLook } from "@/shared/ui";
-import { SignOutButton } from "@/features/auth";
 import { copy } from "@/shared/copy/es";
 import type { PixelSpriteData } from "@/shared/types/pixel";
-import { BrandMark } from "@/shared/ui";
 import type { DashboardOverview, SquadCalloutKind } from "../domain/overview";
 import { PlayerCard } from "./PlayerCard";
 import { SquadCallout } from "./SquadCallout";
@@ -40,7 +38,7 @@ export interface DashboardViewProps {
 }
 
 /**
- * The cadet's dashboard, an arcade terminal: the brand with sign out on the header (the QR and the Red are on the card), the compact
+ * The cadet's dashboard, an arcade terminal (the brand and sign out are in the attendee shell's header, the QR and the Red are on the card): the compact
  * cadet card (and their place in the ranking), then the "Terminal de misión" with every entry. One column
  * up to 520px; from 760px the cadet's column on the left and the terminal on the right. Data arrives ready.
  */
@@ -64,12 +62,6 @@ export function DashboardView({
   const t = copy.dashboard;
   return (
     <div className="gap-space-5 flex flex-col">
-      <header className="gap-space-3 flex items-start justify-between">
-        <BrandMark />
-        <div className="gap-space-2 flex shrink-0 items-center">
-          <SignOutButton variant="icon" />
-        </div>
-      </header>
       <h1 className="sr-only">{t.title}</h1>
 
       <div className="gap-space-5 grid min-[760px]:grid-cols-2 min-[760px]:items-start">

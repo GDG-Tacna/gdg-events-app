@@ -68,7 +68,7 @@ export default async function DashboardPage() {
   return (
     <>
       <SpaceBackground />
-      <main className="px-space-4 pt-safe-space-6 pb-safe-space-6 mx-auto w-full max-w-[520px] min-[760px]:max-w-[960px]">
+      <main className="px-space-4 pt-space-4 pb-safe-space-6 mx-auto w-full max-w-[520px] min-[760px]:max-w-[880px]">
         <ScreenEnter>
           <DashboardView
             overview={overview.value}
