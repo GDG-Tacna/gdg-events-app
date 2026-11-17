@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DevFest Space Arcade · Odisea de Código
 
-## Getting Started
+Event companion web app for DevFest Tacna 2026: a mobile-first PWA where attendees ("cadets") check in with QR codes, complete missions, earn XP and G-Credits, climb a leaderboard and play small arcade mini-games. Staff and organizers run the event from an admin panel and a stage screen.
 
-First, run the development server:
+Next.js (TypeScript strict) · Firebase (Firestore + Auth) · Tailwind + shadcn/ui · Vitest + Playwright.
+
+## Where things are written down
+
+| Read | For |
+| --- | --- |
+| `docs/ROADMAP.md` | The product and its phases |
+| `docs/architecture.md` | Layers, folder rules and the decisions log |
+| `docs/DESIGN-SYSTEM.md` | Tokens, components and voice |
+| `docs/progress.md` | What is built and what is not yet verified |
+| `docs/deploy.md` | Deployment and the load test |
+| `CONTRIBUTING.md` | How we work as a team |
+
+## Run it locally
+
+Requirements: Node 22 (`.nvmrc`), and for the emulators Java and the Firebase CLI.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
+cp .env.example .env.local   # then fill it in, see below
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Use the emulators, not the event's Firebase project
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The real project holds the event's data. Develop against the emulators (or a separate development project):
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. In `.env.local` set `NEXT_PUBLIC_USE_FIREBASE_EMULATOR=true`, `FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099` and `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080` (they are in `.env.example`).
+2. Start them: `npx firebase-tools emulators:start` (ports are in `firebase.json`).
+3. Generate your own `QR_SIGNING_SECRET` (the command is in `.env.example`).
 
-## Learn More
+Never put the event project's service account key on a personal machine unless you are the one deploying. Scripts under `scripts/` that write data (`talks:seed`, `talks:missions`, `load:*`) run against whatever project your `.env.local` points to.
 
-To learn more about Next.js, take a look at the following resources:
+## Commands
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server |
+| `npm run typecheck` | `next typegen` and `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm test` | Unit tests (Vitest) |
+| `npm run e2e` | End-to-end tests (Playwright) |
+| `npm run build:check` | Production build in its own folder, safe while `npm run dev` runs |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The same typecheck, lint and tests run on every pull request (`.github/workflows/ci.yml`).

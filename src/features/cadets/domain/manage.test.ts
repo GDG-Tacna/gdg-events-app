@@ -4,17 +4,21 @@ import {
   banCadet,
   changeCadetSquad,
   deleteCadet,
+  foldForSearch,
   getCadet,
   listCadets,
+  matchesCadet,
   renameCadet,
   unbanCadet,
   type CadetAccount,
   type CadetAuditEntry,
+  type CadetIdentity,
   type CadetPage,
   type CadetRecord,
   type CadetRemoval,
   type CadetsActor,
   type CadetsDeps,
+  type IndexedCadet,
 } from "./manage";
 
 const NOW = new Date("2026-11-20T12:00:00Z");
@@ -39,9 +43,34 @@ const ACCOUNT: CadetAccount = { email: "nova@example.com", displayName: "Nova Ca
 const REMOVAL: CadetRemoval = { alias: "Nova", checkIns: 2, missions: 1, badges: 0, contacts: 0 };
 const PAGE: CadetPage = { cadets: [RECORD], next: null, total: 1 };
 
+const cadetRow = (uid: string, alias: string, squad: string | null = null): IndexedCadet => ({
+  uid,
+  alias,
+  aliasKey: alias.toLowerCase(),
+  squad,
+  xp: 0,
+  credits: 0,
+  createdAt: null,
+  attendedAt: null,
+  banned: false,
+});
+/** The edition a search reads whole (out of alias order on purpose). */
+const ALL: IndexedCadet[] = [cadetRow("u-nova", "Nova", "firebase"), cadetRow("u-mia", "Mia", "angular"), cadetRow("u-zeta", "Zeta", "firebase"), cadetRow("u-renee", "Renée", "old-squad")];
+const IDENTITIES = new Map<string, CadetIdentity>([
+  ["u-nova", { email: "nova@example.com", displayName: "Nova Cadet" }],
+  ["u-mia", { email: "mia@uni.edu", displayName: null }],
+  ["u-zeta", { email: "zeta@example.com", displayName: "José Pérez" }],
+]);
+const SQUAD_NAMES = new Map([
+  ["firebase", "Firebase"],
+  ["angular", "Angular"],
+  ["old-squad", "Legado"],
+]);
+
 interface Setup {
   record?: CadetRecord | null;
   account?: Result<CadetAccount | null, { code: string }>;
+  identities?: Result<ReadonlyMap<string, CadetIdentity>, { code: string }>;
   rename?: Result<{ before: string } | "taken" | null, { code: string }>;
   squad?: Result<{ before: string | null } | null, { code: string }>;
   ban?: Result<{ wasBanned: boolean } | null, { code: string }>;
@@ -50,7 +79,7 @@ interface Setup {
   disable?: Result<void, { code: string }>;
 }
 
-function setup({ record = RECORD, account = ok(ACCOUNT), rename = ok({ before: "Nova" }), squad = ok({ before: "firebase" }), ban = ok({ wasBanned: false }), remove = ok(REMOVAL), squads = ok(true), disable = ok(undefined) }: Setup = {}) {
+function setup({ record = RECORD, account = ok(ACCOUNT), identities = ok(new Map<string, CadetIdentity>()), rename = ok({ before: "Nova" }), squad = ok({ before: "firebase" }), ban = ok({ wasBanned: false }), remove = ok(REMOVAL), squads = ok(true), disable = ok(undefined) }: Setup = {}) {
   const entries: CadetAuditEntry[] = [];
   const deps = {
     store: {
@@ -60,10 +89,11 @@ function setup({ record = RECORD, account = ok(ACCOUNT), rename = ok({ before: "
       setSquad: vi.fn(async () => squad),
       setBan: vi.fn(async () => ban),
       remove: vi.fn(async () => remove),
+      listAll: vi.fn(async (): Promise<Result<{ cadets: readonly IndexedCadet[]; total: number }, { code: string }>> => ok({ cadets: ALL, total: 9 })),
     },
-    accounts: { lookup: vi.fn(async () => account), setDisabled: vi.fn(async () => disable) },
+    accounts: { lookup: vi.fn(async () => account), lookupMany: vi.fn(async () => identities), setDisabled: vi.fn(async () => disable) },
     aliases: { check: vi.fn((raw: string) => (raw.trim().length >= 3 ? ok({ display: raw.trim(), key: raw.trim().toLowerCase() }) : err("too-short"))) },
-    squads: { exists: vi.fn(async () => squads) },
+    squads: { exists: vi.fn(async () => squads), names: vi.fn(async (): Promise<Result<ReadonlyMap<string, string>, { code: string }>> => ok(SQUAD_NAMES)) },
     audit: { append: vi.fn(async (entry: CadetAuditEntry) => (entries.push(entry), ok(undefined))) },
     now: () => NOW,
   } satisfies CadetsDeps;
@@ -98,22 +128,39 @@ describe("everything is for admins only", () => {
 });
 
 describe("listCadets", () => {
-  it("asks for a page of the edition's cadets by the start of an alias, normalized", async () => {
+  it("without a search, asks for a page of the edition's cadets by alias", async () => {
     const { deps } = setup();
 
-    expect(await listCadets(deps, ADMIN, { search: "  NoVa ", after: "mia" })).toEqual(ok(PAGE));
+    await listCadets(deps, ADMIN, { search: "   ", after: "mia" });
 
-    expect(deps.store.list).toHaveBeenCalledWith({ search: "nova", after: "mia", limit: 25 });
+    expect(deps.store.list).toHaveBeenCalledWith({ after: "mia", limit: 25 });
+    expect(deps.store.listAll).not.toHaveBeenCalled();
   });
 
-  it("starts from the beginning without a search or a cursor, and ignores a cursor that is absurdly long", async () => {
+  it("adds each cadet's real name and email from their account, in one batch for the page", async () => {
+    const { deps } = setup({ identities: ok(new Map([[RECORD.uid, { email: "nova@example.com", displayName: "Nova Real" }]])) });
+
+    expect(await listCadets(deps, ADMIN, {})).toEqual(ok({ cadets: [{ ...RECORD, identity: { email: "nova@example.com", displayName: "Nova Real" } }], next: null, total: 1 }));
+    expect(deps.accounts.lookupMany).toHaveBeenCalledTimes(1);
+    expect(deps.accounts.lookupMany).toHaveBeenCalledWith([RECORD.uid]);
+  });
+
+  it("still lists the cadets, without name and email, when the accounts cannot be read or one is gone", async () => {
+    const failing = setup({ identities: err({ code: "x" }) });
+    const gone = setup({ identities: ok(new Map()) });
+
+    expect(await listCadets(failing.deps, ADMIN, {})).toEqual(ok({ cadets: [{ ...RECORD, identity: null }], next: null, total: 1 }));
+    expect(await listCadets(gone.deps, ADMIN, {})).toEqual(ok({ cadets: [{ ...RECORD, identity: null }], next: null, total: 1 }));
+  });
+
+  it("starts from the beginning without a cursor, and ignores a cursor that is absurdly long", async () => {
     const { deps } = setup();
 
     await listCadets(deps, ADMIN, {});
-    await listCadets(deps, ADMIN, { search: "x".repeat(100), after: "y".repeat(100) });
+    await listCadets(deps, ADMIN, { after: "y".repeat(100) });
 
-    expect(deps.store.list).toHaveBeenNthCalledWith(1, { search: "", after: null, limit: 25 });
-    expect(deps.store.list).toHaveBeenNthCalledWith(2, { search: "x".repeat(40), after: null, limit: 25 });
+    expect(deps.store.list).toHaveBeenNthCalledWith(1, { after: null, limit: 25 });
+    expect(deps.store.list).toHaveBeenNthCalledWith(2, { after: null, limit: 25 });
   });
 
   it("reports a failed read", async () => {
@@ -121,6 +168,79 @@ describe("listCadets", () => {
     deps.store.list.mockResolvedValueOnce(err({ code: "x" }));
 
     expect(await listCadets(deps, ADMIN, {})).toEqual(err({ code: "unknown" }));
+  });
+
+  describe("with a search", () => {
+    const search = (query: string, after: string | null = null, deps = setup({ identities: ok(IDENTITIES) }).deps) => listCadets(deps, ADMIN, { search: query, after });
+    const aliases = async (query: string, after: string | null = null, deps?: CadetsDeps) => {
+      const listed = await search(query, after, deps as ReturnType<typeof setup>["deps"] | undefined);
+      return listed.ok ? listed.value.cadets.map((cadet) => cadet.alias) : listed;
+    };
+
+    it("finds by any part of the alias, ignoring case, accents and extra spaces", async () => {
+      expect(await aliases("  OV ")).toEqual(["Nova"]);
+      expect(await aliases("rene")).toEqual(["Renée"]);
+    });
+
+    it("finds by the account's name and email, and shows them on each match", async () => {
+      expect(await aliases("jose")).toEqual(["Zeta"]);
+      expect(await aliases("perez")).toEqual(["Zeta"]);
+      expect(await aliases("@uni.edu")).toEqual(["Mia"]);
+
+      const listed = await search("zeta");
+      expect(listed.ok && listed.value.cadets[0]?.identity).toEqual({ email: "zeta@example.com", displayName: "José Pérez" });
+    });
+
+    it("finds by the squad's name or id, retired squads included", async () => {
+      expect(await aliases("fire")).toEqual(["Nova", "Zeta"]);
+      expect(await aliases("legado")).toEqual(["Renée"]);
+      expect(await aliases("old-squad")).toEqual(["Renée"]);
+    });
+
+    it("orders by alias key and keeps the edition's total, not the matches", async () => {
+      const listed = await search("a");
+
+      expect(listed.ok && listed.value.cadets.map((cadet) => cadet.alias)).toEqual(["Mia", "Nova", "Renée", "Zeta"]);
+      expect(listed.ok && listed.value.total).toBe(9);
+      expect(listed.ok && "aliasKey" in (listed.value.cadets[0] ?? {})).toBe(false);
+    });
+
+    it("says it found nothing", async () => {
+      expect(await aliases("zzz")).toEqual([]);
+    });
+
+    it("pages the matches with the alias key as the cursor", async () => {
+      const { deps } = setup();
+      const many: IndexedCadet[] = Array.from({ length: 30 }, (_, at) => cadetRow(`u-${at}`, `Cad${String(at).padStart(2, "0")}`));
+      deps.store.listAll.mockResolvedValue(ok({ cadets: many, total: 30 }));
+
+      const first = await listCadets(deps, ADMIN, { search: "cad" });
+      expect(first.ok && first.value.cadets).toHaveLength(25);
+      expect(first.ok && first.value.next).toBe("cad24");
+
+      const second = await listCadets(deps, ADMIN, { search: "cad", after: "cad24" });
+      expect(second.ok && second.value.cadets.map((cadet) => cadet.alias)).toEqual(["Cad25", "Cad26", "Cad27", "Cad28", "Cad29"]);
+      expect(second.ok && second.value.next).toBeNull();
+    });
+
+    it("still finds by alias and squad id when the accounts or the squads' names cannot be read", async () => {
+      const { deps } = setup({ identities: err({ code: "x" }) });
+      deps.squads.names.mockResolvedValue(err({ code: "x" }));
+
+      expect(await aliases("jose", null, deps)).toEqual([]);
+      expect(await aliases("firebase", null, deps)).toEqual(["Nova", "Zeta"]);
+      expect(await aliases("mi", null, deps)).toEqual(["Mia"]);
+    });
+
+    it("reads the accounts of every cadet of the edition in one lookup, and reports a failed read", async () => {
+      const { deps } = setup({ identities: ok(IDENTITIES) });
+      await listCadets(deps, ADMIN, { search: "x" });
+      expect(deps.accounts.lookupMany).toHaveBeenCalledTimes(1);
+      expect(deps.accounts.lookupMany).toHaveBeenCalledWith(["u-nova", "u-mia", "u-zeta", "u-renee"]);
+
+      deps.store.listAll.mockResolvedValueOnce(err({ code: "x" }));
+      expect(await listCadets(deps, ADMIN, { search: "nova" })).toEqual(err({ code: "unknown" }));
+    });
   });
 });
 
@@ -296,5 +416,16 @@ describe("deleteCadet", () => {
 
     expect(await deleteCadet(deps, GLOBAL, { uid: UID })).toEqual(ok(REMOVAL));
     expect(console.error).toHaveBeenCalled();
+  });
+});
+
+describe("matchesCadet", () => {
+  it("matches any of the fields, folded, and skips the missing ones", () => {
+    expect(matchesCadet("jose", { alias: "Zeta", displayName: "José" })).toBe(true);
+    expect(matchesCadet("jose", { alias: "Zeta", displayName: null, email: null, squadId: null })).toBe(false);
+  });
+
+  it("folds a search the same way as the fields", () => {
+    expect(foldForSearch("  ÁNGEL   Ruiz ")).toBe("angel ruiz");
   });
 });

@@ -15,7 +15,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 const t = copy.admin.cadets;
 const HREFS = { list: "/admin/cadetes", detailBase: "/admin/cadetes" };
 
-const ROW = (uid: string, alias: string, extra: Partial<CadetRow> = {}): CadetRow => ({ uid, alias, squadName: "Firebase", xp: 1200, credits: 30, attended: true, banned: false, ...extra });
+const ROW = (uid: string, alias: string, extra: Partial<CadetRow> = {}): CadetRow => ({ uid, alias, name: "Ana Quispe", email: "ana@example.com", squadName: "Firebase", xp: 1200, credits: 30, attended: true, banned: false, ...extra });
 
 describe("CadetsListView", () => {
   const renderList = (props: Partial<Parameters<typeof CadetsListView>[0]> = {}) =>
@@ -32,6 +32,16 @@ describe("CadetsListView", () => {
     expect(items[1]).toHaveTextContent(t.banned);
     expect(screen.getByRole("link", { name: "Nova" })).toHaveAttribute("href", "/admin/cadetes/u1");
     expect(screen.getByText(/42 en total/)).toBeInTheDocument();
+  });
+
+  it("shows each cadet's real name and email under the alias, or says they are missing", () => {
+    renderList({ cadets: [ROW("u1", "Nova"), ROW("u2", "Mia", { name: null, email: null })] });
+
+    const items = within(screen.getByRole("list", { name: t.listLabel })).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Ana Quispe");
+    expect(items[0]).toHaveTextContent("ana@example.com");
+    expect(items[1]).toHaveTextContent(t.noName);
+    expect(items[1]).toHaveTextContent(t.noEmail);
   });
 
   it("searches with a plain form that keeps the search in the box", () => {
@@ -59,7 +69,7 @@ describe("CadetsListView", () => {
     unmount();
 
     renderList({ cadets: [], total: 3, search: "zz" });
-    expect(screen.getByText("Ningún alias empieza con «zz».")).toBeInTheDocument();
+    expect(screen.getByText("Ningún cadete coincide con «zz».")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: t.clear })).toHaveAttribute("href", "/admin/cadetes");
   });
 

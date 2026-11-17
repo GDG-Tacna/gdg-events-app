@@ -3,7 +3,10 @@ import type { Auth } from "firebase-admin/auth";
 import { getAdminAuth } from "@/shared/lib/firebase/admin";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
-import type { AccountDirectory, CadetAccount } from "../../domain/manage";
+import type { AccountDirectory, CadetAccount, CadetIdentity } from "../../domain/manage";
+
+/** The most accounts the Admin SDK reads in one call. */
+const LOOKUP_BATCH = 100;
 
 const isNotFound = (cause: unknown) => typeof cause === "object" && cause !== null && (cause as { code?: unknown }).code === "auth/user-not-found";
 
@@ -23,6 +26,21 @@ export class FirebaseAccountDirectory implements AccountDirectory {
     } catch (cause) {
       if (isNotFound(cause)) return ok(null);
       logServerError("cadets.accounts.lookup", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async lookupMany(uids: readonly string[]): Promise<Result<ReadonlyMap<string, CadetIdentity>, { code: string }>> {
+    try {
+      const auth = this.getAuth();
+      const found = new Map<string, CadetIdentity>();
+      for (let start = 0; start < uids.length; start += LOOKUP_BATCH) {
+        const batch = await auth.getUsers(uids.slice(start, start + LOOKUP_BATCH).map((uid) => ({ uid })));
+        for (const user of batch.users) found.set(user.uid, { email: user.email ?? null, displayName: user.displayName ?? null });
+      }
+      return ok(found);
+    } catch (cause) {
+      logServerError("cadets.accounts.lookupMany", cause);
       return err({ code: "unknown" });
     }
   }

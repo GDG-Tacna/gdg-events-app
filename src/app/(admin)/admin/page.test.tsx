@@ -19,7 +19,7 @@ vi.mock("@/features/insights/server", () => insightsServer);
 const { default: AdminHomePage } = await import("./page");
 
 const OVERVIEW = {
-  current: { eventId: "devfest-2026", registered: 200, attended: 150, talkCheckIns: 320, standVisits: 90, missionsCompleted: 410, contacts: 75, rations: [{ checkpointId: "lunch", name: "Almuerzo", count: 120 }] },
+  current: { eventId: "devfest-2026", registered: 200, attended: 150, talkCheckIns: 320, standVisits: 90, missionsCompleted: 410, contacts: 75, squads: [{ squadId: "firebase", name: "Firebase", count: 120 }], withoutSquad: 0, rations: [{ checkpointId: "lunch", name: "Almuerzo", count: 120 }] },
   past: [{ eventId: "devfest-2025", registered: 180, attended: 140 }],
 };
 

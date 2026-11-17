@@ -19,6 +19,10 @@ export const cadetsDeps: CadetsDeps = {
       const listed = await squadStore.list();
       return listed.ok ? ok(listed.value.some((squad) => squad.id === id)) : err({ code: "unknown" });
     },
+    names: async () => {
+      const listed = await squadStore.list();
+      return listed.ok ? ok(new Map(listed.value.map((squad) => [squad.id, squad.name] as const))) : err({ code: "unknown" });
+    },
   },
   audit: new FirestoreAuditLog(),
   now: () => new Date(),

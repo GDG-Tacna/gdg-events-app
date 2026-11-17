@@ -64,6 +64,31 @@ export function InsightsPanel({ overview, cadetsHref }: InsightsPanelProps) {
         </ul>
       </section>
 
+      <Card className="gap-space-3 flex flex-col">
+        <h2 className="type-title text-foreground">{t.squadsTitle}</h2>
+        {current.squads.length === 0 ? (
+          <p className="type-body-sm text-muted-foreground">{t.noSquads}</p>
+        ) : (
+          <ul aria-label={t.squadsTitle} className="gap-space-2 flex flex-col">
+            {current.squads.map((squad) => (
+              <li key={squad.squadId} className="border-border gap-space-3 py-space-2 flex items-center justify-between border-b last:border-b-0">
+                <span className="type-label text-foreground">{squad.name}</span>
+                <span className="type-title text-cyan tabular-nums">
+                  {formatNumber(squad.count)}
+                  {share(squad.count, current.registered) ? <span className="type-caption text-text-subtle ml-space-2">{share(squad.count, current.registered)}</span> : null}
+                </span>
+              </li>
+            ))}
+            {current.withoutSquad > 0 ? (
+              <li className="border-border gap-space-3 py-space-2 flex items-center justify-between border-b last:border-b-0">
+                <span className="type-label text-muted-foreground">{t.withoutSquad}</span>
+                <span className="type-title text-muted-foreground tabular-nums">{formatNumber(current.withoutSquad)}</span>
+              </li>
+            ) : null}
+          </ul>
+        )}
+      </Card>
+
       <div className="gap-space-4 grid grid-cols-1 min-[760px]:grid-cols-2">
         <Card className="gap-space-3 flex flex-col">
           <h2 className="type-title text-foreground">{t.rationsTitle}</h2>

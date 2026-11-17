@@ -1,0 +1,17 @@
+# Who is asked to review a pull request that touches these paths.
+# Replace @OWNER-USERNAME with the maintainer's GitHub username (or a team such as @GDG-Tacna/maintainers) before relying on this file.
+
+# Everything, unless a rule below says otherwise.
+*                              @OWNER-USERNAME
+
+# Security: who may read or write what, and how the server trusts the client.
+/firestore.rules               @OWNER-USERNAME
+/src/app-shell/permissions*    @OWNER-USERNAME
+/src/app-shell/guards*         @OWNER-USERNAME
+/src/features/ephemeral-qr/    @OWNER-USERNAME
+/src/features/auth/            @OWNER-USERNAME
+
+# Deployment, secrets and the repo's own workflow.
+/apphosting.yaml               @OWNER-USERNAME
+/.github/                      @OWNER-USERNAME
+/scripts/                      @OWNER-USERNAME

@@ -4,7 +4,7 @@ import { squadStore } from "@/app-shell/composition/squads.server";
 import { requireRole } from "@/app-shell/guards";
 import { requireSection } from "@/app-shell/permissions.server";
 import { CadetsListView } from "@/features/cadets";
-import { listCadets } from "@/features/cadets/server";
+import { CADETS_SEARCH_MAX, listCadets } from "@/features/cadets/server";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { ScreenEnter } from "@/shared/ui";
@@ -17,7 +17,7 @@ export default async function AdminCadetsPage({ searchParams }: PageProps<"/admi
   const session = await requireRole(["admin"]);
   await requireSection(session, "cadets");
   const params = await searchParams;
-  const search = first(params.q).slice(0, 40);
+  const search = first(params.q).slice(0, CADETS_SEARCH_MAX);
   const after = first(params.despues) || null;
 
   const [page, squads] = await Promise.all([listCadets(cadetsDeps, { uid: session.uid, role: session.role }, { search, after }), squadStore.list()]);
@@ -34,6 +34,8 @@ export default async function AdminCadetsPage({ searchParams }: PageProps<"/admi
         cadets={page.value.cadets.map((cadet) => ({
           uid: cadet.uid,
           alias: cadet.alias,
+          name: cadet.identity?.displayName ?? null,
+          email: cadet.identity?.email ?? null,
           squadName: cadet.squad ? (squadNames.get(cadet.squad) ?? cadet.squad) : null,
           xp: cadet.xp,
           credits: cadet.credits,

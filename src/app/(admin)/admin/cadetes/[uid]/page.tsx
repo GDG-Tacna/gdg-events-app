@@ -32,6 +32,8 @@ export default async function AdminCadetPage({ params }: PageProps<"/admin/cadet
         cadet={{
           uid: cadet.uid,
           alias: cadet.alias,
+          name: account?.displayName ?? null,
+          email: account?.email ?? null,
           squad: cadet.squad,
           squadName: cadet.squad ? (squadOptions.find((squad) => squad.id === cadet.squad)?.name ?? cadet.squad) : null,
           xp: cadet.xp,
