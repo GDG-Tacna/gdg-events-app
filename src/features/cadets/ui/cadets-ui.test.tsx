@@ -69,7 +69,7 @@ describe("CadetsListView", () => {
     unmount();
 
     renderList({ cadets: [], total: 3, search: "zz" });
-    expect(screen.getByText("Ningún alias empieza con «zz».")).toBeInTheDocument();
+    expect(screen.getByText("Ningún cadete coincide con «zz».")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: t.clear })).toHaveAttribute("href", "/admin/cadetes");
   });
 

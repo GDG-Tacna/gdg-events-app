@@ -1414,14 +1414,14 @@ export const copy = {
       title: "Cadetes",
       /** Placeholder: {n}. */
       subtitle: "Quién se registró en esta edición ({n} en total). Entra a un cadete para cambiar su alias o escuadrón, bloquearlo o eliminar un registro hecho por error.",
-      searchLabel: "Buscar por alias",
-      searchPlaceholder: "Empieza a escribir un alias",
+      searchLabel: "Buscar cadetes",
+      searchPlaceholder: "Alias, nombre, correo o escuadrón",
       search: "Buscar",
       clear: "Ver todos",
       listLabel: "Cadetes de la edición",
       empty: "Todavía no se registró ningún cadete.",
       /** Placeholder: {q}. */
-      noResults: "Ningún alias empieza con «{q}».",
+      noResults: "Ningún cadete coincide con «{q}».",
       more: "Ver más cadetes",
       noSquad: "Sin escuadrón",
       noName: "Sin nombre en su cuenta",
