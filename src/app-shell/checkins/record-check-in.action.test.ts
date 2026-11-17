@@ -79,6 +79,11 @@ describe("recordCheckInAction", () => {
     },
   );
 
+  it("tells a cadet who scans another cadet's personal pass that the pass is for staff", async () => {
+    expect(await recordCheckInAction("devfest:at:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA")).toEqual({ ok: false, code: "pass-code" });
+    expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
+  });
+
   it("points a cadet's contact code to the Red, or treats it as any other code with the network off", async () => {
     expect(await recordCheckInAction("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA")).toEqual({ ok: false, code: "contact-code" });
     expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();

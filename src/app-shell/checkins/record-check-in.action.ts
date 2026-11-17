@@ -12,6 +12,7 @@ import { recordCheckIn } from "@/features/checkins/server";
 import { rewardTalk } from "@/features/economy/server";
 import { completeByCheckpoint, completeBySpeaker } from "@/features/missions/server";
 import { isContactCode } from "@/features/network";
+import { isPassCode } from "@/features/pass";
 import { isSpeakerCode } from "@/features/speakers";
 import { verifySpeakerCode } from "@/features/speakers/server";
 import { FEATURES } from "@/shared/config/features";
@@ -43,6 +44,8 @@ export async function recordCheckInAction(payload: string): Promise<RecordCheckI
   if (!parsed.success) return { ok: false, code: "invalid-code" };
   // Another cadet's contact code: say where it is scanned instead of calling it invalid.
   if ((await moduleOn("network")) && isContactCode(parsed.data)) return { ok: false, code: "contact-code" };
+  // A cadet's personal pass is for staff to scan: say so instead of calling it «not a DevFest code».
+  if (isPassCode(parsed.data)) return { ok: false, code: "pass-code" };
   if (isSpeakerCode(parsed.data)) return meetSpeaker(session.uid, parsed.data);
 
   const result = await recordCheckIn(checkInDeps, { uid: session.uid, payload: parsed.data });

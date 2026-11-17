@@ -256,6 +256,20 @@ describe("ScannerView results", () => {
     view.unmount();
   });
 
+  it("points another cadet's personal pass to the Red as well, since only staff scan it", async () => {
+    const { scanner, see } = fakeScanner();
+    const record = vi.fn(async () => ({ ok: false, code: "pass-code" }) as const);
+    const view = render(<ScannerView camera={scanner} record={record} homeHref="/dashboard" networkHref="/red" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await see("devfest:at:someone");
+
+    expect(screen.getByRole("heading", { level: 2, name: copy.scanner.errors["pass-code"].title })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: copy.scanner.toNetwork })).toHaveAttribute("href", "/red");
+    view.unmount();
+  });
+
   it("points a printed station code to the cadet's own QR, which staff scan there", async () => {
     const { scanner, see } = fakeScanner();
     const record = vi.fn(async () => ({ ok: false, code: "staff-station" }) as const);
