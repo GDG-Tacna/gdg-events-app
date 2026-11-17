@@ -19,7 +19,7 @@ export interface CadetsListViewProps {
 const chip = "type-caption border-line-strong text-foreground px-space-3 rounded-full border py-1";
 
 /**
- * The Cadetes screen: everyone registered in the edition, by alias, with a search by the start of the alias and a link
+ * The Cadetes screen: everyone registered in the edition, by alias, each with their real name and email, with a search by the start of the alias and a link
  * to each one's page. It only shows (the search is a plain form, the next page a plain link): no state, no client code.
  */
 export function CadetsListView({ cadets, total, search, nextHref, hrefs }: CadetsListViewProps) {
@@ -73,6 +73,8 @@ export function CadetsListView({ cadets, total, search, nextHref, hrefs }: Cadet
                       {cadet.alias}
                     </Link>
                   </p>
+                  <p className="type-caption text-foreground truncate">{cadet.name ?? t.noName}</p>
+                  <p className="type-caption text-muted-foreground truncate">{cadet.email ?? t.noEmail}</p>
                   <p className="type-caption text-muted-foreground">
                     {cadet.squadName ?? t.noSquad} · {interpolate(t.xp, { xp: formatNumber(cadet.xp) })}
                   </p>

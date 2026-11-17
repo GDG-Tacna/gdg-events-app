@@ -10,6 +10,7 @@ import {
   unbanCadet,
   type CadetAccount,
   type CadetAuditEntry,
+  type CadetIdentity,
   type CadetPage,
   type CadetRecord,
   type CadetRemoval,
@@ -42,6 +43,7 @@ const PAGE: CadetPage = { cadets: [RECORD], next: null, total: 1 };
 interface Setup {
   record?: CadetRecord | null;
   account?: Result<CadetAccount | null, { code: string }>;
+  identities?: Result<ReadonlyMap<string, CadetIdentity>, { code: string }>;
   rename?: Result<{ before: string } | "taken" | null, { code: string }>;
   squad?: Result<{ before: string | null } | null, { code: string }>;
   ban?: Result<{ wasBanned: boolean } | null, { code: string }>;
@@ -50,7 +52,7 @@ interface Setup {
   disable?: Result<void, { code: string }>;
 }
 
-function setup({ record = RECORD, account = ok(ACCOUNT), rename = ok({ before: "Nova" }), squad = ok({ before: "firebase" }), ban = ok({ wasBanned: false }), remove = ok(REMOVAL), squads = ok(true), disable = ok(undefined) }: Setup = {}) {
+function setup({ record = RECORD, account = ok(ACCOUNT), identities = ok(new Map<string, CadetIdentity>()), rename = ok({ before: "Nova" }), squad = ok({ before: "firebase" }), ban = ok({ wasBanned: false }), remove = ok(REMOVAL), squads = ok(true), disable = ok(undefined) }: Setup = {}) {
   const entries: CadetAuditEntry[] = [];
   const deps = {
     store: {
@@ -61,7 +63,7 @@ function setup({ record = RECORD, account = ok(ACCOUNT), rename = ok({ before: "
       setBan: vi.fn(async () => ban),
       remove: vi.fn(async () => remove),
     },
-    accounts: { lookup: vi.fn(async () => account), setDisabled: vi.fn(async () => disable) },
+    accounts: { lookup: vi.fn(async () => account), lookupMany: vi.fn(async () => identities), setDisabled: vi.fn(async () => disable) },
     aliases: { check: vi.fn((raw: string) => (raw.trim().length >= 3 ? ok({ display: raw.trim(), key: raw.trim().toLowerCase() }) : err("too-short"))) },
     squads: { exists: vi.fn(async () => squads) },
     audit: { append: vi.fn(async (entry: CadetAuditEntry) => (entries.push(entry), ok(undefined))) },
@@ -101,9 +103,25 @@ describe("listCadets", () => {
   it("asks for a page of the edition's cadets by the start of an alias, normalized", async () => {
     const { deps } = setup();
 
-    expect(await listCadets(deps, ADMIN, { search: "  NoVa ", after: "mia" })).toEqual(ok(PAGE));
+    await listCadets(deps, ADMIN, { search: "  NoVa ", after: "mia" });
 
     expect(deps.store.list).toHaveBeenCalledWith({ search: "nova", after: "mia", limit: 25 });
+  });
+
+  it("adds each cadet's real name and email from their account, in one batch for the page", async () => {
+    const { deps } = setup({ identities: ok(new Map([[RECORD.uid, { email: "nova@example.com", displayName: "Nova Real" }]])) });
+
+    expect(await listCadets(deps, ADMIN, {})).toEqual(ok({ cadets: [{ ...RECORD, identity: { email: "nova@example.com", displayName: "Nova Real" } }], next: null, total: 1 }));
+    expect(deps.accounts.lookupMany).toHaveBeenCalledTimes(1);
+    expect(deps.accounts.lookupMany).toHaveBeenCalledWith([RECORD.uid]);
+  });
+
+  it("still lists the cadets, without name and email, when the accounts cannot be read or one is gone", async () => {
+    const failing = setup({ identities: err({ code: "x" }) });
+    const gone = setup({ identities: ok(new Map()) });
+
+    expect(await listCadets(failing.deps, ADMIN, {})).toEqual(ok({ cadets: [{ ...RECORD, identity: null }], next: null, total: 1 }));
+    expect(await listCadets(gone.deps, ADMIN, {})).toEqual(ok({ cadets: [{ ...RECORD, identity: null }], next: null, total: 1 }));
   });
 
   it("starts from the beginning without a search or a cursor, and ignores a cursor that is absurdly long", async () => {

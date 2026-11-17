@@ -4,6 +4,9 @@ import type { CadetsErrorCode } from "../domain/manage";
 export interface CadetRow {
   uid: string;
   alias: string;
+  /** The name and email of their sign-in account; `null` when the account could not be read or has none. */
+  name: string | null;
+  email: string | null;
   squadName: string | null;
   xp: number;
   credits: number;

@@ -34,6 +34,8 @@ export default async function AdminCadetsPage({ searchParams }: PageProps<"/admi
         cadets={page.value.cadets.map((cadet) => ({
           uid: cadet.uid,
           alias: cadet.alias,
+          name: cadet.identity?.displayName ?? null,
+          email: cadet.identity?.email ?? null,
           squadName: cadet.squad ? (squadNames.get(cadet.squad) ?? cadet.squad) : null,
           xp: cadet.xp,
           credits: cadet.credits,

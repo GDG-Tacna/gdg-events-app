@@ -39,6 +39,18 @@ export interface CadetAccount {
   disabled: boolean;
 }
 
+/** Who a cadet is by name: what their sign-in account says (the list shows it next to the alias). */
+export interface CadetIdentity {
+  email: string | null;
+  displayName: string | null;
+}
+
+/** A cadet in the list: the profile plus their account's name and email, `null` when the account could not be read. */
+export interface CadetListItem extends CadetSummary {
+  identity: CadetIdentity | null;
+}
+
+/** What the store answers: profiles only, no accounts. */
 export interface CadetPage {
   cadets: readonly CadetSummary[];
   /** The alias key to ask the next page after, or `null` at the end. */
@@ -54,6 +66,13 @@ export interface CadetRemoval {
   missions: number;
   badges: number;
   contacts: number;
+}
+
+/** A page of the list, with each cadet's name and email. */
+export interface CadetListPage {
+  cadets: readonly CadetListItem[];
+  next: string | null;
+  total: number;
 }
 
 export const CADETS_PAGE_SIZE = 25;
@@ -98,6 +117,8 @@ export interface CadetStore {
 
 /** The sign-in accounts (the identity provider answers it). */
 export interface AccountDirectory {
+  /** The name and email of several accounts at once; an account that does not exist is simply absent from the map. */
+  lookupMany(uids: readonly string[]): Promise<Result<ReadonlyMap<string, CadetIdentity>, { code: string }>>;
   /** `null` when the account does not exist. */
   lookup(uid: string): Promise<Result<CadetAccount | null, { code: string }>>;
   /** Disables or enables the account. Disabling also signs the person out everywhere, so it applies at once. */
@@ -139,16 +160,24 @@ async function audit(deps: Pick<CadetsDeps, "audit" | "now">, entry: Omit<CadetA
   if (!written.ok) logServerError("cadets.audit.append", new Error(`audit entry missing for ${entry.targetUid}`));
 }
 
-/** One page of the edition's cadets, by alias; `search` keeps those whose alias starts with it. */
+/**
+ * One page of the edition's cadets, by alias; `search` keeps those whose alias starts with it. Each cadet comes with the
+ * name and email of their account; if the accounts cannot be read the list still shows, without them.
+ */
 export async function listCadets(
-  deps: Pick<CadetsDeps, "store">,
+  deps: Pick<CadetsDeps, "store" | "accounts">,
   actor: CadetsActor,
   query: { search?: string; after?: string | null },
-): Promise<Result<CadetPage, CadetsError>> {
+): Promise<Result<CadetListPage, CadetsError>> {
   if (forbidden(actor)) return err(cadetsError("forbidden"));
   const search = (query.search ?? "").normalize("NFC").trim().toLowerCase().slice(0, 40);
   const listed = await deps.store.list({ search, after: query.after && query.after.length <= 80 ? query.after : null, limit: CADETS_PAGE_SIZE });
-  return listed.ok ? ok(listed.value) : err(cadetsError("unknown"));
+  if (!listed.ok) return err(cadetsError("unknown"));
+
+  const identities = await deps.accounts.lookupMany(listed.value.cadets.map((cadet) => cadet.uid));
+  if (!identities.ok) logServerError("cadets.list.accounts", new Error(identities.error.code));
+  const cadets = listed.value.cadets.map((cadet) => ({ ...cadet, identity: identities.ok ? (identities.value.get(cadet.uid) ?? null) : null }));
+  return ok({ cadets, next: listed.value.next, total: listed.value.total });
 }
 
 /** A cadet's record with the account behind it (email, whether it is disabled). */
