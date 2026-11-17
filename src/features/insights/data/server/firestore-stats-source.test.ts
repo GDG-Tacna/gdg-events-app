@@ -44,7 +44,7 @@ const E = "events/devfest-2026";
 const fake = () =>
   fakeFirestore(
     {
-      [`${E}/participants`]: { a: { attendedAt: new Date() }, b: {}, c: { attendedAt: new Date() } },
+      [`${E}/participants`]: { a: { attendedAt: new Date(), squad: "firebase" }, b: { squad: "firebase" }, c: { attendedAt: new Date(), squad: "angular" } },
       [`${E}/checkins`]: { 1: { kind: "talk", checkpointId: "keynote" }, 2: { kind: "stand", checkpointId: "stand-1" }, 3: { kind: "catering", checkpointId: "lunch" }, 4: { kind: "catering", checkpointId: "lunch" } },
       [`${E}/checkpoints`]: { lunch: { kind: "catering", name: "Almuerzo" }, coffee: { kind: "catering" }, keynote: { kind: "talk", name: "Keynote" } },
       [`${E}/missionCompletions`]: { x: { status: "completed" }, y: { status: "failed" } },
@@ -74,6 +74,16 @@ describe("FirestoreStatsSource", () => {
     ]);
   });
 
+  it("counts the cadets of one squad", async () => {
+    const f = fake();
+    const stats = new FirestoreStatsSource(() => f.db);
+
+    expect(await stats.squadMembers("devfest-2026", "firebase")).toEqual({ ok: true, value: 2 });
+    expect(await stats.squadMembers("devfest-2026", "angular")).toEqual({ ok: true, value: 1 });
+    expect(await stats.squadMembers("devfest-2026", "gemini")).toEqual({ ok: true, value: 0 });
+    expect(f.queries).toContain(`${E}/participants?squad==firebase`);
+  });
+
   it("lists every edition, including one whose own document was never written", async () => {
     expect(await new FirestoreStatsSource(() => fake().db).editions()).toEqual({ ok: true, value: ["devfest-2025", "devfest-2026"] });
   });
@@ -96,7 +106,7 @@ describe("FirestoreStatsSource", () => {
       throw new Error("down");
     });
 
-    for (const call of [() => broken.editions(), () => broken.registered("e"), () => broken.attended("e"), () => broken.contacts("e"), () => broken.rations("e")]) {
+    for (const call of [() => broken.editions(), () => broken.registered("e"), () => broken.attended("e"), () => broken.contacts("e"), () => broken.squadMembers("e", "s"), () => broken.rations("e")]) {
       expect(await call()).toEqual({ ok: false, error: { code: "unknown" } });
     }
   });

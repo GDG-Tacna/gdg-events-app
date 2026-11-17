@@ -64,6 +64,10 @@ export class FirestoreStatsSource implements StatsSource {
     return this.count("contacts", (db) => eventCollection(db, eventId, CONTACTS_COLLECTION));
   }
 
+  squadMembers(eventId: string, squadId: string) {
+    return this.count("squadMembers", (db) => eventCollection(db, eventId, PARTICIPANTS_COLLECTION).where("squad", "==", squadId));
+  }
+
   async rations(eventId: string): Promise<Result<ReadonlyArray<{ checkpointId: string; name: string; count: number }>, { code: string }>> {
     try {
       const db = this.getDb();

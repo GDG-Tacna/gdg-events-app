@@ -74,7 +74,7 @@ beforeEach(() => {
 
 describe("admin cadets list page", () => {
   beforeEach(() => {
-    server.listCadets.mockResolvedValue({ ok: true, value: { cadets: [CADET], next: "nova", total: 40 } });
+    server.listCadets.mockResolvedValue({ ok: true, value: { cadets: [{ ...CADET, identity: { email: "nova@example.com", displayName: "Nova Real" } }], next: "nova", total: 40 } });
   });
 
   it("checks the admin role and the section itself before reading anything", async () => {
@@ -93,7 +93,7 @@ describe("admin cadets list page", () => {
 
     expect(server.listCadets).toHaveBeenCalledWith({ marker: "cadets" }, { uid: "a1", role: "admin" }, { search: "no", after: null });
     expect(view?.props).toEqual({
-      cadets: [{ uid: "cadet-0001", alias: "Nova", squadName: "Firebase", xp: 120, credits: 30, attended: true, banned: false }],
+      cadets: [{ uid: "cadet-0001", alias: "Nova", name: "Nova Real", email: "nova@example.com", squadName: "Firebase", xp: 120, credits: 30, attended: true, banned: false }],
       total: 40,
       search: "no",
       nextHref: "/admin/cadetes?q=no&despues=nova",

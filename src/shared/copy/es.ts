@@ -1424,6 +1424,8 @@ export const copy = {
       noResults: "Ningún alias empieza con «{q}».",
       more: "Ver más cadetes",
       noSquad: "Sin escuadrón",
+      noName: "Sin nombre en su cuenta",
+      noEmail: "Sin correo",
       /** Placeholder: {xp}. */
       xp: "{xp} XP",
       /** Placeholder: {n}. */
@@ -2020,6 +2022,9 @@ export const copy = {
         /** Placeholder: {pct}, a percentage of the cadets registered. */
         attendedShare: "{pct} de los registrados",
       },
+      squadsTitle: "Cadetes por escuadrón",
+      noSquads: "Aún no hay escuadrones.",
+      withoutSquad: "Sin escuadrón",
       rationsTitle: "Raciones entregadas",
       noRations: "Aún no hay puestos de catering.",
       pastTitle: "Ediciones anteriores",
