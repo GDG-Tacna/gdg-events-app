@@ -370,6 +370,10 @@ export const copy = {
       forbidden: { title: "Esta cuenta no puede escanear", body: "Solo los cadetes registran asistencia." },
       disabled: { title: "Escáner no disponible", body: "El registro por QR no está disponible por ahora." },
       unknown: { title: "No pudimos verificar el código", body: "Inténtalo de nuevo." },
+      "pass-code": {
+        title: "Es el pase de otro cadete",
+        body: "El pase solo lo escanea el staff. Para conectar con otro cadete, pídele que abra la Red y escanea el código que muestra ahí.",
+      },
       "contact-code": { title: "Es el código de un cadete", body: "Para conectar con otro cadete, escanéalo desde la Red." },
       "staff-station": {
         title: "Este QR lo escanea el staff",

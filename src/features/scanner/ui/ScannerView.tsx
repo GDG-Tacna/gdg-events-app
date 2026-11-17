@@ -57,7 +57,7 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
   const message = done ? messageFor(done) : state.status === "camera-error" ? copy.scanner.cameraErrors[state.code] : null;
   const succeeded = done?.ok === true;
   // Another cadet's contact code: the way forward is the Red, so scanning again steps back.
-  const toNetwork = done && !done.ok && done.code === "contact-code" ? networkHref : undefined;
+  const toNetwork = done && !done.ok && (done.code === "contact-code" || done.code === "pass-code") ? networkHref : undefined;
   // A printed station code: the way forward is showing the cadet's own QR to the staff.
   const toPass = done && !done.ok && done.code === "staff-station" ? passHref : undefined;
   // Missions this scan just completed: the board shows them with a celebration, so the way forward is there.
