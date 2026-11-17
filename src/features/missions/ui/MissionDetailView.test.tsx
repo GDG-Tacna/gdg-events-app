@@ -182,16 +182,17 @@ describe("MissionDetailView", () => {
     expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
   });
 
-  it("sends a stand mission to the cadet's own QR (the staff scan it at the stand), never to the scanner", () => {
+  it("sends a stand mission to the scanner (the stand's screen), and also offers the cadet's own QR for staff to scan", () => {
     const { unmount } = renderView(STAND);
 
     expect(screen.getByText(copy.missions.howTo.stand)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: copy.missions.scan })).toHaveAttribute("href", "/scan");
     expect(screen.getByRole("link", { name: copy.missions.showQr })).toHaveAttribute("href", "/pass");
-    expect(screen.queryByRole("link", { name: copy.missions.scan })).not.toBeInTheDocument();
     unmount();
 
-    // With check-ins off there is no QR to show: the explanation stays, without a button.
+    // With check-ins off there is no QR to show: only the scanner stays.
     renderView(STAND, undefined, { passHref: undefined });
+    expect(screen.getByRole("link", { name: copy.missions.scan })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
   });
 

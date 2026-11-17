@@ -156,12 +156,11 @@ export function MissionDetailView({ mission, answer, backHref, scanHref, passHre
       {answerable && (mission.config.type === "talk" || mission.config.type === "stand" || mission.config.type === "speaker") ? (
         <Card className="gap-space-4 flex flex-col">
           <p className="type-body text-foreground">{copy.missions.howTo[mission.config.type]}</p>
-          {mission.config.type !== "stand" ? (
-            <ButtonLink href={scanHref} variant="primary">
-              {copy.missions.scan}
-            </ButtonLink>
-          ) : passHref ? (
-            <ButtonLink href={passHref} variant="primary">
+          <ButtonLink href={scanHref} variant="primary">
+            {copy.missions.scan}
+          </ButtonLink>
+          {mission.config.type === "stand" && passHref ? (
+            <ButtonLink href={passHref} variant="secondary">
               {copy.missions.showQr}
             </ButtonLink>
           ) : null}

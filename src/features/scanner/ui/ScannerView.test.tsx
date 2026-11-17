@@ -242,17 +242,36 @@ describe("ScannerView results", () => {
     expect(screen.queryByRole("link", { name: copy.scanner.toNetwork })).not.toBeInTheDocument();
   });
 
-  it("points a cadet's contact code to the Red, when it is on", async () => {
+  it("shows the other cadet and what the contact paid when a contact code is scanned, with a way to the contacts", async () => {
     const { scanner, see } = fakeScanner();
-    const record = vi.fn(async () => ({ ok: false, code: "contact-code" }) as const);
-    const view = render(<ScannerView camera={scanner} record={record} homeHref="/dashboard" networkHref="/red" />);
+    const contact = { card: { alias: "Mia", squad: "Gemini", links: { linkedin: null, github: null, web: null } }, created: true, xpEarned: 20, creditsEarned: 5, capReached: false };
+    const record = vi.fn(async () => ({ ok: true, checkpointId: "contact", kind: "contact", recorded: true, firstEntrance: false, contact }) as const);
+    const view = render(
+      <ScannerView camera={scanner} record={record} homeHref="/dashboard" networkHref="/red" renderContact={(found) => <p>Tarjeta de {found.card.alias}</p>} />,
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     await see("devfest:ct:someone");
 
-    expect(screen.getByRole("heading", { level: 2, name: copy.scanner.errors["contact-code"].title })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: copy.scanner.toNetwork })).toHaveAttribute("href", "/red");
+    expect(screen.getByRole("heading", { level: 2, name: copy.scanner.success.contact.title })).toBeInTheDocument();
+    expect(screen.getByText("Tarjeta de Mia")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: copy.scanner.toContacts })).toHaveAttribute("href", "/red");
+    view.unmount();
+  });
+
+  it("says when the two were already contacts, and falls back to the alias without a card renderer", async () => {
+    const { scanner, see } = fakeScanner();
+    const contact = { card: { alias: "Mia", squad: null, links: { linkedin: null, github: null, web: null } }, created: false, xpEarned: 0, creditsEarned: 0, capReached: false };
+    const record = vi.fn(async () => ({ ok: true, checkpointId: "contact", kind: "contact", recorded: false, firstEntrance: false, contact }) as const);
+    const view = render(<ScannerView camera={scanner} record={record} homeHref="/dashboard" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await see("devfest:ct:someone");
+
+    expect(screen.getByRole("heading", { level: 2, name: copy.scanner.alreadyContact.title })).toBeInTheDocument();
+    expect(screen.getByText("Mia")).toBeInTheDocument();
     view.unmount();
   });
 

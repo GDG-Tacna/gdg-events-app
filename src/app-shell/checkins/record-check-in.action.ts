@@ -7,7 +7,8 @@ import { speakerCodeDeps } from "@/app-shell/composition/speakers.server";
 import { currentEconomy, rewardLedger } from "@/app-shell/composition/economy.server";
 import { missionDeps } from "@/app-shell/composition/missions.server";
 import { getSession } from "@/app-shell/guards";
-import type { RecordCheckInActionResult, ScanReward } from "@/features/checkins";
+import { connectContactAction } from "@/app-shell/network/network.actions";
+import type { CheckInErrorCode, RecordCheckInActionResult, ScanReward } from "@/features/checkins";
 import { recordCheckIn } from "@/features/checkins/server";
 import { rewardTalk } from "@/features/economy/server";
 import { completeByCheckpoint, completeBySpeaker } from "@/features/missions/server";
@@ -42,8 +43,8 @@ export async function recordCheckInAction(payload: string): Promise<RecordCheckI
 
   const parsed = payloadSchema.safeParse(payload);
   if (!parsed.success) return { ok: false, code: "invalid-code" };
-  // Another cadet's contact code: say where it is scanned instead of calling it invalid.
-  if ((await moduleOn("network")) && isContactCode(parsed.data)) return { ok: false, code: "contact-code" };
+  // Another cadet's contact code: the same scanner makes the contact (what the Red's own scanner does).
+  if ((await moduleOn("network")) && isContactCode(parsed.data)) return connectContact(parsed.data);
   // A cadet's personal pass is for staff to scan: say so instead of calling it «not a DevFest code».
   if (isPassCode(parsed.data)) return { ok: false, code: "pass-code" };
   if (isSpeakerCode(parsed.data)) return meetSpeaker(session.uid, parsed.data);
@@ -66,6 +67,38 @@ export async function recordCheckInAction(payload: string): Promise<RecordCheckI
   // Whatever this scan earned (a talk, a stand, its missions) may unlock badges; never fails the check-in.
   const achievements = await unlockAchievements(session.uid);
   return { ok: true, ...result.value, missions, talkCredits, achievements };
+}
+
+/** The scanner's words for what the Red can refuse; the link errors cannot come from a scan. */
+const CONTACT_ERRORS: Record<string, CheckInErrorCode> = {
+  "invalid-code": "invalid-code",
+  "expired-code": "expired-code",
+  self: "own-contact-code",
+  "unknown-cadet": "unknown-cadet",
+  "not-registered": "not-registered",
+  unauthenticated: "unauthenticated",
+  forbidden: "forbidden",
+  disabled: "disabled",
+};
+
+/**
+ * Another cadet's contact code: makes the two contacts through the Red's action (which checks the session, the code and
+ * pays both) and answers in the scanner's shape. It is not a check-in, so it never counts for the key metric.
+ */
+async function connectContact(payload: string): Promise<RecordCheckInActionResult> {
+  const connected = await connectContactAction(payload);
+  if (!connected.ok) return { ok: false, code: CONTACT_ERRORS[connected.code] ?? "unknown" };
+  const { card, created, xpEarned, creditsEarned, capReached, achievements } = connected;
+  // `checkpointId` names no puesto here: a contact is between cadets.
+  return {
+    ok: true,
+    checkpointId: "contact",
+    kind: "contact",
+    recorded: created,
+    firstEntrance: false,
+    contact: { card, created, xpEarned, creditsEarned, capReached },
+    achievements,
+  };
 }
 
 /**

@@ -323,7 +323,7 @@ export const copy = {
   scanner: {
     title: "Escáner de salto",
     videoLabel: "Vista de la cámara",
-    hint: "Apunta al código QR del puesto.",
+    hint: "Apunta al código QR de una charla, un stand, un speaker o de otro cadete.",
     sending: "Verificando el código…",
     retry: "Reintentar",
     scanAgain: "Escanear otro código",
@@ -349,7 +349,9 @@ export const copy = {
       catering: { title: "¡Suministros registrados!", body: "Tu paso por este puesto quedó registrado." },
       stand: { title: "¡Stand visitado!", body: "Tu visita a este stand quedó registrada." },
       speaker: { title: "¡Speaker encontrado!", body: "Escaneaste el código de este speaker." },
+      contact: { title: "¡Nuevo contacto!", body: "Ya están conectados. Su tarjeta está en tus contactos." },
     },
+    alreadyContact: { title: "Ya eran contactos", body: "Este cadete ya estaba en tu red: no suma dos veces." },
     already: { title: "Ya estabas registrado", body: "Este puesto ya contaba para ti: no se suma dos veces." },
     missions: { label: "Misiones de este puesto", completed: "Misión completada", already: "Ya la habías completado", xp: "+{xp} XP", credits: "+{n} G-Credits" },
     viewMission: "Ver misión",
@@ -372,15 +374,17 @@ export const copy = {
       unknown: { title: "No pudimos verificar el código", body: "Inténtalo de nuevo." },
       "pass-code": {
         title: "Es el pase de otro cadete",
-        body: "El pase solo lo escanea el staff. Para conectar con otro cadete, pídele que abra la Red y escanea el código que muestra ahí.",
+        body: "El pase solo lo escanea el staff. Para conectar con otro cadete, pídele que abra la Red y muestre su código de contacto.",
       },
-      "contact-code": { title: "Es el código de un cadete", body: "Para conectar con otro cadete, escanéalo desde la Red." },
+      "own-contact-code": { title: "Ese es tu propio código", body: "Escanea el código de otro cadete." },
+      "unknown-cadet": { title: "Cadete no encontrado", body: "Ese cadete no está registrado en esta edición." },
       "staff-station": {
         title: "Este QR lo escanea el staff",
         body: "En el catering, muestra tu QR personal y el staff lo escanea. En la entrada y los stands, escanea el código que aparece en su pantalla.",
       },
     },
     toNetwork: "Ir a la Red",
+    toContacts: "Ver mis contactos",
     toPass: "Mostrar mi QR",
   },
   stage: {

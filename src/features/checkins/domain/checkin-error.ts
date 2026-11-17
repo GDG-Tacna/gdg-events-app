@@ -10,8 +10,10 @@ export type CheckInErrorCode =
   | "own-speaker-code"
   | "not-registered"
   | "rate-limited"
-  /** A cadet's contact code (phase 5): it belongs in the Red, not at a checkpoint. */
-  | "contact-code"
+  /** A cadet scanning their own contact code. */
+  | "own-contact-code"
+  /** A contact code of someone who is not a cadet of this edition. */
+  | "unknown-cadet"
   /** A cadet's personal pass: only staff scan it. Another cadet's way to connect is the Red. */
   | "pass-code"
   /** A printed station code (entrance, catering, stand): staff scan the cadet's pass there now. */

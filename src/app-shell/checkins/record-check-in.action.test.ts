@@ -24,6 +24,9 @@ vi.mock("@/app-shell/guards", () => guards);
 const checkinsServer = { recordCheckIn: vi.fn() };
 vi.mock("@/features/checkins/server", () => checkinsServer);
 
+const network = vi.hoisted(() => ({ connectContactAction: vi.fn() }));
+vi.mock("@/app-shell/network/network.actions", () => network);
+
 const features = vi.hoisted(() => ({ FEATURES: { checkins: true, missions: true, network: true } }));
 vi.mock("@/shared/config/features", () => features);
 
@@ -84,13 +87,39 @@ describe("recordCheckInAction", () => {
     expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
   });
 
-  it("points a cadet's contact code to the Red, or treats it as any other code with the network off", async () => {
-    expect(await recordCheckInAction("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA")).toEqual({ ok: false, code: "contact-code" });
-    expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
+  it("makes the contact for a cadet's contact code through the Red, never as a check-in", async () => {
+    const card = { alias: "Bruno", squad: "Gemini", links: { linkedin: null, github: null, web: null } };
+    network.connectContactAction.mockResolvedValue({ ok: true, card, created: true, xpEarned: 20, creditsEarned: 5, capReached: false, achievements: [{ id: "a", name: "Red", tone: "cyan" }] });
 
+    expect(await recordCheckInAction("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA")).toEqual({
+      ok: true,
+      checkpointId: "contact",
+      kind: "contact",
+      recorded: true,
+      firstEntrance: false,
+      contact: { card, created: true, xpEarned: 20, creditsEarned: 5, capReached: false },
+      achievements: [{ id: "a", name: "Red", tone: "cyan" }],
+    });
+    expect(network.connectContactAction).toHaveBeenCalledWith("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA");
+    expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("answers a contact repeated as not recorded, and translates what the Red refuses", async () => {
+    const card = { alias: "Bruno", squad: null, links: { linkedin: null, github: null, web: null } };
+    network.connectContactAction.mockResolvedValueOnce({ ok: true, card, created: false, xpEarned: 0, creditsEarned: 0, capReached: false, achievements: [] });
+    expect(await recordCheckInAction("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA")).toMatchObject({ ok: true, kind: "contact", recorded: false });
+
+    for (const [refused, expected] of [["self", "own-contact-code"], ["unknown-cadet", "unknown-cadet"], ["expired-code", "expired-code"], ["invalid-github", "unknown"]] as const) {
+      network.connectContactAction.mockResolvedValueOnce({ ok: false, code: refused });
+      expect(await recordCheckInAction("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA")).toEqual({ ok: false, code: expected });
+    }
+  });
+
+  it("treats a contact code as any other code with the network off", async () => {
     features.FEATURES.network = false;
     checkinsServer.recordCheckIn.mockResolvedValue({ ok: false, error: { code: "invalid-code" } });
     expect(await recordCheckInAction("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA")).toEqual({ ok: false, code: "invalid-code" });
+    expect(network.connectContactAction).not.toHaveBeenCalled();
   });
 
   it("uses the uid of the session, never one from the client, and returns the result as plain data", async () => {

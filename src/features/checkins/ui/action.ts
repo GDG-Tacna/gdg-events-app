@@ -13,8 +13,19 @@ export interface ScanReward {
 }
 
 /** What the server action answers to the scanner screen. Plain data: it crosses the client boundary. */
-/** What a scan was: a checkpoint of some kind, or a speaker's own code («Conoce al speaker»). */
-export type ScanKind = CheckpointKind | "speaker";
+/** What a scan was: a checkpoint of some kind, a speaker's own code («Conoce al speaker») or another cadet's contact code. */
+export type ScanKind = CheckpointKind | "speaker" | "contact";
+
+/** The other cadet a contact code was scanned from: their card and what the contact paid. Filled in by the app shell. */
+export interface ScanContact {
+  card: { alias: string; squad: string | null; links: { linkedin: string | null; github: string | null; web: string | null } };
+  /** False when the two were already contacts. */
+  created: boolean;
+  xpEarned: number;
+  creditsEarned: number;
+  /** Past the edition's cap of paid contacts: the contact counts, it pays nothing. */
+  capReached: boolean;
+}
 
 export type RecordCheckInActionResult =
   | {
@@ -24,7 +35,9 @@ export type RecordCheckInActionResult =
       kind: ScanKind;
       recorded: boolean;
       firstEntrance: boolean;
-      /** The scanned puesto as the cadet sees it (absent for a speaker's code). */
+      /** The other cadet, for a contact code (absent otherwise). `recorded` then means the contact is new. */
+      contact?: ScanContact;
+      /** The scanned puesto as the cadet sees it (absent for a speaker's or a contact code). */
       checkpoint?: { name: string; description: string; image: string | null };
       /** Missions tied to this checkpoint (talks and stands) or speaker. Absent or empty when there are none. */
       missions?: readonly ScanReward[];
