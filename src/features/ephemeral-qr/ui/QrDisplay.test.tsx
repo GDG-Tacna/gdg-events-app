@@ -80,6 +80,17 @@ describe("QrDisplay", () => {
     expect(screen.getByText(copy.admin.qr.loading)).toBeInTheDocument();
   });
 
+  it("measures the bar against how long the server gave this code, so a one-minute entrance code starts full", async () => {
+    const { unmount } = await renderDisplay(vi.fn(async () => showing(60)));
+    expect(screen.getByRole("progressbar", { name: copy.admin.qr.timeLabel })).toHaveAttribute("aria-valuemax", "60");
+    expect(screen.getByRole("progressbar", { name: copy.admin.qr.timeLabel })).toHaveAttribute("aria-valuenow", "60");
+    expect(screen.getByRole("timer")).toHaveTextContent("Vence en 1:00");
+    unmount();
+
+    await renderDisplay(vi.fn(async () => showing(120)));
+    expect(screen.getByRole("progressbar", { name: copy.admin.qr.timeLabel })).toHaveAttribute("aria-valuemax", "120");
+  });
+
   it("shows the code, how long it has left and what to do with it", async () => {
     await renderDisplay(vi.fn(async () => showing(102)));
 

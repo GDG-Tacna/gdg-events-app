@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { err, ok, type Result } from "@/shared/lib/result";
 import type { QrEncoder, TalkLookup, TokenSigner } from "./ports";
-import { QR_LIFETIME_SECONDS, QR_MAX_FUTURE_SECONDS, formatPayload, parsePayload, signingInput } from "./qr-code";
+import { ENTRANCE_QR_LIFETIME_SECONDS, QR_LIFETIME_SECONDS, QR_MAX_FUTURE_SECONDS, formatPayload, parsePayload, signingInput } from "./qr-code";
 import { qrError } from "./qr-error";
-import { issueQr, listTalks, verifyPayload, type EphemeralQrDeps, type QrActor } from "./use-cases";
+import { issueQr, listScreenCheckpoints, listTalks, verifyPayload, type EphemeralQrDeps, type QrActor } from "./use-cases";
 
 const ADMIN: QrActor = { uid: "a1", role: "admin" };
 const NOW = Date.UTC(2026, 9, 20, 14, 0, 0, 500); // 14:00:00.500
 const NOW_SECONDS = Math.floor(NOW / 1000);
 const TALK = { id: "talk-keynote", kind: "talk", name: "Keynote", active: true };
+const DOOR = { id: "entrada-norte", kind: "entrance", name: "Entrada norte", active: true };
+const STAFF: QrActor = { uid: "s1", role: "staff", kinds: ["entrance", "catering", "stand"] };
 
 /** A signer that is easy to reason about: the "signature" is the reversed input, padded to look like one. */
 const signer: TokenSigner = {
@@ -35,6 +37,26 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
+describe("listScreenCheckpoints", () => {
+  it("lists every open talk and entrance for an admin, with its kind", async () => {
+    const t = setup({ active: ok([TALK, DOOR, { id: "almuerzo", kind: "catering", name: "Almuerzo", active: true }, { id: "stand-ai", kind: "stand", name: "AI", active: true }]) });
+
+    expect(await listScreenCheckpoints(t.deps, ADMIN)).toEqual(ok([{ id: "talk-keynote", name: "Keynote", kind: "talk" }, { id: "entrada-norte", name: "Entrada norte", kind: "entrance" }]));
+  });
+
+  it("lists only the entrances for staff who may operate them, and nothing for staff who may not", async () => {
+    const t = setup({ active: ok([TALK, DOOR]) });
+
+    expect(await listScreenCheckpoints(t.deps, STAFF)).toEqual(ok([{ id: "entrada-norte", name: "Entrada norte", kind: "entrance" }]));
+    expect(await listScreenCheckpoints(t.deps, { ...STAFF, kinds: ["catering"] })).toEqual(ok([]));
+  });
+
+  it("refuses attendees and reports a failed read", async () => {
+    expect(await listScreenCheckpoints(setup().deps, { uid: "u1", role: "attendee" })).toEqual(err(qrError("forbidden")));
+    expect(await listScreenCheckpoints(setup({ active: err({ code: "x" }) }).deps, ADMIN)).toEqual(err(qrError("unknown")));
+  });
+});
+
 describe("issueQr", () => {
   it("issues a signed code for an active talk that works for two minutes", async () => {
     const t = setup();
@@ -59,7 +81,6 @@ describe("issueQr", () => {
   });
 
   it.each([
-    [{ uid: "s1", role: "staff" }],
     [{ uid: "u1", role: "attendee" }],
     [{ uid: "u2", role: null }],
   ] as const)("refuses %j before touching the catalog", async (actor) => {
@@ -82,10 +103,69 @@ describe("issueQr", () => {
     expect(t.encoder.encode).not.toHaveBeenCalled();
   });
 
-  it.each(["catering", "entrance"])("only talks use ephemeral codes: %s is refused", async (kind) => {
+  it.each(["catering", "stand"])("only talks and the entrance show a code on a screen: %s is refused", async (kind) => {
     const t = setup({ found: ok({ ...TALK, kind }) });
 
-    expect(await issueQr(t.deps, ADMIN, { checkpointId: "talk-keynote" })).toEqual(err(qrError("not-a-talk")));
+    expect(await issueQr(t.deps, ADMIN, { checkpointId: "talk-keynote" })).toEqual(err(qrError("not-shown-on-screen")));
+  });
+
+  it("issues the entrance's code for a minute, half of a talk's, and the verifier accepts it", async () => {
+    const t = setup({ found: ok(DOOR) });
+
+    const result = await issueQr(t.deps, ADMIN, { checkpointId: "entrada-norte" });
+
+    expect(result.ok && result.value).toMatchObject({ checkpointId: "entrada-norte", name: "Entrada norte", issuedAt: NOW, expiresAt: (NOW_SECONDS + ENTRANCE_QR_LIFETIME_SECONDS) * 1000 });
+    expect(ENTRANCE_QR_LIFETIME_SECONDS).toBe(60);
+    expect(ENTRANCE_QR_LIFETIME_SECONDS).toBeLessThan(QR_LIFETIME_SECONDS);
+    expect(verifyPayload({ signer, now: () => NOW }, result.ok ? result.value.payload : "")).toEqual({ ok: true, checkpointId: "entrada-norte" });
+  });
+
+  describe("staff", () => {
+    it("show the entrance's code when the edition lets staff operate entrances", async () => {
+      const t = setup({ found: ok(DOOR) });
+
+      expect(await issueQr(t.deps, STAFF, { checkpointId: "entrada-norte" })).toMatchObject({ ok: true });
+    });
+
+    it("do not show it when the edition keeps them off entrances", async () => {
+      const t = setup({ found: ok(DOOR) });
+
+      expect(await issueQr(t.deps, { ...STAFF, kinds: ["catering", "stand"] }, { checkpointId: "entrada-norte" })).toEqual(err(qrError("forbidden")));
+      expect(await issueQr(t.deps, { uid: "s2", role: "staff" }, { checkpointId: "entrada-norte" })).toEqual(err(qrError("forbidden")));
+      expect(t.encoder.encode).not.toHaveBeenCalled();
+    });
+
+    it("never show a talk's code, whatever they may operate", async () => {
+      const t = setup();
+
+      expect(await issueQr(t.deps, STAFF, { checkpointId: "talk-keynote" })).toEqual(err(qrError("forbidden")));
+      expect(t.encoder.encode).not.toHaveBeenCalled();
+    });
+
+    it("are told the code is not for a screen when it is a meal or a stand, not that they lack permission", async () => {
+      const t = setup({ found: ok({ ...DOOR, kind: "catering" }) });
+
+      expect(await issueQr(t.deps, STAFF, { checkpointId: "entrada-norte" })).toEqual(err(qrError("not-shown-on-screen")));
+    });
+  });
+
+  it("gives every screen a code of its own: two devices at the same door share nothing", async () => {
+    const first = setup({ found: ok(DOOR), now: NOW });
+    const second = setup({ found: ok(DOOR), now: NOW + 17_000 });
+
+    const a = await issueQr(first.deps, STAFF, { checkpointId: "entrada-norte" });
+    const b = await issueQr(second.deps, ADMIN, { checkpointId: "entrada-norte" });
+
+    expect(a.ok && b.ok).toBe(true);
+    if (!a.ok || !b.ok) return;
+    // Different codes, each with its own expiry, and nothing stored: the deps have no store to write to.
+    expect(a.value.payload).not.toBe(b.value.payload);
+    expect(a.value.expiresAt).not.toBe(b.value.expiresAt);
+    // Both work at once, and neither depends on the other being shown.
+    const now = NOW + 20_000;
+    expect(verifyPayload({ signer, now: () => now }, a.value.payload)).toEqual({ ok: true, checkpointId: "entrada-norte" });
+    expect(verifyPayload({ signer, now: () => now }, b.value.payload)).toEqual({ ok: true, checkpointId: "entrada-norte" });
+    expect(Object.keys(first.deps).sort()).toEqual(["encoder", "lookup", "now", "signer"]);
   });
 
   it("reports a catalog failure as unknown", async () => {

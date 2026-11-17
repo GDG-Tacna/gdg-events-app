@@ -3,7 +3,6 @@
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { Button, Card, InlineAlert, ProgressBar, Skeleton } from "@/shared/ui";
-import { QR_LIFETIME_SECONDS } from "../domain/qr-code";
 import type { EphemeralQrErrorCode } from "../domain/qr-error";
 import type { IssueQrAction } from "./action";
 import { QrCodeSvg } from "./QrCodeSvg";
@@ -60,7 +59,7 @@ export function QrDisplay({ checkpointId, name, issue, texts }: QrDisplayProps) 
               </p>
               <ProgressBar
                 value={Math.ceil(state.remainingMs / 1000)}
-                max={QR_LIFETIME_SECONDS}
+                max={Math.round((state.qr.expiresAt - state.qr.issuedAt) / 1000)}
                 label={copy.admin.qr.timeLabel}
                 valueText={interpolate(copy.admin.qr.expiresIn, { time: formatCountdown(state.remainingMs) })}
               />

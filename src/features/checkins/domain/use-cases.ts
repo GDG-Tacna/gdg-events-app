@@ -28,9 +28,10 @@ export interface RecordCheckInResult {
  * stored. Idempotent: scanning the same checkpoint again returns the existing one, and only a real
  * check-in is counted for the key metric.
  *
- * A cadet checks in only to talks, with the code on the talk's screen (signed, short-lived). The stations
- * (entrance, catering, stands) are operated by staff, who scan the cadet's pass: a printed station code is
- * retired (it can be photographed and passed around) and answers `staff-station` without reading anything.
+ * A cadet checks in to a talk or to the entrance, with the code on its screen (signed, short-lived). The other
+ * stations (catering, stands) are operated by staff, who scan the cadet's pass; the entrance can also be passed by staff
+ * scanning the pass. A printed station code is retired (it can be photographed and passed around) and answers
+ * `staff-station` without reading anything.
  */
 export async function recordCheckIn(
   deps: RecordCheckInDeps,
@@ -49,8 +50,8 @@ export async function recordCheckIn(
   if (!found.value.active) return err(checkInError("checkpoint-inactive"));
 
   const checkpoint = found.value;
-  // Signed screen codes exist only for talks; anything else answers like a bad code.
-  if (checkpoint.kind !== "talk") return err(checkInError("invalid-code"));
+  // Signed screen codes exist only for talks and the entrance; anything else answers like a bad code.
+  if (checkpoint.kind !== "talk" && checkpoint.kind !== "entrance") return err(checkInError("invalid-code"));
 
   const outcome = await deps.checkIns.record({ uid: input.uid, checkpoint, at: deps.now() });
   if (!outcome.ok) return outcome;

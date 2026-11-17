@@ -96,6 +96,30 @@ describe("CheckpointsAdminView open and close", () => {
   });
 });
 
+describe("CheckpointsAdminView entrance code", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const ENTRANCE: CheckpointView = { id: "entrada-norte", kind: "entrance", name: "Entrada norte", active: true, requirements: NONE };
+  const render2 = (checkpoints: CheckpointView[], qrBase?: string) =>
+    render(<CheckpointsAdminView checkpoints={checkpoints} create={vi.fn()} rename={vi.fn()} setActive={vi.fn()} remove={vi.fn()} qrBase={qrBase} setRequirements={vi.fn()} levels={LEVELS} />);
+
+  it("links an open entrance to the screen that shows its code, and nothing else", () => {
+    render2([ENTRANCE, LUNCH, STAND], "/admin/qr");
+
+    expect(screen.getByRole("link", { name: `${copy.admin.checkpoints.showQr}: Entrada norte` })).toHaveAttribute("href", "/admin/qr/entrada-norte");
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+  });
+
+  it("leaves it out for a closed entrance, and without a place to show the code", () => {
+    const { unmount } = render2([{ ...ENTRANCE, active: false }], "/admin/qr");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    unmount();
+
+    render2([ENTRANCE]);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+});
+
 describe("CheckpointsAdminView delete", () => {
   beforeEach(() => vi.clearAllMocks());
 

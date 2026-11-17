@@ -63,6 +63,13 @@ describe("staff home page", () => {
     expect(within(screen.getByRole("region", { name: copy.staff.kinds.stand })).getByText("12 visitas")).toBeInTheDocument();
   });
 
+  it("offers the entrance's code for the door screen on the entrances only", async () => {
+    render(await StaffHomePage());
+
+    const door = screen.getAllByRole("link", { name: copy.staff.showEntranceQr });
+    expect(door.map((link) => link.getAttribute("href"))).toEqual(["/staff/qr/entrance-main"]);
+  });
+
   it("leaves out a kind with no open station", async () => {
     server.listServePoints.mockResolvedValue({ ok: true, value: [{ id: "lunch-1", kind: "catering", name: "Almuerzo", servedCount: 1 }] });
 

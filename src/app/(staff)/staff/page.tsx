@@ -55,6 +55,11 @@ export default async function StaffHomePage() {
                         <ButtonLink href={`${ROUTES.staff}/serve/${point.id}`} className="mt-auto">
                           {copy.staff.serve}
                         </ButtonLink>
+                        {point.kind === "entrance" ? (
+                          <ButtonLink href={`${ROUTES.staffQr}/${point.id}`} variant="secondary">
+                            {copy.staff.showEntranceQr}
+                          </ButtonLink>
+                        ) : null}
                       </Card>
                     </li>
                   ))}

@@ -371,7 +371,7 @@ export const copy = {
       "contact-code": { title: "Es el código de un cadete", body: "Para conectar con otro cadete, escanéalo desde la Red." },
       "staff-station": {
         title: "Este QR lo escanea el staff",
-        body: "En la entrada, el catering y los stands, muestra tu QR personal y el staff lo escanea.",
+        body: "En el catering y los stands, muestra tu QR personal y el staff lo escanea. Para la entrada, escanea el código que aparece en la pantalla de la puerta.",
       },
     },
     toNetwork: "Ir a la Red",
@@ -690,6 +690,9 @@ export const copy = {
     empty: "No hay puestos abiertos. Pídele a un admin que cree uno.",
     /** What each kind of station is, as a chip and as the group title. */
     kinds: { entrance: "Entrada", catering: "Catering", stand: "Stand" },
+    /** The entrance's code, on a screen at the door for cadets to scan. */
+    showEntranceQr: "Mostrar QR de ingreso",
+    entranceQrBack: "Volver a los puestos",
     /** How many cadets a station has scanned. Placeholder: {count}. */
     servedCount: { entrance: "{count} ingresos", catering: "{count} raciones entregadas", stand: "{count} visitas" },
     serve: "Escanear aquí",
@@ -919,7 +922,7 @@ export const copy = {
         errors: {
           "checkpoint-not-found": "Ese speaker no existe.",
           "checkpoint-inactive": "Ese speaker está desactivado: actívalo para mostrar su código.",
-          "not-a-talk": "Ese código no es de un speaker.",
+          "not-shown-on-screen": "Ese código no es de un speaker.",
           unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
           forbidden: "No tienes permiso para mostrar este código.",
           disabled: "Los códigos de speaker no están disponibles por ahora.",
@@ -2135,6 +2138,8 @@ export const copy = {
       /** Placeholder: {name}. */
       closedDone: "«{name}» está cerrado: ya no acepta escaneos.",
       delete: "Eliminar",
+      /** The entrance's code, on a screen at the door for cadets to scan. */
+      showQr: "Mostrar QR de ingreso",
       /** Placeholder: {name}. */
       confirmDeleteTitle: "¿Eliminar el puesto «{name}»?",
       confirmDelete: "Se borra para siempre. Solo se puede si nadie hizo check-in allí y ninguna misión lo usa.",
@@ -2240,6 +2245,8 @@ export const copy = {
       back: "Volver a las charlas",
       loading: "Generando código…",
       scanHint: "Escanea este código con la app para registrar tu asistencia.",
+      scanHintEntrance: "Escanea este código con la app para registrar tu ingreso al evento.",
+      backEntrance: "Volver a puestos",
       /** Placeholder: {name}. */
       codeLabel: "Código QR de {name}",
       timeLabel: "Tiempo restante del código",
@@ -2252,9 +2259,9 @@ export const copy = {
       errors: {
         "checkpoint-not-found": "Esa charla no existe.",
         "checkpoint-inactive": "Esa charla ya no está activa.",
-        "not-a-talk": "Solo las charlas usan códigos que cambian. Catering y entrada usan un QR impreso.",
+        "not-shown-on-screen": "Solo las charlas y la entrada usan un código que cambia en pantalla. El catering y los stands los registra el staff con el QR del cadet.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
-        forbidden: "Solo un admin puede proyectar códigos.",
+        forbidden: "No tienes permiso para mostrar este código.",
         disabled: "Los códigos de charla no están disponibles por ahora.",
         unknown: "No pudimos generar el código. Revisa la clave de firma del servidor e inténtalo de nuevo.",
       },

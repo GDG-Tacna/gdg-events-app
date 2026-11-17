@@ -2,9 +2,9 @@ import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import type { QrEncoder, TalkLookup, TokenSigner } from "./ports";
 import {
-  QR_LIFETIME_SECONDS,
   QR_MAX_FUTURE_SECONDS,
   formatPayload,
+  lifetimeSecondsFor,
   parsePayload,
   signingInput,
 } from "./qr-code";
@@ -22,11 +22,25 @@ export interface EphemeralQrDeps {
 export interface QrActor {
   uid: string;
   role: "attendee" | "staff" | "admin" | null;
+  /** For staff: the kinds of station the edition lets them operate (an admin needs none). */
+  kinds?: readonly string[];
+}
+
+/** The checkpoints whose code is drawn on a screen: a talk's, in its room, and the entrance's, at the door. */
+const SCREEN_KINDS: readonly string[] = ["talk", "entrance"];
+
+/**
+ * Who may put a checkpoint's code on a screen: an admin (an organizer is one) any of them; staff only the entrance's,
+ * and only when the edition lets staff operate entrances. A talk's code never goes to staff.
+ */
+function mayShow(actor: QrActor, kind: string): boolean {
+  if (actor.role === "admin") return true;
+  return actor.role === "staff" && kind === "entrance" && (actor.kinds ?? []).includes("entrance");
 }
 
 export interface IssuedQr {
   checkpointId: string;
-  /** The talk's name, to show next to the code. */
+  /** The talk's or the entrance's name, to show next to the code. */
   name: string;
   /** What the QR contains. */
   payload: string;
@@ -54,26 +68,47 @@ export async function listTalks(
   return ok(active.value.filter((checkpoint) => checkpoint.kind === "talk").map(({ id, name }) => ({ id, name })));
 }
 
+/** A checkpoint that can show a code on a screen, with its kind. */
+export interface ScreenCheckpoint {
+  id: string;
+  name: string;
+  kind: string;
+}
+
+/** The checkpoints this actor can put on a screen: every open talk and entrance for an admin, the entrances for allowed staff. */
+export async function listScreenCheckpoints(
+  deps: Pick<EphemeralQrDeps, "lookup">,
+  actor: QrActor,
+): Promise<Result<readonly ScreenCheckpoint[], EphemeralQrError>> {
+  if (actor.role !== "admin" && actor.role !== "staff") return err(qrError("forbidden"));
+
+  const active = await deps.lookup.listActive();
+  if (!active.ok) return err(qrError("unknown"));
+  return ok(active.value.filter((checkpoint) => SCREEN_KINDS.includes(checkpoint.kind) && mayShow(actor, checkpoint.kind)).map(({ id, name, kind }) => ({ id, name, kind })));
+}
+
 /**
- * Admin only: a signed code for a talk that works for two minutes. Nothing is stored: the code carries
- * its own expiry and signature, so issuing costs no database write and any server instance can verify it.
+ * A signed code for a talk (two minutes) or an entrance (one minute), for whoever may show it. Nothing is stored: the code
+ * carries its own expiry and signature, so issuing costs no database write, any server instance can verify it, and
+ * every screen that asks gets a code of its own: two devices at the same door share nothing.
  */
 export async function issueQr(
   deps: EphemeralQrDeps,
   actor: QrActor,
   input: { checkpointId: string },
 ): Promise<Result<IssuedQr, EphemeralQrError>> {
-  if (actor.role !== "admin") return err(qrError("forbidden"));
+  if (actor.role !== "admin" && actor.role !== "staff") return err(qrError("forbidden"));
 
   const found = await deps.lookup.find(input.checkpointId);
   if (!found.ok) return err(qrError("unknown"));
   if (found.value === null) return err(qrError("checkpoint-not-found"));
   if (!found.value.active) return err(qrError("checkpoint-inactive"));
-  if (found.value.kind !== "talk") return err(qrError("not-a-talk"));
+  if (!SCREEN_KINDS.includes(found.value.kind)) return err(qrError("not-shown-on-screen"));
+  if (!mayShow(actor, found.value.kind)) return err(qrError("forbidden"));
 
   try {
     const issuedAt = deps.now();
-    const expiresAtSeconds = Math.floor(issuedAt / 1000) + QR_LIFETIME_SECONDS;
+    const expiresAtSeconds = Math.floor(issuedAt / 1000) + lifetimeSecondsFor(found.value.kind);
     const signature = deps.signer.sign(signingInput(found.value.id, expiresAtSeconds));
     const payload = formatPayload(found.value.id, expiresAtSeconds, signature);
 

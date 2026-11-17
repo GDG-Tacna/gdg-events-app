@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { isCheckpointId, type CheckpointKind } from "@/features/checkins";
@@ -27,6 +28,8 @@ export interface CheckpointsAdminViewProps {
   rename: RenameCheckpointAction;
   setActive: SetCheckpointActiveAction;
   remove: DeleteCheckpointAction;
+  /** Where an entrance's code is shown (`${qrBase}/${id}`); without it the entrance has no such button. A plain path: a client component cannot receive functions from a server page. */
+  qrBase?: string;
   /** Whether the session may delete stations here (a draft edition, or an admin of every edition); the server decides again. */
   canDelete?: boolean;
   setRequirements: SetFoodRequirementsAction;
@@ -78,7 +81,7 @@ function KindChoice({ value, onChange, disabled }: { value: CheckpointKind; onCh
  * Creating, renaming and the requirements open in a dialog, where a refusal shows too. Nothing is deleted: a closed
  * checkpoint keeps its history. The server decides everything; this view shows the outcome.
  */
-export function CheckpointsAdminView({ checkpoints, create, rename, setActive, remove, canDelete = true, setRequirements, levels }: CheckpointsAdminViewProps) {
+export function CheckpointsAdminView({ checkpoints, create, rename, setActive, remove, qrBase, canDelete = true, setRequirements, levels }: CheckpointsAdminViewProps) {
   const t = copy.admin.checkpoints;
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
@@ -253,6 +256,11 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
                     >
                       {toggling ? (checkpoint.active ? t.closing : t.opening) : checkpoint.active ? t.close : t.reopen}
                     </Button>
+                    {qrBase && checkpoint.kind === "entrance" && checkpoint.active ? (
+                      <Link href={`${qrBase}/${checkpoint.id}`} aria-label={`${t.showQr}: ${checkpoint.name}`} className="type-label text-primary hover:bg-secondary focus-visible:ring-ring px-space-4 inline-flex h-9 items-center rounded-md focus-visible:ring-[3px] focus-visible:outline-none">
+                        {t.showQr}
+                      </Link>
+                    ) : null}
                     {canDelete ? (
                       <Button
                         variant="ghost"

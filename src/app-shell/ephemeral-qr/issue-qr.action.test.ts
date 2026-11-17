@@ -6,6 +6,9 @@ vi.mock("@/app-shell/composition/ephemeral-qr.server", () => ({ ephemeralQrDeps:
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
+const permissions = vi.hoisted(() => ({ mayEdit: vi.fn<(session: unknown, section: unknown) => Promise<boolean>>(async () => true), staffStations: vi.fn(async () => ["entrance", "catering"]) }));
+vi.mock("@/app-shell/permissions.server", () => permissions);
+
 const qrServer = { issueQr: vi.fn() };
 vi.mock("@/features/ephemeral-qr/server", () => qrServer);
 
@@ -22,14 +25,27 @@ describe("issueQrAction", () => {
     features.FEATURES.admin = true;
     features.FEATURES.checkins = true;
     guards.getSession.mockResolvedValue(session("admin"));
+    permissions.mayEdit.mockResolvedValue(true);
+    permissions.staffStations.mockResolvedValue(["entrance", "catering"]);
   });
 
-  it.each([["admin"], ["checkins"]] as const)("does nothing when the %s feature is switched off", async (flag) => {
-    features.FEATURES[flag] = false;
+  it("does nothing when check-ins are switched off, without reading the session", async () => {
+    features.FEATURES.checkins = false;
 
     expect(await issueQrAction({ checkpointId: "talk-1" })).toEqual({ ok: false, code: "disabled" });
     expect(guards.getSession).not.toHaveBeenCalled();
     expect(qrServer.issueQr).not.toHaveBeenCalled();
+  });
+
+  it("switches off the admin's screens with the admin area, but not the staff's", async () => {
+    features.FEATURES.admin = false;
+    expect(await issueQrAction({ checkpointId: "talk-1" })).toEqual({ ok: false, code: "disabled" });
+    expect(qrServer.issueQr).not.toHaveBeenCalled();
+
+    guards.getSession.mockResolvedValue(session("staff"));
+    qrServer.issueQr.mockResolvedValue({ ok: false, error: { code: "forbidden" } });
+    await issueQrAction({ checkpointId: "entrada-norte" });
+    expect(qrServer.issueQr).toHaveBeenCalledTimes(1);
   });
 
   it("refuses an anonymous caller", async () => {
@@ -39,11 +55,29 @@ describe("issueQrAction", () => {
     expect(qrServer.issueQr).not.toHaveBeenCalled();
   });
 
-  it.each(["attendee", "staff", null] as const)("refuses a %s session", async (role) => {
+  it.each(["attendee", null] as const)("refuses a %s session", async (role) => {
     guards.getSession.mockResolvedValue(session(role));
 
     expect(await issueQrAction({ checkpointId: "talk-1" })).toEqual({ ok: false, code: "forbidden" });
     expect(qrServer.issueQr).not.toHaveBeenCalled();
+  });
+
+  it("refuses an admin the edition keeps away from Puestos and Charlas, whatever their role", async () => {
+    permissions.mayEdit.mockResolvedValue(false);
+
+    expect(await issueQrAction({ checkpointId: "entrada-norte" })).toEqual({ ok: false, code: "forbidden" });
+    expect(permissions.mayEdit).toHaveBeenCalledWith(session("admin"), ["checkpoints", "talks"]);
+    expect(qrServer.issueQr).not.toHaveBeenCalled();
+  });
+
+  it("lets staff ask, handing the use case the kinds of station the edition lets them operate", async () => {
+    guards.getSession.mockResolvedValue(session("staff"));
+    qrServer.issueQr.mockResolvedValue({ ok: true, value: { checkpointId: "entrada-norte", name: "Entrada norte", payload: "devfest:eq:X", cells: ["1"], issuedAt: 1, expiresAt: 61_001 } });
+
+    expect(await issueQrAction({ checkpointId: "entrada-norte" })).toMatchObject({ ok: true, qr: { checkpointId: "entrada-norte", expiresAt: 61_001 } });
+
+    expect(qrServer.issueQr).toHaveBeenCalledWith({ marker: "deps" }, { uid: "a1", role: "staff", kinds: ["entrance", "catering"] }, { checkpointId: "entrada-norte" });
+    expect(permissions.mayEdit).not.toHaveBeenCalled();
   });
 
   it.each(["", "x".repeat(49), undefined as unknown as string, 5 as unknown as string])(
@@ -78,8 +112,8 @@ describe("issueQrAction", () => {
   });
 
   it("maps a use case failure to its code only", async () => {
-    qrServer.issueQr.mockResolvedValue({ ok: false, error: { code: "not-a-talk" } });
+    qrServer.issueQr.mockResolvedValue({ ok: false, error: { code: "not-shown-on-screen" } });
 
-    expect(await issueQrAction({ checkpointId: "lunch-1" })).toEqual({ ok: false, code: "not-a-talk" });
+    expect(await issueQrAction({ checkpointId: "lunch-1" })).toEqual({ ok: false, code: "not-shown-on-screen" });
   });
 });

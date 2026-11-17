@@ -4,11 +4,13 @@ import "server-only";
 export type { QrEncoder, TalkLookup, TokenSigner } from "./domain/ports";
 export {
   issueQr,
+  listScreenCheckpoints,
   listTalks,
   verifyPayload,
   type EphemeralQrDeps,
   type IssuedQr,
   type QrActor,
+  type ScreenCheckpoint,
   type TalkOption,
 } from "./domain/use-cases";
 export { EphemeralQrPayloadVerifier } from "./data/ephemeral-qr-payload-verifier";

@@ -1,8 +1,8 @@
 export type EphemeralQrErrorCode =
   | "checkpoint-not-found"
   | "checkpoint-inactive"
-  /** Only talks use ephemeral codes; catering and entrance use printed ones. */
-  | "not-a-talk"
+  /** Only talks and entrances have a code that changes on a screen; catering and stands are scanned by staff. */
+  | "not-shown-on-screen"
   | "unauthenticated"
   | "forbidden"
   | "disabled"

@@ -7,6 +7,7 @@ import { requireRole } from "@/app-shell/guards";
 import { CheckpointsAdminView } from "@/features/checkpoints";
 import { getEditionLadder } from "@/features/attendee/server";
 import { listCheckpoints } from "@/features/checkpoints/server";
+import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { rankName } from "@/shared/copy/rank-name";
 import { ScreenEnter } from "@/shared/ui";
@@ -31,6 +32,7 @@ export default async function AdminCheckpointsPage() {
         rename={renameCheckpointAction}
         setActive={setCheckpointActiveAction}
         remove={deleteCheckpointAction}
+        qrBase={ROUTES.adminQr}
         canDelete={await mayDeleteItems(session)}
         setRequirements={setFoodRequirementsAction}
         levels={ladder.map((rank) => ({ level: rank.level, name: rankName(rank.id, rank.level, rank.name) }))}

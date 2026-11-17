@@ -33,6 +33,8 @@ export const ROUTES = {
   speaker: "/speaker",
   /** Staff area: pick a serving point and hand out rations. Staff and admin. */
   staff: "/staff",
+  /** The entrance's code on a screen (`/staff/qr/{checkpointId}`), for cadets to scan. Staff and admin. */
+  staffQr: "/staff/qr",
   /** Admin area (Centro de control). Admin role only. */
   admin: "/admin",
   adminTeam: "/admin/team",

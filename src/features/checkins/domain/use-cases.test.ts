@@ -70,10 +70,25 @@ describe("recordCheckIn", () => {
     expect(t.analytics.track).not.toHaveBeenCalled();
   });
 
-  it.each([LUNCH, ENTRANCE, { ...ENTRANCE, id: "stand-cloud", kind: "stand" as const }])("refuses a screen code for anything but a talk ($kind)", async (checkpoint) => {
+  it.each([LUNCH, { ...ENTRANCE, id: "stand-cloud", kind: "stand" as const }])("refuses a screen code for anything but a talk or the entrance ($kind)", async (checkpoint) => {
     const t = setup({ verified: ok({ checkpointId: checkpoint.id, source: "ephemeral" } as VerifiedScan), found: ok(checkpoint) });
 
     expect(await recordCheckIn(t.deps, { uid: "u1", payload: "x" })).toEqual(err(checkInError("invalid-code")));
+    expect(t.checkIns.record).not.toHaveBeenCalled();
+  });
+
+  it("accepts the entrance's screen code, and the first one registers the cadet at the event", async () => {
+    const t = setup({ verified: ok({ checkpointId: ENTRANCE.id, source: "ephemeral" } as VerifiedScan), found: ok(ENTRANCE), outcome: ok({ kind: "recorded", firstEntrance: true }) });
+
+    expect(await recordCheckIn(t.deps, { uid: "u1", payload: "x" })).toEqual(ok({ checkpointId: "entrance-main", kind: "entrance", recorded: true, firstEntrance: true }));
+    expect(t.checkIns.record).toHaveBeenCalledWith({ uid: "u1", checkpoint: ENTRANCE, at: expect.any(Date) });
+    expect(t.analytics.track).toHaveBeenCalledWith({ name: "checkin_completed", uid: "u1", checkpointId: "entrance-main", kind: "entrance" });
+  });
+
+  it("answers that a closed entrance is not taking check-ins", async () => {
+    const t = setup({ verified: ok({ checkpointId: ENTRANCE.id, source: "ephemeral" } as VerifiedScan), found: ok({ ...ENTRANCE, active: false }) });
+
+    expect(await recordCheckIn(t.deps, { uid: "u1", payload: "x" })).toEqual(err(checkInError("checkpoint-inactive")));
     expect(t.checkIns.record).not.toHaveBeenCalled();
   });
 
