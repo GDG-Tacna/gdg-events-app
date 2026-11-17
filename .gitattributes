@@ -1,0 +1,12 @@
+# Store text files with LF in the repository; each machine checks them out with its own line endings.
+# Without this, files edited on Windows and elsewhere show up as whole-file changes.
+* text=auto
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
