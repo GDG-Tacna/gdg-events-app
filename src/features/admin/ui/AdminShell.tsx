@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { BrandMark, Icon, SpaceBackground, type IconName } from "@/shared/ui";
+import { Icon, PlatformMark, SpaceBackground, type IconName } from "@/shared/ui";
 
 export interface AdminNavItem {
   href: string;
@@ -107,14 +107,13 @@ export function AdminShell({ items, account, accountActions, accountPhotoUrl, co
         <aside className="print:hidden px-space-4 pt-safe-space-4 pb-space-4 min-[760px]:pt-safe-space-8 min-[760px]:pb-space-8 min-[760px]:sticky min-[760px]:top-0 min-[760px]:h-dvh min-[760px]:overflow-y-auto">
           <div className="gap-space-4 flex flex-col min-[760px]:h-full">
             <div className="gap-space-3 flex items-start justify-between">
-              <BrandMark />
+              <PlatformMark />
               {/* On phones the account sits at the top: its avatar and an icon to sign out. */}
               <div className="gap-space-2 flex shrink-0 items-center min-[760px]:hidden">
                 <AccountAvatar name={account} photoUrl={accountPhotoUrl} />
                 {compactAccountActions}
               </div>
             </div>
-            <p className="type-label text-accent">{copy.admin.brand}</p>
             {edition}
 
             <nav aria-label={copy.admin.navLabel}>
