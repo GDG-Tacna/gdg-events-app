@@ -91,7 +91,7 @@ describe("recordCheckInAction", () => {
   it("uses the uid of the session, never one from the client, and returns the result as plain data", async () => {
     checkinsServer.recordCheckIn.mockResolvedValue({
       ok: true,
-      value: { checkpointId: "entrance-main", kind: "entrance", recorded: true, firstEntrance: true },
+      value: { checkpointId: "entrance-main", kind: "entrance", recorded: true, firstEntrance: true, checkpoint: { name: "Puerta norte", description: "Bienvenidos", image: "/media/door.webp" } },
     });
 
     const result = await recordCheckInAction("devfest:cp:entrance-main");
@@ -106,6 +106,8 @@ describe("recordCheckInAction", () => {
       kind: "entrance",
       recorded: true,
       firstEntrance: true,
+      // The cadet sees the name, description and image of the place they scanned.
+      checkpoint: { name: "Puerta norte", description: "Bienvenidos", image: "/media/door.webp" },
       missions: [],
       talkCredits: 0,
       achievements: [],

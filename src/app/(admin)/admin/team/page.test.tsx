@@ -10,6 +10,16 @@ vi.mock("@/app-shell/admin/team.actions", () => ({
 }));
 
 vi.mock("@/app-shell/composition/edition.server", () => ({ currentEditionId: async () => "devfest-2026" }));
+vi.mock("@/app-shell/composition/checkpoint-admin.server", () => ({ checkpointAdminDeps: { marker: "checkpoints" }, staffScopeDeps: { marker: "scopes" } }));
+vi.mock("@/app-shell/admin/staff-scope.action", () => ({ setStaffScopeAction: async () => ({ ok: true, checkpointIds: null }) }));
+
+const checkpointsServer = vi.hoisted(() => ({
+  STATION_KINDS: ["entrance", "catering", "stand"],
+  isStationKind: (kind: string) => ["entrance", "catering", "stand"].includes(kind),
+  listCheckpoints: vi.fn(),
+  listStaffScopes: vi.fn(),
+}));
+vi.mock("@/features/checkpoints/server", () => checkpointsServer);
 
 const guards = { requireRole: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
@@ -19,6 +29,8 @@ vi.mock("@/features/admin/server", () => adminServer);
 
 const { TeamView } = await import("@/features/admin");
 const { grantRoleAction, revokeRoleAction } = await import("@/app-shell/admin/team.actions");
+const { setStaffScopeAction } = await import("@/app-shell/admin/staff-scope.action");
+const permissions = await import("@/app-shell/permissions.server");
 const { default: AdminTeamPage } = await import("./page");
 
 function findElement(node: ReactNode, type: unknown): { props: Record<string, unknown> } | null {
@@ -43,6 +55,16 @@ describe("admin team page", () => {
     guards.requireRole.mockResolvedValue({ uid: "a1", role: "admin", adminScope: "global", displayName: "Ana", photoUrl: null });
     adminServer.listTeam.mockResolvedValue({ ok: true, value: MEMBERS });
     adminServer.listInvites.mockResolvedValue({ ok: true, value: [] });
+    checkpointsServer.listStaffScopes.mockResolvedValue({ ok: true, value: { s1: ["stand-louis"] } });
+    checkpointsServer.listCheckpoints.mockResolvedValue({
+      ok: true,
+      value: [
+        { id: "talk-keynote", kind: "talk", name: "Keynote", active: true },
+        { id: "stand-louis", kind: "stand", name: "Stand Louis 3D", active: true },
+        { id: "almuerzo", kind: "catering", name: "Almuerzo", active: false },
+        { id: "entrada-norte", kind: "entrance", name: "Entrada norte", active: true },
+      ],
+    });
   });
 
   it("checks the admin role itself, because the layout does not run again on every navigation", async () => {
@@ -63,6 +85,35 @@ describe("admin team page", () => {
       revoke: revokeRoleAction,
       eventId: "devfest-2026",
     });
+  });
+
+  it("hands the view each staff member's stations and the edition's stations to choose from, grouped by kind and never a talk", async () => {
+    const tree = await AdminTeamPage();
+
+    expect(checkpointsServer.listStaffScopes).toHaveBeenCalledWith({ marker: "scopes" }, { uid: "a1", role: "admin", adminScope: "global" });
+    expect(findElement(tree, TeamView)?.props).toMatchObject({
+      staffScopes: { s1: ["stand-louis"] },
+      stations: [
+        { id: "entrada-norte", kind: "entrance", name: "Entrada norte", active: true },
+        { id: "almuerzo", kind: "catering", name: "Almuerzo", active: false },
+        { id: "stand-louis", kind: "stand", name: "Stand Louis 3D", active: true },
+      ],
+      setScope: setStaffScopeAction,
+    });
+  });
+
+  it("lets a viewer who may not edit the team see the stations but not change them", async () => {
+    vi.spyOn(permissions, "mayEdit").mockResolvedValueOnce(false);
+
+    const tree = await AdminTeamPage();
+
+    expect(findElement(tree, TeamView)?.props.setScope).toBeUndefined();
+  });
+
+  it("surfaces a failed read of the stations instead of showing everyone as unlimited", async () => {
+    checkpointsServer.listStaffScopes.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+
+    await expect(AdminTeamPage()).rejects.toThrow("Could not read the staff's stations");
   });
 
   it("does not read anything when the guard stops the request", async () => {

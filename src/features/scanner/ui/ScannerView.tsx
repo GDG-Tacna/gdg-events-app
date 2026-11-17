@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import type { RecordCheckInAction } from "@/features/checkins";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
-import { Button, ButtonLink, Card, Icon, PixelCoin, UnlockedBadges } from "@/shared/ui";
+import { Button, ButtonLink, Card, Icon, PixelCoin, Thumbnail, UnlockedBadges } from "@/shared/ui";
 import type { ScanOutcome } from "../domain/scan-state";
 import type { QrCamera } from "./qr-camera";
 import { ScanReticle } from "./ScanReticle";
@@ -64,6 +64,8 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
   const justCompleted = done?.ok ? done.missions.filter((mission) => mission.justCompleted) : [];
   const toMissions = missionsHref && justCompleted.length > 0 ? `${missionsHref}?completadas=${justCompleted.map((mission) => mission.id).join(",")}` : undefined;
   const leadsAway = Boolean(toNetwork || toPass || toMissions);
+  // The entrance or the stand just scanned, with its logo and what it is (a talk has its own mission card).
+  const place = done?.ok && (done.kind === "entrance" || done.kind === "stand") ? (done.checkpoint ?? null) : null;
 
   const statusText = state.status === "sending" ? copy.scanner.sending : state.status === "scanning" ? copy.scanner.hint : null;
 
@@ -110,6 +112,16 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
                 <p className="type-body text-muted-foreground">{message.body}</p>
               </div>
             </div>
+
+            {place ? (
+              <div aria-label={copy.scanner.placeLabel} role="group" className="bg-surface-raised border-border gap-space-3 p-space-3 flex items-center rounded-md border">
+                {place.image ? <Thumbnail url={place.image} size={64} /> : null}
+                <div className="gap-space-1 flex min-w-0 flex-col">
+                  <p className="type-label text-foreground">{place.name}</p>
+                  {place.description ? <p className="type-body-sm text-muted-foreground">{place.description}</p> : null}
+                </div>
+              </div>
+            ) : null}
 
             {done?.ok ? <UnlockedBadges badges={done.achievements} href={achievementsHref} /> : null}
 

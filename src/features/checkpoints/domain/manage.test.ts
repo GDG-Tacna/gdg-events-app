@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { err, ok, type Result } from "@/shared/lib/result";
+import type { RecordImages } from "@/features/media/constants";
 import {
   createCheckpoint,
   deleteCheckpoint,
+  editCheckpoint,
   listCheckpoints,
+  listIdentityLocks,
+  normalizeDescription,
   normalizeName,
-  renameCheckpoint,
   setCheckpointActive,
-  setFoodRequirements,
   suggestId,
   type CheckpointDeletion,
   type CheckpointStore,
@@ -21,26 +23,49 @@ import { manageError } from "./manage-error";
 const NOW = new Date("2026-10-20T13:00:00Z");
 const ADMIN: ManageActor = { uid: "a1", role: "admin" };
 const NONE = { minLevel: null, minTalks: null };
-const LUNCH: ManagedCheckpoint = { id: "lunch-1", kind: "catering", name: "Almuerzo", active: true, requirements: NONE };
+const LUNCH: ManagedCheckpoint = { id: "lunch-1", kind: "catering", name: "Almuerzo", active: true, description: "", image: null, requirements: NONE };
+const LOGO = "public/e1/checkpoint/abcdef123456.webp";
+const LOGO_REF = { path: LOGO, url: `/media/${LOGO}` };
+
+type Saved = Result<{ before: ManagedCheckpoint; after: ManagedCheckpoint } | null, { code: "has-check-ins" | "has-missions" | "already-exists" | "unknown" }>;
 
 interface Setup {
   list?: Result<readonly ManagedCheckpoint[], { code: string }>;
   create?: Result<void, { code: "already-exists" | "unknown" }>;
-  update?: Result<{ before: ManagedCheckpoint; after: ManagedCheckpoint } | null, { code: string }>;
+  update?: Saved;
+  rekey?: Saved;
   remove?: Result<CheckpointDeletion, { code: string }>;
+  usage?: Result<Readonly<Record<string, { checkIns: boolean; missions: boolean }>>, { code: string }>;
+  planned?: Result<readonly string[], { code: string }>;
   auditFails?: boolean;
 }
 
-function setup({ list = ok([LUNCH]), create = ok(undefined), update = ok({ before: LUNCH, after: LUNCH }), remove = ok({ kind: "deleted", checkpoint: LUNCH } as CheckpointDeletion), auditFails = false }: Setup = {}) {
-  const store: CheckpointStore = {
+function setup({
+  list = ok([LUNCH]),
+  create = ok(undefined),
+  update = ok({ before: LUNCH, after: LUNCH }),
+  rekey = ok({ before: LUNCH, after: LUNCH }),
+  remove = ok({ kind: "deleted", checkpoint: LUNCH } as CheckpointDeletion),
+  usage = ok({}),
+  planned = ok([]),
+  auditFails = false,
+}: Setup = {}) {
+  const store = {
     list: vi.fn(async () => list),
     create: vi.fn(async () => create),
     update: vi.fn(async () => update),
+    rekey: vi.fn(async () => rekey),
     delete: vi.fn(async () => remove),
-  };
+    usage: vi.fn(async () => usage),
+  } as unknown as CheckpointStore & Record<"list" | "create" | "update" | "rekey" | "delete" | "usage", ReturnType<typeof vi.fn>>;
   const audit: ManageAudit = { append: vi.fn(async () => (auditFails ? err({ code: "unknown" }) : ok(undefined))) };
-  const deps: ManageDeps = { store, audit, now: () => NOW };
-  return { deps, store, audit };
+  const images: RecordImages = {
+    ref: vi.fn((path: string, purpose: string) => (purpose === "checkpoint" && path.includes("/checkpoint/") ? { path, url: `/media/${path}` } : null)),
+    remove: vi.fn(async () => undefined),
+  };
+  const planStands = { ids: vi.fn(async () => planned) };
+  const deps: ManageDeps = { store, audit, images, planStands, now: () => NOW };
+  return { deps, store, audit, images, planStands };
 }
 
 beforeEach(() => {
@@ -155,46 +180,6 @@ describe("createCheckpoint", () => {
   });
 });
 
-describe("renameCheckpoint", () => {
-  const renamed = { before: LUNCH, after: { ...LUNCH, name: "Almuerzo día 1" } };
-
-  it("renames and audits what changed", async () => {
-    const t = setup({ update: ok(renamed) });
-
-    const result = await renameCheckpoint(t.deps, ADMIN, { id: "lunch-1", name: " Almuerzo día 1 " });
-
-    expect(result).toEqual(ok(renamed.after));
-    expect(t.store.update).toHaveBeenCalledWith("lunch-1", { name: "Almuerzo día 1" });
-    expect(t.audit.append).toHaveBeenCalledWith(
-      expect.objectContaining({ action: "checkpoint.renamed", targetUid: "lunch-1", details: { from: "Almuerzo", to: "Almuerzo día 1" } }),
-    );
-  });
-
-  it("writes no audit line when the name did not change", async () => {
-    const t = setup({ update: ok({ before: LUNCH, after: LUNCH }) });
-
-    await renameCheckpoint(t.deps, ADMIN, { id: "lunch-1", name: "Almuerzo" });
-
-    expect(t.audit.append).not.toHaveBeenCalled();
-  });
-
-  it("refuses non-admins, bad names and ids that cannot exist, without touching the store", async () => {
-    const t = setup();
-
-    expect(await renameCheckpoint(t.deps, { uid: "s1", role: "staff" }, { id: "lunch-1", name: "Otro" })).toEqual(err(manageError("forbidden")));
-    expect(await renameCheckpoint(t.deps, ADMIN, { id: "lunch-1", name: "x" })).toEqual(err(manageError("invalid-name")));
-    expect(await renameCheckpoint(t.deps, ADMIN, { id: "../users", name: "Otro" })).toEqual(err(manageError("not-found")));
-    expect(t.store.update).not.toHaveBeenCalled();
-  });
-
-  it("says so when the checkpoint does not exist, and reports store failures", async () => {
-    expect(await renameCheckpoint(setup({ update: ok(null) }).deps, ADMIN, { id: "lunch-1", name: "Otro" })).toEqual(err(manageError("not-found")));
-    expect(await renameCheckpoint(setup({ update: err({ code: "unknown" }) }).deps, ADMIN, { id: "lunch-1", name: "Otro" })).toEqual(
-      err(manageError("unknown")),
-    );
-  });
-});
-
 describe("setCheckpointActive", () => {
   it("closes an open checkpoint and audits it as deactivated", async () => {
     const t = setup({ update: ok({ before: LUNCH, after: { ...LUNCH, active: false } }) });
@@ -282,64 +267,202 @@ describe("listCheckpoints", () => {
   });
 });
 
-describe("setFoodRequirements", () => {
-  const GATED = { minLevel: 2, minTalks: 3 };
-  const TALK: ManagedCheckpoint = { id: "talk-1", kind: "talk", name: "Keynote", active: true, requirements: NONE };
+describe("normalizeDescription", () => {
+  it("trims, allows empty and refuses more than 200 characters", () => {
+    expect(normalizeDescription("  Impresión 3D  ")).toBe("Impresión 3D");
+    expect(normalizeDescription(undefined)).toBe("");
+    expect(normalizeDescription("x".repeat(200))).toHaveLength(200);
+    expect(normalizeDescription("x".repeat(201))).toBeNull();
+  });
+});
 
-  it("saves a meal's minimum level and talks, and audits the change", async () => {
+describe("createCheckpoint with a description and an image", () => {
+  it("saves both, the image only when it is an upload for a puesto", async () => {
+    const t = setup();
+
+    const result = await createCheckpoint(t.deps, ADMIN, { name: "Louis 3D", id: "louis-3d", kind: "stand", description: " Impresión 3D ", imagePath: LOGO });
+
+    expect(result).toMatchObject({ ok: true, value: { description: "Impresión 3D", image: LOGO_REF } });
+    expect(t.store.create).toHaveBeenCalledWith(expect.objectContaining({ description: "Impresión 3D", image: LOGO_REF }));
+    expect(await createCheckpoint(t.deps, ADMIN, { name: "Louis 3D", id: "louis-3d", kind: "stand", imagePath: "public/e1/mission/abcdef123456.webp" })).toEqual(err(manageError("invalid-image")));
+    expect(await createCheckpoint(t.deps, ADMIN, { name: "Louis 3D", id: "louis-3d", kind: "stand", description: "x".repeat(201) })).toEqual(err(manageError("invalid-description")));
+  });
+});
+
+describe("editCheckpoint", () => {
+  const STAND: ManagedCheckpoint = { id: "louis-3d", kind: "stand", name: "Louis 3D", active: true, description: "", image: null, requirements: NONE };
+  const GATED = { minLevel: 2, minTalks: 3 };
+
+  it("always saves the name, description and image, and audits what changed", async () => {
+    const after = { ...STAND, name: "Louis 3D Lab", description: "Impresión 3D", image: LOGO_REF };
+    const t = setup({ list: ok([STAND]), update: ok({ before: STAND, after }) });
+
+    const result = await editCheckpoint(t.deps, ADMIN, { id: "louis-3d", name: " Louis 3D Lab ", description: "Impresión 3D", imagePath: LOGO });
+
+    expect(result).toEqual(ok(after));
+    expect(t.store.update).toHaveBeenCalledWith("louis-3d", { name: "Louis 3D Lab", description: "Impresión 3D", image: LOGO_REF });
+    expect(t.store.rekey).not.toHaveBeenCalled();
+    // Name, description and image never need the plan or the dependency checks.
+    expect(t.planStands.ids).not.toHaveBeenCalled();
+    expect(t.audit.append).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "checkpoint.updated", targetUid: "louis-3d", details: expect.objectContaining({ changed: "name,description,image", from: "Louis 3D" }) }),
+    );
+  });
+
+  it("keeps the image when none is sent, and drops the one it replaced", async () => {
+    const before = { ...STAND, image: { path: "public/e1/checkpoint/old123456789.webp", url: "/media/old" } };
+    const kept = setup({ list: ok([before]), update: ok({ before, after: before }) });
+    await editCheckpoint(kept.deps, ADMIN, { id: "louis-3d", name: "Louis 3D", description: "" });
+    expect(kept.store.update).toHaveBeenCalledWith("louis-3d", { name: "Louis 3D", description: "" });
+    expect(kept.images.remove).not.toHaveBeenCalled();
+    expect(kept.audit.append).not.toHaveBeenCalled();
+
+    const replaced = setup({ list: ok([before]), update: ok({ before, after: { ...before, image: LOGO_REF } }) });
+    await editCheckpoint(replaced.deps, ADMIN, { id: "louis-3d", name: "Louis 3D", description: "", imagePath: LOGO });
+    expect(replaced.images.remove).toHaveBeenCalledWith("public/e1/checkpoint/old123456789.webp");
+  });
+
+  it("changes the kind when nothing refers to the puesto", async () => {
+    const after = { ...STAND, kind: "entrance" as const };
+    const t = setup({ list: ok([STAND]), update: ok({ before: STAND, after }) });
+
+    expect(await editCheckpoint(t.deps, ADMIN, { id: "louis-3d", name: "Louis 3D", description: "", kind: "entrance" })).toEqual(ok(after));
+    expect(t.store.update).toHaveBeenCalledWith("louis-3d", expect.objectContaining({ kind: "entrance" }));
+    expect(t.audit.append).toHaveBeenCalledWith(expect.objectContaining({ details: expect.objectContaining({ changed: "kind", fromKind: "stand", toKind: "entrance" }) }));
+  });
+
+  it("moves the puesto to a new id and audits it as reidentified", async () => {
+    const after = { ...STAND, id: "louis-lab" };
+    const t = setup({ list: ok([STAND]), rekey: ok({ before: STAND, after }) });
+
+    expect(await editCheckpoint(t.deps, ADMIN, { id: "louis-3d", name: "Louis 3D", description: "", newId: "louis-lab" })).toEqual(ok(after));
+    expect(t.store.rekey).toHaveBeenCalledWith("louis-3d", "louis-lab", { name: "Louis 3D", description: "" });
+    expect(t.store.update).not.toHaveBeenCalled();
+    expect(t.audit.append).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "checkpoint.reidentified", targetUid: "louis-lab", details: { from: "louis-3d", to: "louis-lab", name: "Louis 3D" } }),
+    );
+  });
+
+  it("treats the same kind and id as no change", async () => {
+    const t = setup({ list: ok([STAND]), update: ok({ before: STAND, after: STAND }) });
+
+    await editCheckpoint(t.deps, ADMIN, { id: "louis-3d", name: "Louis 3D", description: "", kind: "stand", newId: "louis-3d" });
+
+    expect(t.store.update).toHaveBeenCalledWith("louis-3d", { name: "Louis 3D", description: "" });
+    expect(t.planStands.ids).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["has check-ins", "has-check-ins"],
+    ["is used by a mission", "has-missions"],
+  ] as const)("refuses a new kind or id when the puesto %s (the store checks)", async (_why, code) => {
+    const kind = setup({ list: ok([STAND]), update: err({ code }) });
+    expect(await editCheckpoint(kind.deps, ADMIN, { id: "louis-3d", name: "Louis 3D", description: "", kind: "entrance" })).toEqual(err(manageError(code)));
+    const id = setup({ list: ok([STAND]), rekey: err({ code }) });
+    expect(await editCheckpoint(id.deps, ADMIN, { id: "louis-3d", name: "Louis 3D", description: "", newId: "louis-lab" })).toEqual(err(manageError(code)));
+    expect(id.audit.append).not.toHaveBeenCalled();
+  });
+
+  it("refuses a taken id", async () => {
+    const t = setup({ list: ok([STAND]), rekey: err({ code: "already-exists" }) });
+
+    expect(await editCheckpoint(t.deps, ADMIN, { id: "louis-3d", name: "Louis 3D", description: "", newId: "lunch-1" })).toEqual(err(manageError("already-exists")));
+  });
+
+  it("keeps the kind and id of a stand of the venue plan, but still saves its texts", async () => {
+    const PLAN: ManagedCheckpoint = { ...STAND, id: "stand-cloud", name: "Stand Cloud" };
+    const t = setup({ list: ok([PLAN]), planned: ok(["stand-cloud"]), update: ok({ before: PLAN, after: PLAN }) });
+
+    expect(await editCheckpoint(t.deps, ADMIN, { id: "stand-cloud", name: "Stand Cloud", description: "", kind: "entrance" })).toEqual(err(manageError("from-plan")));
+    expect(await editCheckpoint(t.deps, ADMIN, { id: "stand-cloud", name: "Stand Cloud", description: "", newId: "stand-nube" })).toEqual(err(manageError("from-plan")));
+    expect(t.store.update).not.toHaveBeenCalled();
+    expect(t.store.rekey).not.toHaveBeenCalled();
+    expect(await editCheckpoint(t.deps, ADMIN, { id: "stand-cloud", name: "Stand Cloud", description: "Nube" })).toMatchObject({ ok: true });
+  });
+
+  it("clears the food gate of a puesto that stops being a meal", async () => {
+    const gated = { ...LUNCH, requirements: GATED };
+    const t = setup({ list: ok([gated]), update: ok({ before: gated, after: { ...LUNCH, kind: "stand" } }) });
+
+    await editCheckpoint(t.deps, ADMIN, { id: "lunch-1", name: "Almuerzo", description: "", kind: "stand" });
+
+    expect(t.store.update).toHaveBeenCalledWith("lunch-1", { name: "Almuerzo", description: "", kind: "stand", requirements: null });
+  });
+
+  it("saves a meal's food gate and audits it", async () => {
     const t = setup({ update: ok({ before: LUNCH, after: { ...LUNCH, requirements: GATED } }) });
 
-    expect(await setFoodRequirements(t.deps, ADMIN, { id: "lunch-1", minLevel: 2, minTalks: 3 })).toEqual(ok({ ...LUNCH, requirements: GATED }));
-    expect(t.store.update).toHaveBeenCalledWith("lunch-1", { requirements: GATED });
-    expect(t.audit.append).toHaveBeenCalledWith({
-      action: "checkpoint.requirements",
-      actorUid: "a1",
-      targetUid: "lunch-1",
-      details: { name: "Almuerzo", minLevel: "2", minTalks: "3" },
-      at: NOW,
-    });
+    await editCheckpoint(t.deps, ADMIN, { id: "lunch-1", name: "Almuerzo", description: "", requirements: { minLevel: 2, minTalks: 3 } });
+
+    expect(t.store.update).toHaveBeenCalledWith("lunch-1", { name: "Almuerzo", description: "", requirements: GATED });
+    expect(t.audit.append).toHaveBeenCalledWith(expect.objectContaining({ details: expect.objectContaining({ changed: "requirements", minLevel: "2", minTalks: "3" }) }));
   });
 
-  it("clears them: level 1 and 0 talks mean no condition", async () => {
-    const t = setup({ update: ok({ before: { ...LUNCH, requirements: GATED }, after: LUNCH }) });
+  it("refuses bad input before reading anything", async () => {
+    const t = setup({ list: ok([STAND]) });
+    const base = { id: "louis-3d", name: "Louis 3D", description: "" };
 
-    await setFoodRequirements(t.deps, ADMIN, { id: "lunch-1", minLevel: 1, minTalks: 0 });
-
-    expect(t.store.update).toHaveBeenCalledWith("lunch-1", { requirements: NONE });
-    expect(t.audit.append).toHaveBeenCalledWith(expect.objectContaining({ details: { name: "Almuerzo", minLevel: null, minTalks: null } }));
-  });
-
-  it("writes no audit line when nothing changed", async () => {
-    const same = { ...LUNCH, requirements: GATED };
-    const t = setup({ update: ok({ before: same, after: same }) });
-
-    await setFoodRequirements(t.deps, ADMIN, { id: "lunch-1", minLevel: 2, minTalks: 3 });
-    expect(t.audit.append).not.toHaveBeenCalled();
-
-    const talksOnly = setup({ update: ok({ before: same, after: { ...LUNCH, requirements: { minLevel: 2, minTalks: null } } }) });
-    await setFoodRequirements(talksOnly.deps, ADMIN, { id: "lunch-1", minLevel: 2, minTalks: null });
-    expect(talksOnly.audit.append).toHaveBeenCalled();
-
-    const levelOnly = setup({ update: ok({ before: same, after: { ...LUNCH, requirements: { minLevel: 3, minTalks: 3 } } }) });
-    await setFoodRequirements(levelOnly.deps, ADMIN, { id: "lunch-1", minLevel: 3, minTalks: 3 });
-    expect(levelOnly.audit.append).toHaveBeenCalled();
-  });
-
-  it("refuses non-admins, values out of range, unknown ids and checkpoints that are not meals", async () => {
-    const t = setup({ list: ok([LUNCH, TALK]) });
-
-    expect(await setFoodRequirements(t.deps, { uid: "s1", role: "staff" }, { id: "lunch-1", minLevel: 2, minTalks: null })).toEqual(err(manageError("forbidden")));
-    expect(await setFoodRequirements(t.deps, ADMIN, { id: "lunch-1", minLevel: 11, minTalks: null })).toEqual(err(manageError("invalid-level")));
-    expect(await setFoodRequirements(t.deps, ADMIN, { id: "lunch-1", minLevel: null, minTalks: 51 })).toEqual(err(manageError("invalid-talks")));
-    expect(await setFoodRequirements(t.deps, ADMIN, { id: "../x", minLevel: 2, minTalks: null })).toEqual(err(manageError("not-found")));
-    expect(await setFoodRequirements(t.deps, ADMIN, { id: "lunch-9", minLevel: 2, minTalks: null })).toEqual(err(manageError("not-found")));
-    expect(await setFoodRequirements(t.deps, ADMIN, { id: "talk-1", minLevel: 2, minTalks: null })).toEqual(err(manageError("not-catering")));
+    expect(await editCheckpoint(t.deps, { uid: "s1", role: "staff" }, base)).toEqual(err(manageError("forbidden")));
+    expect(await editCheckpoint(t.deps, ADMIN, { ...base, id: "../x" })).toEqual(err(manageError("not-found")));
+    expect(await editCheckpoint(t.deps, ADMIN, { ...base, name: "x" })).toEqual(err(manageError("invalid-name")));
+    expect(await editCheckpoint(t.deps, ADMIN, { ...base, description: "x".repeat(201) })).toEqual(err(manageError("invalid-description")));
+    expect(await editCheckpoint(t.deps, ADMIN, { ...base, imagePath: "https://evil.example/x.png" })).toEqual(err(manageError("invalid-image")));
+    expect(await editCheckpoint(t.deps, ADMIN, { ...base, kind: "talk" })).toEqual(err(manageError("invalid-kind")));
+    expect(await editCheckpoint(t.deps, ADMIN, { ...base, newId: "No Valid" })).toEqual(err(manageError("invalid-id")));
+    expect(await editCheckpoint(t.deps, ADMIN, { ...base, requirements: { minLevel: 11, minTalks: null } })).toEqual(err(manageError("invalid-level")));
+    expect(t.store.list).not.toHaveBeenCalled();
+    // A food gate only for a meal.
+    expect(await editCheckpoint(t.deps, ADMIN, { ...base, requirements: { minLevel: 2, minTalks: null } })).toEqual(err(manageError("not-catering")));
     expect(t.store.update).not.toHaveBeenCalled();
   });
 
-  it("reports failed reads and writes, and a checkpoint gone meanwhile", async () => {
-    expect(await setFoodRequirements(setup({ list: err({ code: "unknown" }) }).deps, ADMIN, { id: "lunch-1", minLevel: 2, minTalks: null })).toEqual(err(manageError("unknown")));
-    expect(await setFoodRequirements(setup({ update: err({ code: "unknown" }) }).deps, ADMIN, { id: "lunch-1", minLevel: 2, minTalks: null })).toEqual(err(manageError("unknown")));
-    expect(await setFoodRequirements(setup({ update: ok(null) }).deps, ADMIN, { id: "lunch-1", minLevel: 2, minTalks: null })).toEqual(err(manageError("not-found")));
+  it("never edits a talk, and reports a missing puesto and failed reads or writes", async () => {
+    const TALK: ManagedCheckpoint = { id: "talk-1", kind: "talk", name: "Keynote", active: true, description: "", image: null, requirements: NONE };
+    expect(await editCheckpoint(setup({ list: ok([TALK]) }).deps, ADMIN, { id: "talk-1", name: "Otro", description: "" })).toEqual(err(manageError("not-found")));
+    expect(await editCheckpoint(setup().deps, ADMIN, { id: "ghost-1", name: "Otro", description: "" })).toEqual(err(manageError("not-found")));
+    expect(await editCheckpoint(setup({ list: err({ code: "unknown" }) }).deps, ADMIN, { id: "lunch-1", name: "Otro", description: "" })).toEqual(err(manageError("unknown")));
+    expect(await editCheckpoint(setup({ update: err({ code: "unknown" }) }).deps, ADMIN, { id: "lunch-1", name: "Otro", description: "" })).toEqual(err(manageError("unknown")));
+    expect(await editCheckpoint(setup({ update: ok(null) }).deps, ADMIN, { id: "lunch-1", name: "Otro", description: "" })).toEqual(err(manageError("not-found")));
+    expect(await editCheckpoint(setup({ planned: err({ code: "unknown" }) }).deps, ADMIN, { id: "lunch-1", name: "Otro", description: "", kind: "stand" })).toEqual(err(manageError("unknown")));
+  });
+});
+
+describe("listIdentityLocks", () => {
+  it("says why each puesto's kind and id are locked: the plan first, then check-ins, then missions", async () => {
+    const t = setup({
+      planned: ok(["stand-cloud"]),
+      usage: ok({
+        "stand-cloud": { checkIns: true, missions: false },
+        "lunch-1": { checkIns: true, missions: true },
+        "louis-3d": { checkIns: false, missions: true },
+        free: { checkIns: false, missions: false },
+      }),
+    });
+
+    const result = await listIdentityLocks(t.deps, ADMIN, [
+      { id: "stand-cloud", kind: "stand" },
+      { id: "lunch-1", kind: "catering" },
+      { id: "louis-3d", kind: "stand" },
+      { id: "free", kind: "entrance" },
+    ]);
+
+    expect(result).toEqual(ok({ "stand-cloud": "from-plan", "lunch-1": "has-check-ins", "louis-3d": "has-missions", free: null }));
+  });
+
+  it("is for admins only, and reports failed reads", async () => {
+    expect(await listIdentityLocks(setup().deps, { uid: "s1", role: "staff" }, [])).toEqual(err(manageError("forbidden")));
+    expect(await listIdentityLocks(setup({ usage: err({ code: "unknown" }) }).deps, ADMIN, [])).toEqual(err(manageError("unknown")));
+    expect(await listIdentityLocks(setup({ planned: err({ code: "unknown" }) }).deps, ADMIN, [])).toEqual(err(manageError("unknown")));
+  });
+});
+
+describe("deleteCheckpoint and its image", () => {
+  it("deletes the image of the puesto it deleted", async () => {
+    const withLogo = { ...LUNCH, image: LOGO_REF };
+    const t = setup({ remove: ok({ kind: "deleted", checkpoint: withLogo }) });
+
+    await deleteCheckpoint(t.deps, ADMIN, { id: "lunch-1" });
+
+    expect(t.images.remove).toHaveBeenCalledWith(LOGO);
   });
 });

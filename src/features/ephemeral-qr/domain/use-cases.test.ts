@@ -10,6 +10,8 @@ const NOW = Date.UTC(2026, 9, 20, 14, 0, 0, 500); // 14:00:00.500
 const NOW_SECONDS = Math.floor(NOW / 1000);
 const TALK = { id: "talk-keynote", kind: "talk", name: "Keynote", active: true };
 const DOOR = { id: "entrada-norte", kind: "entrance", name: "Entrada norte", active: true };
+const STAND = { id: "stand-louis", kind: "stand", name: "Stand Louis 3D", active: true };
+const OTHER_STAND = { id: "stand-cloud", kind: "stand", name: "Stand Cloud", active: true };
 const STAFF: QrActor = { uid: "s1", role: "staff", kinds: ["entrance", "catering", "stand"] };
 
 /** A signer that is easy to reason about: the "signature" is the reversed input, padded to look like one. */
@@ -38,17 +40,39 @@ beforeEach(() => {
 });
 
 describe("listScreenCheckpoints", () => {
-  it("lists every open talk and entrance for an admin, with its kind", async () => {
+  it("lists every open talk, entrance and stand for an admin, with its kind, but never a meal", async () => {
     const t = setup({ active: ok([TALK, DOOR, { id: "almuerzo", kind: "catering", name: "Almuerzo", active: true }, { id: "stand-ai", kind: "stand", name: "AI", active: true }]) });
 
-    expect(await listScreenCheckpoints(t.deps, ADMIN)).toEqual(ok([{ id: "talk-keynote", name: "Keynote", kind: "talk" }, { id: "entrada-norte", name: "Entrada norte", kind: "entrance" }]));
+    expect(await listScreenCheckpoints(t.deps, ADMIN)).toEqual(
+      ok([
+        { id: "talk-keynote", name: "Keynote", kind: "talk", description: "", image: null },
+        { id: "entrada-norte", name: "Entrada norte", kind: "entrance", description: "", image: null },
+        { id: "stand-ai", name: "AI", kind: "stand", description: "", image: null },
+      ]),
+    );
   });
 
-  it("lists only the entrances for staff who may operate them, and nothing for staff who may not", async () => {
-    const t = setup({ active: ok([TALK, DOOR]) });
+  it("lists only the entrances and stands staff may operate, and nothing for staff who may not", async () => {
+    const t = setup({ active: ok([TALK, DOOR, STAND]) });
 
-    expect(await listScreenCheckpoints(t.deps, STAFF)).toEqual(ok([{ id: "entrada-norte", name: "Entrada norte", kind: "entrance" }]));
+    expect(await listScreenCheckpoints(t.deps, STAFF)).toEqual(ok([{ id: "entrada-norte", name: "Entrada norte", kind: "entrance", description: "", image: null }, { id: "stand-louis", name: "Stand Louis 3D", kind: "stand", description: "", image: null }]));
+    expect(await listScreenCheckpoints(t.deps, { ...STAFF, kinds: ["stand"] })).toEqual(ok([{ id: "stand-louis", name: "Stand Louis 3D", kind: "stand", description: "", image: null }]));
     expect(await listScreenCheckpoints(t.deps, { ...STAFF, kinds: ["catering"] })).toEqual(ok([]));
+  });
+
+  it("carries a puesto's description and image address, for its screen", async () => {
+    const t = setup({ active: ok([{ ...STAND, description: "Impresión 3D", image: "/media/logo.webp" }]) });
+
+    expect(await listScreenCheckpoints(t.deps, ADMIN)).toMatchObject({ ok: true, value: [{ id: "stand-louis", description: "Impresión 3D", image: "/media/logo.webp" }] });
+  });
+
+  it("lists only their own stations for staff an admin limited, and never limits an admin", async () => {
+    const t = setup({ active: ok([TALK, DOOR, STAND, OTHER_STAND]) });
+
+    expect(await listScreenCheckpoints(t.deps, { ...STAFF, checkpointIds: ["stand-louis"] })).toEqual(ok([{ id: "stand-louis", name: "Stand Louis 3D", kind: "stand", description: "", image: null }]));
+    expect(await listScreenCheckpoints(t.deps, { ...STAFF, checkpointIds: [] })).toEqual(ok([]));
+    const admin = await listScreenCheckpoints(t.deps, { ...ADMIN, checkpointIds: ["stand-louis"] });
+    expect(admin.ok && admin.value.map((point) => point.id)).toEqual(["talk-keynote", "entrada-norte", "stand-louis", "stand-cloud"]);
   });
 
   it("refuses attendees and reports a failed read", async () => {
@@ -103,10 +127,19 @@ describe("issueQr", () => {
     expect(t.encoder.encode).not.toHaveBeenCalled();
   });
 
-  it.each(["catering", "stand"])("only talks and the entrance show a code on a screen: %s is refused", async (kind) => {
-    const t = setup({ found: ok({ ...TALK, kind }) });
+  it("only talks, entrances and stands show a code on a screen: a meal is refused", async () => {
+    const t = setup({ found: ok({ ...TALK, kind: "catering" }) });
 
     expect(await issueQr(t.deps, ADMIN, { checkpointId: "talk-keynote" })).toEqual(err(qrError("not-shown-on-screen")));
+  });
+
+  it("issues a stand's code for a minute, like the entrance's, and the verifier accepts it", async () => {
+    const t = setup({ found: ok(STAND) });
+
+    const result = await issueQr(t.deps, ADMIN, { checkpointId: "stand-louis" });
+
+    expect(result.ok && result.value).toMatchObject({ checkpointId: "stand-louis", name: "Stand Louis 3D", issuedAt: NOW, expiresAt: (NOW_SECONDS + ENTRANCE_QR_LIFETIME_SECONDS) * 1000 });
+    expect(verifyPayload({ signer, now: () => NOW }, result.ok ? result.value.payload : "")).toEqual({ ok: true, checkpointId: "stand-louis" });
   });
 
   it("issues the entrance's code for a minute, half of a talk's, and the verifier accepts it", async () => {
@@ -142,7 +175,36 @@ describe("issueQr", () => {
       expect(t.encoder.encode).not.toHaveBeenCalled();
     });
 
-    it("are told the code is not for a screen when it is a meal or a stand, not that they lack permission", async () => {
+    it("show a stand's code when the edition lets staff operate stands", async () => {
+      const t = setup({ found: ok(STAND) });
+
+      expect(await issueQr(t.deps, STAFF, { checkpointId: "stand-louis" })).toMatchObject({ ok: true, value: { checkpointId: "stand-louis" } });
+    });
+
+    it("do not show a stand's code when the edition keeps them off stands", async () => {
+      const t = setup({ found: ok(STAND) });
+
+      expect(await issueQr(t.deps, { ...STAFF, kinds: ["entrance", "catering"] }, { checkpointId: "stand-louis" })).toEqual(err(qrError("forbidden")));
+      expect(t.encoder.encode).not.toHaveBeenCalled();
+    });
+
+    it("show only their own stand when an admin limited them, and are forbidden another one", async () => {
+      const limited: QrActor = { ...STAFF, checkpointIds: ["stand-louis"] };
+
+      expect(await issueQr(setup({ found: ok(STAND) }).deps, limited, { checkpointId: "stand-louis" })).toMatchObject({ ok: true });
+      const other = setup({ found: ok(OTHER_STAND) });
+      expect(await issueQr(other.deps, limited, { checkpointId: "stand-cloud" })).toEqual(err(qrError("forbidden")));
+      expect(await issueQr(setup({ found: ok(DOOR) }).deps, limited, { checkpointId: "entrada-norte" })).toEqual(err(qrError("forbidden")));
+      expect(other.encoder.encode).not.toHaveBeenCalled();
+    });
+
+    it("never show a talk's code, even when limited to that very checkpoint", async () => {
+      const t = setup();
+
+      expect(await issueQr(t.deps, { ...STAFF, checkpointIds: ["talk-keynote"] }, { checkpointId: "talk-keynote" })).toEqual(err(qrError("forbidden")));
+    });
+
+    it("are told the code is not for a screen when it is a meal, not that they lack permission", async () => {
       const t = setup({ found: ok({ ...DOOR, kind: "catering" }) });
 
       expect(await issueQr(t.deps, STAFF, { checkpointId: "entrada-norte" })).toEqual(err(qrError("not-shown-on-screen")));

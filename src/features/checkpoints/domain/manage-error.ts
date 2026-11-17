@@ -2,6 +2,10 @@ export type ManageErrorCode =
   | "invalid-name"
   | "invalid-id"
   | "invalid-kind"
+  /** A description longer than 200 characters. */
+  | "invalid-description"
+  /** An image path that is not an upload for a puesto. */
+  | "invalid-image"
   /** A food gate level outside 1..10, or talks outside 0..50. */
   | "invalid-level"
   | "invalid-talks"
@@ -12,6 +16,8 @@ export type ManageErrorCode =
   | "has-check-ins"
   /** A mission points at it: those change or go first. */
   | "has-missions"
+  /** A stand of the venue plan: its kind and id belong to the plan (Zonas), which would re-create it. */
+  | "from-plan"
   /** The edition is published or over: only an admin of every edition deletes there. */
   | "edition-locked"
   | "not-found"

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { copy } from "@/shared/copy/es";
 import { rankWithLevel } from "@/shared/copy/rank-name";
 import { formatNumber, interpolate } from "@/shared/lib/format";
-import { Button, SelectField, TextField } from "@/shared/ui";
+import { SelectField, TextField } from "@/shared/ui";
 import { FOOD_TALKS_MAX, checkFoodRequirements, type FoodRequirements } from "../domain/food-gate";
+import type { ManageErrorCode } from "../domain/manage-error";
 
 /** A level of the edition's ladder, as the admin knows it. */
 export interface LevelOption {
@@ -25,62 +25,58 @@ export function requirementsSummary(requirements: FoodRequirements, levels: read
   return parts.length === 0 ? t.none : parts.join(" · ");
 }
 
+/** What the two fields hold, as typed: an empty level or talks field means no condition. */
+export interface RequirementsDraft {
+  level: string;
+  talks: string;
+}
+
+export const draftOf = (requirements: FoodRequirements): RequirementsDraft => ({
+  level: requirements.minLevel === null ? "" : String(requirements.minLevel),
+  talks: requirements.minTalks === null ? "" : String(requirements.minTalks),
+});
+
+/** The food gate the fields describe, checked like the server does, or the code of what is wrong. */
+export function readDraft(draft: RequirementsDraft): { ok: true; value: FoodRequirements } | { ok: false; code: ManageErrorCode } {
+  const checked = checkFoodRequirements({ minLevel: draft.level === "" ? null : Number(draft.level), minTalks: draft.talks === "" ? null : Number(draft.talks) });
+  return checked.ok ? { ok: true, value: checked.value } : { ok: false, code: checked.code };
+}
+
 export interface FoodRequirementsEditorProps {
-  requirements: FoodRequirements;
+  /** The food gate saved now: a level the ladder no longer has stays offered, so saving does not change it silently. */
+  saved: FoodRequirements;
+  draft: RequirementsDraft;
+  onChange: (draft: RequirementsDraft) => void;
   /** The edition's ladder; level 1 is everyone, so it is offered as "no level condition". */
   levels: readonly LevelOption[];
-  busy: boolean;
-  onSave: (requirements: FoodRequirements) => void;
-  onCancel: () => void;
+  disabled?: boolean;
+  error?: string | null;
 }
 
 /**
- * Edits a meal's food gate: a minimum level chosen from the edition's ladder and a minimum of talks
- * attended. Values are checked like the server does; an empty talks field means no condition.
+ * The fields of a meal's food gate, inside the «Editar puesto» form: a minimum level chosen from the edition's ladder
+ * and a minimum of talks attended. The form checks them with `readDraft` before saving.
  */
-export function FoodRequirementsEditor({ requirements, levels, busy, onSave, onCancel }: FoodRequirementsEditorProps) {
-  const [level, setLevel] = useState(requirements.minLevel === null ? "" : String(requirements.minLevel));
-  const [talks, setTalks] = useState(requirements.minTalks === null ? "" : String(requirements.minTalks));
-  const [error, setError] = useState<string | null>(null);
-
-  // A saved level the ladder no longer has stays visible, so saving does not change it silently.
+export function FoodRequirementsEditor({ saved, draft, onChange, levels, disabled = false, error }: FoodRequirementsEditorProps) {
   const offered = levels.filter((option) => option.level > 1).map((option) => option.level);
-  if (requirements.minLevel !== null && !offered.includes(requirements.minLevel)) offered.push(requirements.minLevel);
+  if (saved.minLevel !== null && !offered.includes(saved.minLevel)) offered.push(saved.minLevel);
   const options = [{ value: "", label: t.levelNone }, ...offered.sort((a, b) => a - b).map((value) => ({ value: String(value), label: levelLabel(value, levels) }))];
 
-  function save() {
-    const checked = checkFoodRequirements({ minLevel: level === "" ? null : Number(level), minTalks: talks === "" ? null : Number(talks) });
-    if (!checked.ok) {
-      setError(copy.admin.checkpoints.errors[checked.code]);
-      return;
-    }
-    setError(null);
-    onSave(checked.value);
-  }
-
   return (
-    <fieldset className="gap-space-3 flex flex-col" disabled={busy}>
+    <fieldset className="gap-space-3 flex flex-col" disabled={disabled}>
       <legend className="type-label text-foreground mb-space-1">{t.title}</legend>
       <p className="type-caption text-text-subtle">{t.help}</p>
-      <SelectField label={t.levelLabel} hint={t.levelHint} options={options} value={level} onChange={(event) => setLevel(event.target.value)} />
+      <SelectField label={t.levelLabel} hint={t.levelHint} options={options} value={draft.level} onChange={(event) => onChange({ ...draft, level: event.target.value })} />
       <TextField
         label={t.talksLabel}
         hint={t.talksHint}
-        value={talks}
+        value={draft.talks}
         inputMode="numeric"
         maxLength={String(FOOD_TALKS_MAX).length}
         autoComplete="off"
         error={error}
-        onChange={(event) => setTalks(event.target.value.replace(/[^0-9]/g, ""))}
+        onChange={(event) => onChange({ ...draft, talks: event.target.value.replace(/[^0-9]/g, "") })}
       />
-      <div className="gap-space-3 flex">
-        <Button size="sm" loading={busy} onClick={save}>
-          {busy ? copy.admin.checkpoints.saving : t.save}
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          {copy.admin.checkpoints.cancel}
-        </Button>
-      </div>
     </fieldset>
   );
 }

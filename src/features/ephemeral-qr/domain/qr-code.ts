@@ -3,11 +3,14 @@ import { isCheckpointId, type CheckpointId } from "@/features/checkins";
 /** How long a talk's code on screen can be scanned. Short on purpose: it forces being in the room. */
 export const QR_LIFETIME_SECONDS = 120;
 
-/** The entrance's code lives half as long: it is on a door screen where a photo could travel to someone outside. */
+/**
+ * The entrance's and a stand's code live half as long: they are on a screen in an open area (the door, the stand's
+ * tablet) where a photo could travel to someone who is not there.
+ */
 export const ENTRANCE_QR_LIFETIME_SECONDS = 60;
 
 /** How long a fresh code of a kind lives. */
-export const lifetimeSecondsFor = (kind: string): number => (kind === "entrance" ? ENTRANCE_QR_LIFETIME_SECONDS : QR_LIFETIME_SECONDS);
+export const lifetimeSecondsFor = (kind: string): number => (kind === "entrance" || kind === "stand" ? ENTRANCE_QR_LIFETIME_SECONDS : QR_LIFETIME_SECONDS);
 
 /** A code may not claim to expire further ahead than a fresh one would, plus a little clock slack. Longest lifetime, so a shorter one is always fine. */
 export const QR_MAX_FUTURE_SECONDS = QR_LIFETIME_SECONDS + 30;

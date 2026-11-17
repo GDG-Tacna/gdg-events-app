@@ -63,11 +63,23 @@ describe("staff home page", () => {
     expect(within(screen.getByRole("region", { name: copy.staff.kinds.stand })).getByText("12 visitas")).toBeInTheDocument();
   });
 
-  it("offers the entrance's code for the door screen on the entrances only", async () => {
+  it("offers the code for a screen on the entrances and the stands, each with its own label, never on a meal", async () => {
     render(await StaffHomePage());
 
     const door = screen.getAllByRole("link", { name: copy.staff.showEntranceQr });
     expect(door.map((link) => link.getAttribute("href"))).toEqual(["/staff/qr/entrance-main"]);
+    const stand = screen.getAllByRole("link", { name: copy.staff.showStandQr });
+    expect(stand.map((link) => link.getAttribute("href"))).toEqual(["/staff/qr/stand-cloud"]);
+    expect(within(screen.getByRole("region", { name: copy.staff.kinds.catering })).queryByRole("link", { name: /QR/ })).not.toBeInTheDocument();
+  });
+
+  it("lists the stations with the ones an admin limited the staff member to", async () => {
+    const permissions = await import("@/app-shell/permissions.server");
+    vi.spyOn(permissions, "staffCheckpoints").mockResolvedValueOnce(["stand-cloud"]);
+
+    await StaffHomePage();
+
+    expect(server.listServePoints).toHaveBeenCalledWith({ marker: "deps" }, { uid: "s1", role: "staff", kinds: ["entrance", "catering", "stand"], checkpointIds: ["stand-cloud"] });
   });
 
   it("leaves out a kind with no open station", async () => {
@@ -96,5 +108,28 @@ describe("staff home page", () => {
     const { container } = render(await StaffHomePage());
 
     expect((await axe(container)).violations).toEqual([]);
+  });
+});
+
+describe("staff home page puesto details", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    guards.requireRole.mockResolvedValue({ uid: "s1", role: "staff", displayName: null, photoUrl: null });
+  });
+
+  it("shows each puesto's image and description on its card", async () => {
+    server.listServePoints.mockResolvedValue({
+      ok: true,
+      value: [
+        { id: "louis-3d", kind: "stand", name: "Louis 3D", description: "Impresión 3D en vivo", image: "/media/logo.webp", servedCount: 4 },
+        { id: "lunch-1", kind: "catering", name: "Almuerzo", description: "", image: null, servedCount: 1 },
+      ],
+    });
+
+    const { container } = render(await StaffHomePage());
+
+    expect(within(screen.getByRole("region", { name: copy.staff.kinds.stand })).getByText("Impresión 3D en vivo")).toBeInTheDocument();
+    expect(container.querySelectorAll("img")).toHaveLength(1);
+    expect(container.querySelector('img[src="/media/logo.webp"]')).not.toBeNull();
   });
 });

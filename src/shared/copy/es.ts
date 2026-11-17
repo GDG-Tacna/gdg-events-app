@@ -232,7 +232,7 @@ export const copy = {
     back: "Volver a misiones",
     howTo: {
       talk: "Esta misión se completa escaneando el QR que aparece en pantalla durante la charla.",
-      stand: "Esta misión se completa al visitar el stand: muéstrale tu QR al staff y lo escanea.",
+      stand: "Esta misión se completa al visitar el stand: escanea el QR que muestra la pantalla del stand.",
       speaker: "Esta misión se completa al conocer al speaker: escanea el QR que te muestra en su teléfono o en pantalla.",
     },
     scan: "Escanear QR",
@@ -328,6 +328,8 @@ export const copy = {
     retry: "Reintentar",
     scanAgain: "Escanear otro código",
     toHome: "Ir al inicio",
+    /** The entrance or stand just scanned, with its logo and description. */
+    placeLabel: "Puesto escaneado",
     cameraErrors: {
       denied: {
         title: "Necesitamos la cámara",
@@ -371,7 +373,7 @@ export const copy = {
       "contact-code": { title: "Es el código de un cadete", body: "Para conectar con otro cadete, escanéalo desde la Red." },
       "staff-station": {
         title: "Este QR lo escanea el staff",
-        body: "En el catering y los stands, muestra tu QR personal y el staff lo escanea. Para la entrada, escanea el código que aparece en la pantalla de la puerta.",
+        body: "En el catering, muestra tu QR personal y el staff lo escanea. En la entrada y los stands, escanea el código que aparece en su pantalla.",
       },
     },
     toNetwork: "Ir a la Red",
@@ -685,13 +687,17 @@ export const copy = {
     brand: "Puesto de staff",
     accountLabel: "Cuenta de staff",
     title: "Puestos",
-    subtitle: "Elige el puesto donde vas a escanear a los cadetes.",
+    subtitle: "Elige tu puesto. Escanea el QR de cada cadete o, en la entrada y los stands, muestra el código en pantalla para que ellos lo escaneen.",
     listLabel: "Puestos abiertos",
     empty: "No hay puestos abiertos. Pídele a un admin que cree uno.",
     /** What each kind of station is, as a chip and as the group title. */
     kinds: { entrance: "Entrada", catering: "Catering", stand: "Stand" },
     /** The entrance's code, on a screen at the door for cadets to scan. */
     showEntranceQr: "Mostrar QR de ingreso",
+    /** A stand's code, on the stand's tablet for cadets to scan. */
+    showStandQr: "Mostrar QR del stand",
+    /** The browser title of the screen that shows an entrance's or a stand's code. */
+    screenQrTitle: "QR en pantalla",
     entranceQrBack: "Volver a los puestos",
     /** How many cadets a station has scanned. Placeholder: {count}. */
     servedCount: { entrance: "{count} ingresos", catering: "{count} raciones entregadas", stand: "{count} visitas" },
@@ -1663,7 +1669,7 @@ export const copy = {
         checkpoint: { talk: "Charla", stand: "Stand", speaker: "Speaker" },
         checkpointHint: {
           talk: "La charla cuyo QR en pantalla completa la misión.",
-          stand: "El stand cuyo QR impreso completa la misión.",
+          stand: "El stand cuyo QR en pantalla completa la misión (también cuenta si el staff escanea el QR del cadete).",
           speaker: "El speaker cuyo QR completa la misión. Lo muestra desde Speakers o desde su teléfono.",
         },
         noCheckpoints: {
@@ -2030,7 +2036,7 @@ export const copy = {
       speakers: { title: "Speakers", description: "Las fichas de quienes dan las charlas: foto, cargo, bio y enlaces." },
       checkpoints: {
         title: "Puestos",
-        description: "Crea la entrada, el catering y los stands que opera el staff, y ábrelos o ciérralos.",
+        description: "Crea y edita la entrada, el catering y los stands, con su descripción e imagen, y ábrelos o ciérralos.",
       },
       squads: {
         title: "Escuadrones",
@@ -2085,15 +2091,15 @@ export const copy = {
     },
     checkpoints: {
       title: "Puestos",
-      subtitle: "Los puestos que opera el staff escaneando el QR de cada cadete: entrada, catering y stands. Las charlas están en Charlas.",
+      subtitle: "Entrada, catering y stands. En la entrada y los stands el cadete también puede escanear un código en pantalla. Las charlas están en Charlas.",
       listLabel: "Puestos del evento",
       empty: "Aún no hay puestos. Crea el primero abajo.",
       kinds: { entrance: "Entrada", talk: "Charla", catering: "Catering", stand: "Stand" },
       kindHelp: {
-        entrance: "Registra la llegada al evento: el staff escanea el QR del cadete.",
+        entrance: "Registra la llegada al evento: el cadete escanea el QR que cambia en la pantalla de la puerta, o el staff escanea el QR del cadete.",
         talk: "Código en pantalla que cambia cada pocos minutos.",
-        catering: "Raciones: el staff escanea el QR del cadete.",
-        stand: "Visita a un stand del plano: el staff escanea el QR del cadete. Completa sus misiones de stand.",
+        catering: "Raciones: el staff escanea el QR del cadete. Puede pedir un nivel o charlas mínimas.",
+        stand: "Visita a un stand del plano: el cadete escanea el código en la pantalla del stand, o el staff escanea su QR. Completa sus misiones de stand.",
       },
       open: "Abierto",
       closed: "Cerrado",
@@ -2101,25 +2107,40 @@ export const copy = {
       reopen: "Abrir",
       closing: "Cerrando…",
       opening: "Abriendo…",
-      rename: "Renombrar",
       save: "Guardar",
       saving: "Guardando…",
       cancel: "Cancelar",
       nameLabel: "Nombre del puesto",
       idLabel: "Identificador",
-      idHint: "Minúsculas, números y guiones. No se puede cambiar después.",
+      idHint: "Minúsculas, números y guiones. Solo se puede cambiar mientras nadie lo use.",
       kindLegend: "Tipo",
-      kindRequired: "Elige el tipo de puesto: no se puede cambiar después.",
+      kindRequired: "Elige el tipo de puesto.",
+      descriptionLabel: "Descripción (opcional)",
+      descriptionHint: "Qué es o qué ofrece el puesto. La ven el cadete al escanear, el staff y la pantalla del QR.",
+      imageLabel: "Imagen (opcional)",
+      /** The «Editar puesto» dialog. */
+      edit: {
+        action: "Editar",
+        title: "Editar puesto",
+        idHint: "Minúsculas, números y guiones. Cambiarlo no afecta nada: nadie lo usa todavía.",
+        /** Placeholder: {name}. */
+        saved: "Puesto «{name}» guardado.",
+        requirementsDropped: "Al dejar de ser catering, el puesto pierde sus requisitos.",
+        /** Why the kind and the identifier cannot change. */
+        locks: {
+          "from-plan": "Este stand viene del plano: se cambia desde Zonas.",
+          "has-check-ins": "Ya tiene check-ins: el tipo y el identificador no se pueden cambiar.",
+          "has-missions": "Una misión lo usa: el tipo y el identificador no se pueden cambiar.",
+          "edition-locked": "La edición ya está publicada: solo un admin de todas las ediciones cambia el tipo y el identificador.",
+        },
+      },
       createTitle: "Crear un puesto",
       create: "Crear puesto",
       creating: "Creando…",
       project: "Proyectar QR",
       /** Placeholder: {name}. */
       created: "Puesto «{name}» creado y abierto.",
-      /** Placeholder: {name}. */
-      renamed: "Ahora se llama «{name}».",
       requirements: {
-        edit: "Requisitos",
         none: "Sin requisitos: cualquier cadete registrado",
         /** Placeholder: {rank}. */
         fromLevel: "Desde {rank}",
@@ -2133,15 +2154,14 @@ export const copy = {
         levelHint: "El rango que debe tener el cadete al momento de escanear.",
         talksLabel: "Charlas asistidas mínimas",
         talksHint: "Vacío o 0 es sin requisito. Cuentan las charlas registradas hasta ese momento.",
-        save: "Guardar requisitos",
-        /** Placeholder: {name}. */
-        saved: "Requisitos de «{name}» guardados.",
       },
       /** Placeholder: {name}. */
       closedDone: "«{name}» está cerrado: ya no acepta escaneos.",
       delete: "Eliminar",
       /** The entrance's code, on a screen at the door for cadets to scan. */
       showQr: "Mostrar QR de ingreso",
+      /** A stand's code, on the stand's tablet for cadets to scan. */
+      showStandQr: "Mostrar QR del stand",
       /** Placeholder: {name}. */
       confirmDeleteTitle: "¿Eliminar el puesto «{name}»?",
       confirmDelete: "Se borra para siempre. Solo se puede si nadie hizo check-in allí y ninguna misión lo usa.",
@@ -2152,12 +2172,15 @@ export const copy = {
         "invalid-name": "El nombre debe tener entre 2 y 60 caracteres.",
         "invalid-id": "El identificador usa minúsculas, números y guiones (2 a 48 caracteres).",
         "invalid-kind": "Elige un tipo de puesto.",
+        "invalid-description": "La descripción puede tener hasta 200 caracteres.",
+        "invalid-image": "La imagen no es válida. Súbela de nuevo.",
         "invalid-level": "Elige un nivel del 1 al 10.",
         "invalid-talks": "Las charlas mínimas son un entero entre 0 y 50.",
         "not-catering": "Solo los puestos de catering tienen requisitos.",
         "already-exists": "Ya existe un puesto con ese identificador.",
         "has-check-ins": "No se puede eliminar: ya hay cadetes que hicieron check-in aquí. Ciérralo para que no acepte más escaneos.",
         "has-missions": "No se puede eliminar: una misión usa este puesto. Cambia o elimina esa misión primero.",
+        "from-plan": "Este stand viene del plano: su tipo y su identificador se cambian desde Zonas.",
         "edition-locked": "Esta edición ya está publicada: solo un admin de todas las ediciones puede eliminar. Puedes cerrar el puesto.",
         "not-found": "Ese puesto no existe.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
@@ -2248,6 +2271,7 @@ export const copy = {
       loading: "Generando código…",
       scanHint: "Escanea este código con la app para registrar tu asistencia.",
       scanHintEntrance: "Escanea este código con la app para registrar tu ingreso al evento.",
+      scanHintStand: "Escanea este código con la app para registrar tu visita al stand.",
       backEntrance: "Volver a puestos",
       /** Placeholder: {name}. */
       codeLabel: "Código QR de {name}",
@@ -2261,7 +2285,7 @@ export const copy = {
       errors: {
         "checkpoint-not-found": "Esa charla no existe.",
         "checkpoint-inactive": "Esa charla ya no está activa.",
-        "not-shown-on-screen": "Solo las charlas y la entrada usan un código que cambia en pantalla. El catering y los stands los registra el staff con el QR del cadet.",
+        "not-shown-on-screen": "Solo las charlas, la entrada y los stands usan un código que cambia en pantalla. El catering lo registra el staff con el QR del cadete.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
         forbidden: "No tienes permiso para mostrar este código.",
         disabled: "Los códigos de charla no están disponibles por ahora.",
@@ -2290,7 +2314,7 @@ export const copy = {
       roleLegend: "Rol",
       roles: { staff: "Staff", organizer: "Organizador", admin: "Admin" },
       roleHelp: {
-        staff: "Escanea a los cadetes en la entrada, el catering y los stands.",
+        staff: "Opera la entrada, el catering y los stands: escanea el QR de los cadetes o muestra el código en pantalla para que ellos lo escaneen.",
         organizer: "Gestiona esta edición como un admin y suma o quita staff. No nombra admins ni organizadores.",
         admin: "Gestiona todo, en todas las ediciones, y el equipo completo.",
       },
@@ -2305,6 +2329,42 @@ export const copy = {
       granted: "{email} ahora es {role}. Debe volver a iniciar sesión para ver el cambio.",
       /** Placeholder: {email}. */
       revoked: "Se quitó el rol a {email}. Deberá volver a iniciar sesión.",
+      /** Which stations a staff member operates (all, or only the ones an admin chose). */
+      scope: {
+        all: "Puestos: Todos",
+        /** Placeholder: {names}. */
+        only: "Solo: {names}",
+        /** A chosen station that no longer exists. */
+        unknownStation: "puesto eliminado",
+        edit: "Elegir puestos",
+        /** Placeholder: {name}. */
+        editLabel: "Elegir puestos de {name}",
+        /** Placeholder: {name}. */
+        title: "Puestos de {name}",
+        help: "Limita esta cuenta de staff a algunos puestos de la edición, por ejemplo el stand de un auspiciador. Solo verá y escaneará esos puestos, y solo podrá mostrar sus códigos.",
+        allOption: "Todos los puestos",
+        allHelp: "Los que la edición permite al staff, como hasta ahora.",
+        someOption: "Solo los puestos que elijas",
+        stationsLegend: "Puestos",
+        noStations: "Esta edición aún no tiene puestos. Créalos en Puestos.",
+        closed: "cerrado",
+        pickOne: "Elige al menos un puesto.",
+        save: "Guardar puestos",
+        saving: "Guardando…",
+        cancel: "Cancelar",
+        /** Placeholder: {name}. */
+        savedAll: "{name} puede operar todos los puestos.",
+        /** Placeholder: {name}. */
+        savedSome: "Puestos de {name} guardados.",
+        errors: {
+          "invalid-scope": "Elige puestos que existan en esta edición.",
+          "not-found": "Esa persona ya no está en el equipo.",
+          unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
+          forbidden: "No tienes permiso para cambiar los puestos del staff.",
+          disabled: "El centro de control no está disponible por ahora.",
+          unknown: "No pudimos guardar los puestos. Inténtalo de nuevo.",
+        },
+      },
       invites: {
         title: "Invitar por enlace",
         help: "Para quien aún no entró a la app. El enlace sirve una vez, solo con ese correo de Google, durante 7 días.",

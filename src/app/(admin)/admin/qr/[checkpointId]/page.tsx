@@ -19,20 +19,22 @@ export default async function AdminQrDisplayPage({ params }: PageProps<"/admin/q
 
   const shown = await listScreenCheckpoints(ephemeralQrDeps, { uid: session.uid, role: session.role });
   if (!shown.ok) throw new Error("Could not read the checkpoints");
-  // Only an open talk or entrance can show a code: anything else (unknown id, catering, closed) is not found.
+  // Only an open talk, entrance or stand can show a code: anything else (unknown id, catering, closed) is not found.
   const point = shown.value.find((candidate) => candidate.id === checkpointId);
   if (!point) notFound();
-  const entrance = point.kind === "entrance";
+  // An entrance and a stand are puestos: their screen leads back there, with their own hint.
+  const station = point.kind === "entrance" || point.kind === "stand";
+  const scanHint = point.kind === "stand" ? copy.admin.qr.scanHintStand : copy.admin.qr.scanHintEntrance;
 
   return (
     <ScreenEnter>
       <div className="gap-space-4 flex flex-col">
         <div>
-          <ButtonLink href={entrance ? ROUTES.adminCheckpoints : ROUTES.adminTalks} variant="ghost" size="sm" className="-ml-space-4">
-            {entrance ? copy.admin.qr.backEntrance : copy.admin.qr.back}
+          <ButtonLink href={station ? ROUTES.adminCheckpoints : ROUTES.adminTalks} variant="ghost" size="sm" className="-ml-space-4">
+            {station ? copy.admin.qr.backEntrance : copy.admin.qr.back}
           </ButtonLink>
         </div>
-        <QrDisplay checkpointId={point.id} name={point.name} issue={issueQrAction} texts={entrance ? { scanHint: copy.admin.qr.scanHintEntrance, errors: copy.admin.qr.errors } : undefined} />
+        <QrDisplay checkpointId={point.id} name={point.name} description={point.description} image={point.image} issue={issueQrAction} texts={station ? { scanHint, errors: copy.admin.qr.errors } : undefined} />
       </div>
     </ScreenEnter>
   );

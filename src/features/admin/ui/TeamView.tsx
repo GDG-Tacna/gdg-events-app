@@ -7,7 +7,8 @@ import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
 import { Button, Card, EditionTag, FormDialog, Icon, InlineAlert, TextField } from "@/shared/ui";
 import { MANAGED_ROLES, normalizeEmail, type ManagedRole, type TeamMember } from "../domain/team";
-import type { GrantRoleAction, RevokeRoleAction } from "./actions";
+import type { GrantRoleAction, RevokeRoleAction, SetStaffScopeAction, StationOption } from "./actions";
+import { StaffScopeDialog, describeScope } from "./StaffScopeDialog";
 import { useTeamActions } from "./use-team-actions";
 
 export interface TeamViewProps {
@@ -20,6 +21,12 @@ export interface TeamViewProps {
   assignable?: readonly ManagedRole[];
   /** The edition whose staff and organizers are listed (admins are global). */
   eventId?: string;
+  /** The stations each limited staff member operates (by uid); someone missing is not limited. */
+  staffScopes?: Readonly<Record<string, readonly string[]>>;
+  /** The edition's entrance, catering and stand checkpoints, to choose a staff member's stations from. */
+  stations?: readonly StationOption[];
+  /** Limits a staff member's stations; without it (the viewer may not edit the team) the stations are only shown. */
+  setScope?: SetStaffScopeAction;
 }
 
 const t = copy.admin.team;
@@ -60,9 +67,11 @@ function RoleChoice({ value, onChange, disabled, roles }: { value: ManagedRole; 
 /**
  * The Equipo screen: who has a role (admins of the app, staff and organizers of this edition), searchable by name or
  * email, each with a trash icon that asks in a dialog before taking the role away; and "Dar rol" for an account that
- * already signed in. The viewer only manages the roles it may (an organizer: staff). The server decides everything.
+ * already signed in. Each staff member shows the stations they operate («Puestos: Todos» or only some), which a viewer
+ * who manages staff can change in a dialog. The viewer only manages the roles it may (an organizer: staff). The server
+ * decides everything.
  */
-export function TeamView({ members, currentUid, grant, revoke, assignable = MANAGED_ROLES, eventId }: TeamViewProps) {
+export function TeamView({ members, currentUid, grant, revoke, assignable = MANAGED_ROLES, eventId, staffScopes = {}, stations = [], setScope }: TeamViewProps) {
   const router = useRouter();
   const { status, notice, grantRole, revokeRole, clearNotice } = useTeamActions(grant, revoke, () => router.refresh());
 
@@ -72,6 +81,8 @@ export function TeamView({ members, currentUid, grant, revoke, assignable = MANA
   const [role, setRole] = useState<ManagedRole>(assignable[0] ?? "staff");
   const [touched, setTouched] = useState(false);
   const [removing, setRemoving] = useState<TeamMember | null>(null);
+  const [scoping, setScoping] = useState<TeamMember | null>(null);
+  const [scopeNotice, setScopeNotice] = useState<string | null>(null);
 
   const busy = status !== "idle";
   const emailError = touched && normalizeEmail(email) === null ? t.errors["invalid-email"] : null;
@@ -107,6 +118,7 @@ export function TeamView({ members, currentUid, grant, revoke, assignable = MANA
           disabled={busy}
           onClick={() => {
             clearNotice();
+            setScopeNotice(null);
             setGranting(true);
           }}
         >
@@ -114,9 +126,9 @@ export function TeamView({ members, currentUid, grant, revoke, assignable = MANA
         </Button>
       </header>
 
-      {notice?.kind === "success" ? (
+      {notice?.kind === "success" || scopeNotice ? (
         <p role="status" className="type-body-sm border-accent/60 bg-accent/10 text-foreground p-space-3 rounded-md border">
-          {notice.text}
+          {notice?.kind === "success" ? notice.text : scopeNotice}
         </p>
       ) : null}
       {notice?.kind === "error" && !granting && !removing ? <InlineAlert>{notice.text}</InlineAlert> : null}
@@ -141,6 +153,27 @@ export function TeamView({ members, currentUid, grant, revoke, assignable = MANA
                     {isYou ? <span className="text-text-subtle"> · {t.you}</span> : null}
                   </p>
                   {member.displayName ? <p className="type-caption text-text-subtle truncate">{member.email}</p> : null}
+                  {member.role === "staff" ? (
+                    <div className="gap-x-space-2 flex flex-wrap items-center">
+                      <p className="type-caption text-muted-foreground">{describeScope(staffScopes[member.uid], stations)}</p>
+                      {setScope && assignable.includes("staff") ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy}
+                          aria-label={interpolate(t.scope.editLabel, { name })}
+                          className="-ml-space-3"
+                          onClick={() => {
+                            clearNotice();
+                            setScopeNotice(null);
+                            setScoping(member);
+                          }}
+                        >
+                          {t.scope.edit}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
                 <RoleChip role={member.role} />
                 {isYou || !assignable.includes(member.role) ? (
@@ -154,6 +187,7 @@ export function TeamView({ members, currentUid, grant, revoke, assignable = MANA
                     title={t.revoke}
                     onClick={() => {
                       clearNotice();
+                      setScopeNotice(null);
                       setRemoving(member);
                     }}
                     className="text-muted-foreground hover:text-danger hover:bg-secondary focus-visible:ring-ring grid size-11 shrink-0 place-items-center rounded-md focus-visible:ring-[3px] focus-visible:outline-none disabled:opacity-50"
@@ -199,6 +233,20 @@ export function TeamView({ members, currentUid, grant, revoke, assignable = MANA
           </Button>
         </form>
       </FormDialog>
+
+      {setScope ? (
+        <StaffScopeDialog
+          target={scoping ? { member: scoping, scope: staffScopes[scoping.uid] } : null}
+          stations={stations}
+          save={setScope}
+          onClose={() => setScoping(null)}
+          onSaved={(message) => {
+            setScoping(null);
+            setScopeNotice(message);
+            router.refresh();
+          }}
+        />
+      ) : null}
 
       <FormDialog
         open={removing !== null}

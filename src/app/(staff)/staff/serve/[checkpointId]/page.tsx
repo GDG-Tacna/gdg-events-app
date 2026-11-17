@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ServeScreenBound } from "@/app-shell/ServeScreenBound";
 import { serveDeps } from "@/app-shell/composition/checkpoints.server";
-import { staffStations } from "@/app-shell/permissions.server";
+import { staffCheckpoints, staffStations } from "@/app-shell/permissions.server";
 import { requireRole } from "@/app-shell/guards";
 import { getServePoint } from "@/features/checkpoints/server";
 import { copy } from "@/shared/copy/es";
@@ -14,7 +14,7 @@ export default async function StaffServePage({ params }: PageProps<"/staff/serve
   const session = await requireRole(["staff"]);
   const { checkpointId } = await params;
 
-  const point = await getServePoint(serveDeps, { uid: session.uid, role: session.role, kinds: session.role === "staff" ? await staffStations() : undefined }, checkpointId);
+  const point = await getServePoint(serveDeps, { uid: session.uid, role: session.role, kinds: session.role === "staff" ? await staffStations() : undefined, checkpointIds: await staffCheckpoints(session) }, checkpointId);
   if (!point.ok) {
     // Unknown, closed or non-station checkpoints are simply not found; a failed read is a real error.
     if (point.error.code === "unknown") throw new Error("Could not read the serving point");
@@ -23,7 +23,7 @@ export default async function StaffServePage({ params }: PageProps<"/staff/serve
 
   return (
     <ScreenEnter>
-      <ServeScreenBound checkpointId={point.value.id} kind={point.value.kind} name={point.value.name} initialCount={point.value.servedCount} />
+      <ServeScreenBound checkpointId={point.value.id} kind={point.value.kind} name={point.value.name} description={point.value.description} image={point.value.image} initialCount={point.value.servedCount} />
     </ScreenEnter>
   );
 }

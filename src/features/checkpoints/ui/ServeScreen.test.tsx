@@ -307,3 +307,29 @@ describe("ServeScreen accessibility", () => {
     expect((await axe(view.container)).violations).toEqual([]);
   });
 });
+
+describe("ServeScreen puesto details", () => {
+  it("shows the station's image and description next to its name", async () => {
+    const scanner = fakeScanner();
+    const { container } = render(
+      <ServeScreen
+        camera={scanner.scanner}
+        serve={vi.fn(async () => served())}
+        checkpointId="louis-3d"
+        kind="stand"
+        name="Louis 3D"
+        description="Impresión 3D en vivo"
+        image="/media/logo.webp"
+        initialCount={0}
+        backHref="/staff"
+      />,
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByRole("heading", { level: 1, name: "Louis 3D" })).toBeInTheDocument();
+    expect(screen.getByText("Impresión 3D en vivo")).toBeInTheDocument();
+    expect(container.querySelector('img[src="/media/logo.webp"]')).not.toBeNull();
+  });
+});

@@ -4,35 +4,43 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { isCheckpointId, type CheckpointKind } from "@/features/checkins";
+import { ImageField, type ImageRef, type UploadImageAction } from "@/features/media";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, Card, FormDialog, Icon, InlineAlert, TextField, useConfirm, type IconName } from "@/shared/ui";
-import { normalizeName, suggestId } from "../domain/manage";
+import { Button, Card, FormDialog, Icon, InlineAlert, TextAreaField, TextField, Thumbnail, useConfirm, type IconName } from "@/shared/ui";
+import { DESCRIPTION_MAX_LENGTH, normalizeName, suggestId } from "../domain/manage";
+import type { ManageErrorCode } from "../domain/manage-error";
 import { STATION_KINDS } from "../domain/serve";
-import { FoodRequirementsEditor, requirementsSummary, type LevelOption } from "./FoodRequirementsEditor";
+import { FoodRequirementsEditor, draftOf, readDraft, requirementsSummary, type LevelOption, type RequirementsDraft } from "./FoodRequirementsEditor";
 import type {
+  CheckpointLockReason,
   CheckpointView,
   CreateCheckpointAction,
   DeleteCheckpointAction,
   DeleteCheckpointActionResult,
+  EditCheckpointAction,
   ManageActionResult,
-  RenameCheckpointAction,
   SetCheckpointActiveAction,
-  SetFoodRequirementsAction,
 } from "./manage-action";
 
 export interface CheckpointsAdminViewProps {
   checkpoints: readonly CheckpointView[];
   create: CreateCheckpointAction;
-  rename: RenameCheckpointAction;
+  edit: EditCheckpointAction;
   setActive: SetCheckpointActiveAction;
   remove: DeleteCheckpointAction;
-  /** Where an entrance's code is shown (`${qrBase}/${id}`); without it the entrance has no such button. A plain path: a client component cannot receive functions from a server page. */
+  /** Uploads a puesto's image (the media feature's action). */
+  upload: UploadImageAction;
+  /**
+   * Per puesto id, why its kind and id cannot change (decided by the server page; absent or null when they can). The
+   * server checks again on save.
+   */
+  locks?: Readonly<Record<string, CheckpointLockReason | null>>;
+  /** Where an entrance's or a stand's code is shown (`${qrBase}/${id}`); without it they have no such button. A plain path: a client component cannot receive functions from a server page. */
   qrBase?: string;
   /** Whether the session may delete stations here (a draft edition, or an admin of every edition); the server decides again. */
   canDelete?: boolean;
-  setRequirements: SetFoodRequirementsAction;
   /** The edition's rank ladder, to name the minimum level of a meal. */
   levels: readonly LevelOption[];
 }
@@ -40,21 +48,37 @@ export interface CheckpointsAdminViewProps {
 type Notice = { kind: "success" | "error"; text: string } | null;
 
 /** Which dialog is open, and for which checkpoint. */
-type OpenDialog = { kind: "create" } | { kind: "rename"; checkpoint: CheckpointView } | { kind: "requirements"; checkpoint: CheckpointView } | null;
+type OpenDialog = { kind: "create" } | { kind: "edit"; checkpoint: CheckpointView } | null;
 
 const chip = "type-caption border-line-strong text-foreground px-space-3 rounded-full border py-1";
 
 /** The line icon of each kind of checkpoint. */
 const KIND_ICON: Record<CheckpointKind, IconName> = { entrance: "door", catering: "coffee", stand: "store", talk: "mic" };
 
-function KindChoice({ value, onChange, disabled, error }: { value: CheckpointKind | null; onChange: (kind: CheckpointKind) => void; disabled: boolean; error?: string | null }) {
+function KindChoice({
+  name,
+  value,
+  onChange,
+  disabled,
+  error,
+  note,
+}: {
+  /** The radio group's name (each dialog has its own). */
+  name: string;
+  value: CheckpointKind | null;
+  onChange: (kind: CheckpointKind) => void;
+  disabled: boolean;
+  error?: string | null;
+  /** Why the kind cannot change, under the options. */
+  note?: string | null;
+}) {
   return (
     <fieldset className="gap-space-2 flex flex-col" disabled={disabled}>
       <legend className="type-label text-foreground mb-space-2">{copy.admin.checkpoints.kindLegend}</legend>
       <div className="gap-space-3 grid grid-cols-1">
         {STATION_KINDS.map((kind) => (
-          <label key={kind} className="relative block cursor-pointer">
-            <input type="radio" name="checkpoint-kind" value={kind} checked={value === kind} onChange={() => onChange(kind)} className="peer sr-only" />
+          <label key={kind} className={cn("relative block", disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
+            <input type="radio" name={name} value={kind} checked={value === kind} onChange={() => onChange(kind)} className="peer sr-only" />
             <span
               className={cn(
                 "gap-space-3 p-space-3 flex min-h-12 items-center rounded-md border transition-colors",
@@ -71,6 +95,7 @@ function KindChoice({ value, onChange, disabled, error }: { value: CheckpointKin
           </label>
         ))}
       </div>
+      {note ? <p className="type-caption text-muted-foreground">{note}</p> : null}
       {error ? (
         <p role="alert" className="type-caption text-destructive">
           {error}
@@ -80,13 +105,131 @@ function KindChoice({ value, onChange, disabled, error }: { value: CheckpointKin
   );
 }
 
+/** The message for a refusal inside the edit dialog: a lock is said as a lock, not as a failed delete. */
+function editErrorText(code: ManageErrorCode): string {
+  const t = copy.admin.checkpoints;
+  return code === "has-check-ins" || code === "has-missions" || code === "from-plan" || code === "edition-locked" ? t.edit.locks[code] : t.errors[code];
+}
+
+interface EditFormProps {
+  checkpoint: CheckpointView;
+  lock: CheckpointLockReason | null;
+  levels: readonly LevelOption[];
+  upload: UploadImageAction;
+  busy: boolean;
+  error: string | null;
+  onSave: (input: Parameters<EditCheckpointAction>[0]) => void;
+  onCancel: () => void;
+}
+
 /**
- * The Puestos screen: every station staff operate (entrance, catering, stand) with its kind's icon, its state and, for
- * a meal, its requirements; on each row renaming, the requirements and opening or closing, and "Nuevo puesto" on top.
- * Creating, renaming and the requirements open in a dialog, where a refusal shows too. Nothing is deleted: a closed
- * checkpoint keeps its history. The server decides everything; this view shows the outcome.
+ * «Editar puesto»: name, description and image always; kind and identifier only when nothing locks them (shown disabled
+ * with the reason otherwise); a meal's requirements while it is a catering puesto.
  */
-export function CheckpointsAdminView({ checkpoints, create, rename, setActive, remove, qrBase, canDelete = true, setRequirements, levels }: CheckpointsAdminViewProps) {
+function EditCheckpointForm({ checkpoint, lock, levels, upload, busy, error, onSave, onCancel }: EditFormProps) {
+  const t = copy.admin.checkpoints;
+  const [name, setName] = useState(checkpoint.name);
+  const [id, setId] = useState(checkpoint.id);
+  const [kind, setKind] = useState<CheckpointKind>(checkpoint.kind);
+  const [description, setDescription] = useState(checkpoint.description);
+  const [image, setImage] = useState<ImageRef | null>(checkpoint.image);
+  const [imageChanged, setImageChanged] = useState(false);
+  const [requirements, setRequirements] = useState<RequirementsDraft>(draftOf(checkpoint.requirements));
+  const [touched, setTouched] = useState(false);
+  const [requirementsError, setRequirementsError] = useState<string | null>(null);
+
+  const locked = lock !== null;
+  const lockText = lock ? t.edit.locks[lock] : null;
+  const nameError = touched && normalizeName(name) === null ? t.errors["invalid-name"] : null;
+  const idError = touched && !locked && !isCheckpointId(id) ? t.errors["invalid-id"] : null;
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    setTouched(true);
+    if (normalizeName(name) === null || (!locked && !isCheckpointId(id))) return;
+    let gate: { minLevel: number | null; minTalks: number | null } | undefined;
+    if (kind === "catering") {
+      const read = readDraft(requirements);
+      if (!read.ok) return setRequirementsError(t.errors[read.code]);
+      gate = read.value;
+    }
+    setRequirementsError(null);
+    onSave({
+      id: checkpoint.id,
+      name,
+      description,
+      ...(imageChanged ? { imagePath: image?.path ?? null } : {}),
+      ...(!locked && kind !== checkpoint.kind ? { kind } : {}),
+      ...(!locked && id !== checkpoint.id ? { newId: id } : {}),
+      ...(gate ? { requirements: gate } : {}),
+    });
+  }
+
+  return (
+    <form onSubmit={submit} noValidate className="gap-space-5 flex flex-col">
+      {error ? <InlineAlert>{error}</InlineAlert> : null}
+      <TextField label={t.nameLabel} value={name} maxLength={60} autoComplete="off" readOnly={busy} error={nameError} onChange={(event) => setName(event.target.value)} onBlur={() => setTouched(true)} />
+      <TextField
+        label={t.idLabel}
+        hint={lockText ?? t.edit.idHint}
+        value={id}
+        maxLength={48}
+        autoComplete="off"
+        autoCapitalize="none"
+        spellCheck={false}
+        disabled={locked}
+        readOnly={busy}
+        error={idError}
+        onChange={(event) => setId(event.target.value)}
+        onBlur={() => setTouched(true)}
+      />
+      <KindChoice name="checkpoint-kind-edit" value={kind} onChange={setKind} disabled={busy || locked} note={lockText} />
+      <TextAreaField
+        label={t.descriptionLabel}
+        hint={t.descriptionHint}
+        value={description}
+        maxLength={DESCRIPTION_MAX_LENGTH}
+        rows={3}
+        readOnly={busy}
+        counter={{ current: description.length, max: DESCRIPTION_MAX_LENGTH }}
+        onChange={(event) => setDescription(event.target.value)}
+      />
+      <ImageField
+        label={t.imageLabel}
+        purpose="checkpoint"
+        value={image}
+        upload={upload}
+        disabled={busy}
+        onChange={(next) => {
+          setImage(next);
+          setImageChanged(true);
+        }}
+      />
+      {kind === "catering" ? (
+        <FoodRequirementsEditor saved={checkpoint.requirements} draft={requirements} onChange={setRequirements} levels={levels} disabled={busy} error={requirementsError} />
+      ) : checkpoint.kind === "catering" ? (
+        <p className="type-caption text-muted-foreground">{t.edit.requirementsDropped}</p>
+      ) : null}
+      <div className="gap-space-3 flex">
+        <Button type="submit" loading={busy} disabled={busy}>
+          {busy ? t.saving : t.save}
+        </Button>
+        <Button type="button" variant="ghost" disabled={busy} onClick={onCancel}>
+          {t.cancel}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * The Puestos screen: every station staff operate (entrance, catering, stand) with its kind's icon or its image, its
+ * description, its state and, for a meal, its requirements; on each row editing, opening or closing, its screen code
+ * and deleting, and "Crear un puesto" on top. Creating and editing open in a dialog, where a refusal shows too. The
+ * server decides everything; this view shows the outcome.
+ */
+export function CheckpointsAdminView({ checkpoints, create, edit, setActive, remove, upload, locks = {}, qrBase, canDelete = true, levels }: CheckpointsAdminViewProps) {
   const t = copy.admin.checkpoints;
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
@@ -97,10 +240,11 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
 
   const [name, setName] = useState("");
   const [idDraft, setIdDraft] = useState<string | null>(null);
-  // No kind is preselected: it cannot change later, and a stand made as a meal by default never shows in stand missions.
+  // No kind is preselected: a stand made as a meal by default would never show in stand missions.
   const [kind, setKind] = useState<CheckpointKind | null>(null);
+  const [description, setDescription] = useState("");
+  const [image, setImage] = useState<ImageRef | null>(null);
   const [touched, setTouched] = useState(false);
-  const [renameDraft, setRenameDraft] = useState("");
 
   const id = idDraft ?? suggestId(name);
   const nameError = touched && normalizeName(name) === null ? t.errors["invalid-name"] : null;
@@ -117,7 +261,7 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
   };
 
   /** Runs one change: marks what is busy, shows the outcome (inside the open dialog for a refusal) and refreshes the list. */
-  async function run(key: string, action: () => Promise<ManageActionResult>, success: (checkpoint: CheckpointView) => string) {
+  async function run(key: string, action: () => Promise<ManageActionResult>, success: (checkpoint: CheckpointView) => string, errorText: (code: ManageErrorCode) => string = (code) => t.errors[code]) {
     setBusy(key);
     setNotice(null);
     setDialogError(null);
@@ -130,7 +274,7 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
     setBusy(null);
 
     if (!result.ok) {
-      const text = t.errors[result.code];
+      const text = errorText(result.code);
       if (dialog) setDialogError(text);
       else setNotice({ kind: "error", text });
       return false;
@@ -164,21 +308,16 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
     setTouched(true);
     if (normalizeName(name) === null || !isCheckpointId(id) || kind === null) return;
 
-    const done = await run("create", () => create({ name, id, kind }), (checkpoint) => interpolate(t.created, { name: checkpoint.name }));
+    const done = await run("create", () => create({ name, id, kind, description, imagePath: image?.path ?? null }), (checkpoint) => interpolate(t.created, { name: checkpoint.name }));
     if (done) {
       setName("");
       setIdDraft(null);
       setKind(null);
+      setDescription("");
+      setImage(null);
       setTouched(false);
       setDialog(null);
     }
-  }
-
-  async function handleRename(event: FormEvent<HTMLFormElement>, checkpoint: CheckpointView) {
-    event.preventDefault();
-    if (busy) return;
-    const done = await run(`rename:${checkpoint.id}`, () => rename({ id: checkpoint.id, name: renameDraft }), (updated) => interpolate(t.renamed, { name: updated.name }));
-    if (done) setDialog(null);
   }
 
   return (
@@ -213,12 +352,17 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
               <li key={checkpoint.id}>
                 <Card className={cn("gap-space-3 flex flex-col", !checkpoint.active && "opacity-75")}>
                   <div className="gap-space-3 flex items-start">
-                    <span aria-hidden="true" className="border-cyan/40 text-cyan bg-bg-deep grid size-11 shrink-0 place-items-center rounded-md border">
-                      <Icon name={KIND_ICON[checkpoint.kind]} size={20} />
-                    </span>
+                    {checkpoint.image ? (
+                      <Thumbnail url={checkpoint.image.url} size={44} />
+                    ) : (
+                      <span aria-hidden="true" className="border-cyan/40 text-cyan bg-bg-deep grid size-11 shrink-0 place-items-center rounded-md border">
+                        <Icon name={KIND_ICON[checkpoint.kind]} size={20} />
+                      </span>
+                    )}
                     <div className="gap-space-1 flex min-w-0 flex-1 flex-col">
                       <p className={cn("type-label truncate", checkpoint.active ? "text-foreground" : "text-text-subtle")}>{checkpoint.name}</p>
                       <p className="type-caption text-text-subtle truncate">{checkpoint.id}</p>
+                      {checkpoint.description ? <p className="type-body-sm text-muted-foreground line-clamp-2">{checkpoint.description}</p> : null}
                       {checkpoint.kind === "catering" ? <p className="type-caption text-muted-foreground">{requirementsSummary(checkpoint.requirements, levels)}</p> : null}
                     </div>
                     <div className="gap-space-2 flex shrink-0 flex-col items-end min-[560px]:flex-row">
@@ -227,29 +371,9 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
                     </div>
                   </div>
                   <div className="gap-space-2 -ml-space-4 flex flex-wrap items-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy !== null}
-                      aria-label={`${t.rename}: ${checkpoint.name}`}
-                      onClick={() => {
-                        setRenameDraft(checkpoint.name);
-                        openDialog({ kind: "rename", checkpoint });
-                      }}
-                    >
-                      {t.rename}
+                    <Button variant="ghost" size="sm" disabled={busy !== null} aria-label={`${t.edit.action}: ${checkpoint.name}`} onClick={() => openDialog({ kind: "edit", checkpoint })}>
+                      {t.edit.action}
                     </Button>
-                    {checkpoint.kind === "catering" ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={busy !== null}
-                        aria-label={`${t.requirements.edit}: ${checkpoint.name}`}
-                        onClick={() => openDialog({ kind: "requirements", checkpoint })}
-                      >
-                        {t.requirements.edit}
-                      </Button>
-                    ) : null}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -264,9 +388,13 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
                     >
                       {toggling ? (checkpoint.active ? t.closing : t.opening) : checkpoint.active ? t.close : t.reopen}
                     </Button>
-                    {qrBase && checkpoint.kind === "entrance" && checkpoint.active ? (
-                      <Link href={`${qrBase}/${checkpoint.id}`} aria-label={`${t.showQr}: ${checkpoint.name}`} className="type-label text-primary hover:bg-secondary focus-visible:ring-ring px-space-4 inline-flex h-9 items-center rounded-md focus-visible:ring-[3px] focus-visible:outline-none">
-                        {t.showQr}
+                    {qrBase && (checkpoint.kind === "entrance" || checkpoint.kind === "stand") && checkpoint.active ? (
+                      <Link
+                        href={`${qrBase}/${checkpoint.id}`}
+                        aria-label={`${checkpoint.kind === "stand" ? t.showStandQr : t.showQr}: ${checkpoint.name}`}
+                        className="type-label text-primary hover:bg-secondary focus-visible:ring-ring px-space-4 inline-flex h-9 items-center rounded-md focus-visible:ring-[3px] focus-visible:outline-none"
+                      >
+                        {checkpoint.kind === "stand" ? t.showStandQr : t.showQr}
                       </Link>
                     ) : null}
                     {canDelete ? (
@@ -316,53 +444,41 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
             onChange={(event) => setIdDraft(event.target.value)}
             onBlur={() => setTouched(true)}
           />
-          <KindChoice value={kind} onChange={setKind} disabled={busy !== null} error={kindError} />
+          <KindChoice name="checkpoint-kind" value={kind} onChange={setKind} disabled={busy !== null} error={kindError} />
+          <TextAreaField
+            label={t.descriptionLabel}
+            hint={t.descriptionHint}
+            value={description}
+            maxLength={DESCRIPTION_MAX_LENGTH}
+            rows={3}
+            readOnly={busy !== null}
+            counter={{ current: description.length, max: DESCRIPTION_MAX_LENGTH }}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+          <ImageField label={t.imageLabel} purpose="checkpoint" value={image} upload={upload} disabled={busy !== null} onChange={setImage} />
           <Button type="submit" block loading={busy === "create"} disabled={busy !== null}>
             {busy === "create" ? t.creating : t.create}
           </Button>
         </form>
       </FormDialog>
 
-      <FormDialog open={dialog?.kind === "rename"} onOpenChange={closeOnDismiss} title={t.rename} description={dialog?.kind === "rename" ? dialog.checkpoint.name : undefined}>
-        {dialog?.kind === "rename" ? (
-          <form onSubmit={(event) => void handleRename(event, dialog.checkpoint)} noValidate className="gap-space-4 flex flex-col">
-            {dialogError ? <InlineAlert>{dialogError}</InlineAlert> : null}
-            <TextField label={t.nameLabel} value={renameDraft} maxLength={60} readOnly={busy !== null} onChange={(event) => setRenameDraft(event.target.value)} />
-            <div className="gap-space-3 flex">
-              <Button type="submit" loading={busy !== null}>
-                {busy !== null ? t.saving : t.save}
-              </Button>
-              <Button type="button" variant="ghost" disabled={busy !== null} onClick={() => setDialog(null)}>
-                {t.cancel}
-              </Button>
-            </div>
-          </form>
-        ) : null}
-      </FormDialog>
-
-      <FormDialog
-        open={dialog?.kind === "requirements"}
-        onOpenChange={closeOnDismiss}
-        title={t.requirements.title}
-        description={dialog?.kind === "requirements" ? dialog.checkpoint.name : undefined}
-      >
-        {dialog?.kind === "requirements" ? (
-          <div className="gap-space-4 flex flex-col">
-            {dialogError ? <InlineAlert>{dialogError}</InlineAlert> : null}
-            <FoodRequirementsEditor
-              requirements={dialog.checkpoint.requirements}
-              levels={levels}
-              busy={busy !== null}
-              onCancel={() => setDialog(null)}
-              onSave={(requirements) =>
-                void run(`gate:${dialog.checkpoint.id}`, () => setRequirements({ id: dialog.checkpoint.id, ...requirements }), (updated) =>
-                  interpolate(t.requirements.saved, { name: updated.name }),
-                ).then((done) => {
-                  if (done) setDialog(null);
-                })
-              }
-            />
-          </div>
+      <FormDialog open={dialog?.kind === "edit"} onOpenChange={closeOnDismiss} title={t.edit.title} description={dialog?.kind === "edit" ? dialog.checkpoint.name : undefined}>
+        {dialog?.kind === "edit" ? (
+          <EditCheckpointForm
+            key={dialog.checkpoint.id}
+            checkpoint={dialog.checkpoint}
+            lock={locks[dialog.checkpoint.id] ?? null}
+            levels={levels}
+            upload={upload}
+            busy={busy !== null}
+            error={dialogError}
+            onCancel={() => setDialog(null)}
+            onSave={(input) =>
+              void run(`edit:${dialog.checkpoint.id}`, () => edit(input), (updated) => interpolate(t.edit.saved, { name: updated.name }), editErrorText).then((done) => {
+                if (done) setDialog(null);
+              })
+            }
+          />
         ) : null}
       </FormDialog>
       {confirmDialog}

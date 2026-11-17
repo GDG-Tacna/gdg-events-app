@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
 import type { TeamMember } from "../domain/team";
-import type { ChangeRoleActionResult, GrantRoleAction, RevokeRoleAction } from "./actions";
+import type { ChangeRoleActionResult, GrantRoleAction, RevokeRoleAction, SetStaffScopeAction, SetStaffScopeActionResult, StationOption } from "./actions";
 import { TeamView } from "./TeamView";
 
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
@@ -209,6 +209,100 @@ describe("TeamView for an organizer", () => {
     await openGrant(user);
 
     expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("value"))).toEqual(["staff", "organizer", "admin"]);
+  });
+});
+
+describe("TeamView staff stations", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const STATIONS: StationOption[] = [
+    { id: "entrada-norte", name: "Entrada norte", kind: "entrance", active: true },
+    { id: "almuerzo", name: "Almuerzo", kind: "catering", active: false },
+    { id: "stand-louis", name: "Stand Louis 3D", kind: "stand", active: true },
+  ];
+  const s = t.scope;
+
+  function scoped(scopes: Record<string, readonly string[]> = {}, result: SetStaffScopeActionResult = { ok: true, checkpointIds: ["stand-louis"] }, withAction = true) {
+    const setScope = vi.fn<SetStaffScopeAction>(async () => result);
+    render(<TeamView members={[ME, ANA, NO_NAME, JOSE]} currentUid="me" grant={vi.fn()} revoke={vi.fn()} staffScopes={scopes} stations={STATIONS} setScope={withAction ? setScope : undefined} />);
+    return { setScope, user: userEvent.setup() };
+  }
+
+  it("shows every staff member's stations, «Todos» when not limited, and nothing for other roles", () => {
+    scoped({ bruno: ["stand-louis", "gone-1"] });
+
+    expect(rows()[1]).toHaveTextContent(s.all);
+    expect(rows()[2]).toHaveTextContent(`Solo: Stand Louis 3D, ${s.unknownStation}`);
+    expect(rows()[0]).not.toHaveTextContent(s.all);
+    expect(rows()[3]).not.toHaveTextContent(s.all);
+    expect(screen.getAllByRole("button", { name: /^Elegir puestos de/ })).toHaveLength(2);
+  });
+
+  it("only shows the stations when the viewer may not change them", () => {
+    scoped({}, undefined, false);
+
+    expect(rows()[1]).toHaveTextContent(s.all);
+    expect(screen.queryByRole("button", { name: /^Elegir puestos de/ })).not.toBeInTheDocument();
+  });
+
+  it("limits a staff member to the chosen stations, says so and refreshes the list", async () => {
+    const { setScope, user } = scoped();
+
+    await user.click(screen.getByRole("button", { name: `Elegir puestos de Ana` }));
+    const dialog = screen.getByRole("dialog", { name: "Puestos de Ana" });
+    expect(within(dialog).getByRole("radio", { name: new RegExp(s.allOption) })).toBeChecked();
+    expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("radio", { name: s.someOption }));
+    expect(within(dialog).getAllByRole("checkbox")).toHaveLength(3);
+    expect(within(dialog).getByText(`Catering · ${s.closed}`)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("checkbox", { name: /Stand Louis 3D/ }));
+    await user.click(within(dialog).getByRole("button", { name: s.save }));
+
+    expect(setScope).toHaveBeenCalledWith({ uid: "ana", checkpointIds: ["stand-louis"] });
+    expect(await screen.findByRole("status")).toHaveTextContent("Puestos de Ana guardados.");
+    expect(router.refresh).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("asks for at least one station before calling the server", async () => {
+    const { setScope, user } = scoped();
+
+    await user.click(screen.getByRole("button", { name: `Elegir puestos de Ana` }));
+    await user.click(screen.getByRole("radio", { name: s.someOption }));
+    await user.click(screen.getByRole("button", { name: s.save }));
+
+    expect(screen.getByText(s.pickOne)).toBeInTheDocument();
+    expect(setScope).not.toHaveBeenCalled();
+  });
+
+  it("lifts a limit with «Todos los puestos»", async () => {
+    const { setScope, user } = scoped({ ana: ["stand-louis"] }, { ok: true, checkpointIds: null });
+
+    await user.click(screen.getByRole("button", { name: `Elegir puestos de Ana` }));
+    expect(screen.getByRole("checkbox", { name: /Stand Louis 3D/ })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: new RegExp(s.allOption) }));
+    await user.click(screen.getByRole("button", { name: s.save }));
+
+    expect(setScope).toHaveBeenCalledWith({ uid: "ana", checkpointIds: null });
+    expect(await screen.findByRole("status")).toHaveTextContent("Ana puede operar todos los puestos.");
+  });
+
+  it("shows the server's reason inside the dialog, which stays open", async () => {
+    const { user } = scoped({ ana: ["stand-louis"] }, { ok: false, code: "invalid-scope" });
+
+    await user.click(screen.getByRole("button", { name: `Elegir puestos de Ana` }));
+    await user.click(screen.getByRole("button", { name: s.save }));
+
+    expect(within(screen.getByRole("dialog")).getByText(s.errors["invalid-scope"])).toBeInTheDocument();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it("has no detectable violations with the dialog open", async () => {
+    const { user } = scoped({ ana: ["stand-louis"] });
+
+    await user.click(screen.getByRole("button", { name: `Elegir puestos de Ana` }));
+    expect((await axe(document.body)).violations).toEqual([]);
   });
 });
 

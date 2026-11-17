@@ -19,7 +19,7 @@ export function useScanner(record: RecordCheckInAction) {
       if (result.ok && result.recorded) track({ name: "check_in", params: { kind: result.kind } });
       if (result.ok) for (const mission of result.missions ?? []) if (mission.justCompleted) track({ name: "mission_complete", params: { via: "scan" } });
       return result.ok
-        ? { ok: true, kind: result.kind, recorded: result.recorded, firstEntrance: result.firstEntrance, missions: result.missions ?? [], talkCredits: result.talkCredits ?? 0, achievements: result.achievements ?? [] }
+        ? { ok: true, kind: result.kind, recorded: result.recorded, firstEntrance: result.firstEntrance, missions: result.missions ?? [], talkCredits: result.talkCredits ?? 0, achievements: result.achievements ?? [], checkpoint: result.checkpoint ?? null }
         : { ok: false, code: result.code };
     },
     [record],

@@ -6,7 +6,7 @@ import { serveDeps } from "@/app-shell/composition/checkpoints.server";
 import { describeShortfall } from "@/app-shell/composition/food-gate.server";
 import { missionDeps } from "@/app-shell/composition/missions.server";
 import { getSession } from "@/app-shell/guards";
-import { staffStations } from "@/app-shell/permissions.server";
+import { staffCheckpoints, staffStations } from "@/app-shell/permissions.server";
 import type { ServeActionResult, StationMission } from "@/features/checkpoints";
 import { serveAttendee } from "@/features/checkpoints/server";
 import { completeByCheckpoint } from "@/features/missions/server";
@@ -36,9 +36,11 @@ export async function serveAttendeeAction(input: { checkpointId: string; payload
   const parsed = inputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "invalid-code" };
 
-  // Staff operate only the kinds of station the edition gives them; admins operate every kind.
+  // Staff operate only the kinds of station the edition gives them, and only their own stations when an admin limited
+  // them; admins operate every station.
   const kinds = session.role === "staff" ? await staffStations() : undefined;
-  const result = await serveAttendee(serveDeps, { uid: session.uid, role: session.role, kinds }, parsed.data);
+  const checkpointIds = await staffCheckpoints(session);
+  const result = await serveAttendee(serveDeps, { uid: session.uid, role: session.role, kinds, checkpointIds }, parsed.data);
   if (!result.ok) {
     return result.error.missing ? { ok: false, code: result.error.code, missing: await describeShortfall(result.error.missing) } : { ok: false, code: result.error.code };
   }

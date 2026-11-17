@@ -6,6 +6,10 @@ export interface ServeCheckpoint {
   kind: string;
   name: string;
   active: boolean;
+  /** What the puesto is (empty or absent when it has none). */
+  description?: string;
+  /** The address of its logo or photo (null or absent when it has none). */
+  image?: string | null;
 }
 
 export interface CheckpointLookup {

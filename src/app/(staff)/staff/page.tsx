@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import { serveDeps } from "@/app-shell/composition/checkpoints.server";
 import { requireRole } from "@/app-shell/guards";
-import { staffStations } from "@/app-shell/permissions.server";
+import { staffCheckpoints, staffStations } from "@/app-shell/permissions.server";
 import { STATION_KINDS } from "@/features/checkpoints";
 import { listServePoints } from "@/features/checkpoints/server";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
-import { ButtonLink, Card, ScreenEnter } from "@/shared/ui";
+import { ButtonLink, Card, ScreenEnter, Thumbnail } from "@/shared/ui";
 
 export const metadata: Metadata = { title: copy.staff.title };
 
 export default async function StaffHomePage() {
   const session = await requireRole(["staff"]);
 
-  const points = await listServePoints(serveDeps, { uid: session.uid, role: session.role, kinds: session.role === "staff" ? await staffStations() : undefined });
+  const points = await listServePoints(serveDeps, { uid: session.uid, role: session.role, kinds: session.role === "staff" ? await staffStations() : undefined, checkpointIds: await staffCheckpoints(session) });
   // A failed read goes to the route error boundary instead of claiming there is nothing to operate.
   if (!points.ok) throw new Error("Could not read the stations");
 
@@ -44,20 +44,24 @@ export default async function StaffHomePage() {
                   {group.points.map((point) => (
                     <li key={point.id}>
                       <Card className="gap-space-4 flex h-full flex-col">
-                        <div className="gap-space-1 flex flex-col">
-                          <h3 className="type-title text-foreground">{point.name}</h3>
-                          {point.servedCount !== null ? (
-                            <p className="type-body-sm text-muted-foreground tabular-nums">
-                              {interpolate(copy.staff.servedCount[point.kind], { count: String(point.servedCount) })}
-                            </p>
-                          ) : null}
+                        <div className="gap-space-3 flex items-start">
+                          {point.image ? <Thumbnail url={point.image} size={56} /> : null}
+                          <div className="gap-space-1 flex min-w-0 flex-col">
+                            <h3 className="type-title text-foreground">{point.name}</h3>
+                            {point.description ? <p className="type-body-sm text-muted-foreground">{point.description}</p> : null}
+                            {point.servedCount !== null ? (
+                              <p className="type-body-sm text-muted-foreground tabular-nums">
+                                {interpolate(copy.staff.servedCount[point.kind], { count: String(point.servedCount) })}
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
                         <ButtonLink href={`${ROUTES.staff}/serve/${point.id}`} className="mt-auto">
                           {copy.staff.serve}
                         </ButtonLink>
-                        {point.kind === "entrance" ? (
+                        {point.kind === "entrance" || point.kind === "stand" ? (
                           <ButtonLink href={`${ROUTES.staffQr}/${point.id}`} variant="secondary">
-                            {copy.staff.showEntranceQr}
+                            {point.kind === "stand" ? copy.staff.showStandQr : copy.staff.showEntranceQr}
                           </ButtonLink>
                         ) : null}
                       </Card>
