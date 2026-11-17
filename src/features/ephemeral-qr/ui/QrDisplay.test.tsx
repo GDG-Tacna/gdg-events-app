@@ -169,3 +169,23 @@ describe("QrDisplay", () => {
     expect((await axe(container)).violations).toEqual([]);
   });
 });
+
+describe("QrDisplay for a puesto", () => {
+  it("shows the puesto's image and description above the code", async () => {
+    const issue = vi.fn<IssueQrAction>(async () => showing());
+    const { container } = render(<QrDisplay checkpointId="louis-3d" name="Louis 3D" description="Impresión 3D en vivo" image="/media/logo.webp" issue={issue} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByRole("heading", { name: "Louis 3D" })).toBeInTheDocument();
+    expect(screen.getByText("Impresión 3D en vivo")).toBeInTheDocument();
+    expect(container.querySelector('img[src="/media/logo.webp"]')).not.toBeNull();
+  });
+
+  it("shows neither when the puesto has none", async () => {
+    const { container } = await renderDisplay(vi.fn<IssueQrAction>(async () => showing()));
+
+    expect(container.querySelector("img")).toBeNull();
+  });
+});

@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { cache } from "react";
 import { ADMIN_SECTIONS, DEFAULT_PERMISSIONS, sectionAccess, type AccessLevel, type AdminSection, type EditionPermissions, type StaffStation } from "@/features/event/server";
 import { logServerError } from "@/shared/lib/log";
+import { staffScopeStore } from "./composition/checkpoint-admin.server";
 import { editionPermissions } from "./composition/event.server";
 import type { AppSession } from "./session-role";
 
@@ -55,4 +56,21 @@ export async function sectionLevels(session: Pick<AppSession, "role" | "adminSco
 export async function staffStations(): Promise<readonly StaffStation[]> {
   const allowed = await permissions();
   return allowed ? allowed.staffStations : DEFAULT_PERMISSIONS.staffStations;
+}
+
+/** One staff member's stations in the request's edition, read once per request. */
+const scopeOf = cache(async (uid: string): Promise<readonly string[] | undefined> => {
+  const read = await staffScopeStore.read(uid);
+  if (read.ok) return read.value ?? undefined;
+  logServerError("permissions.staff-scope", new Error(`the stations of ${uid} could not be read`));
+  return [];
+});
+
+/**
+ * The stations a session is limited to in the request's edition (Admin › Equipo), or `undefined` when it is not
+ * limited: an admin never is, nor staff without a limit. Unlike `staffStations`, a failed read limits staff to nothing
+ * and is logged: an account an organizer restricted (an external stand's team) must never get more than it was given.
+ */
+export async function staffCheckpoints(session: Pick<AppSession, "uid" | "role">): Promise<readonly string[] | undefined> {
+  return session.role === "staff" ? scopeOf(session.uid) : undefined;
 }

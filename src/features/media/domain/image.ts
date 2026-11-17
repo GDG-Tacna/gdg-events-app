@@ -2,7 +2,7 @@ import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 
 /** What an image is for. A closed set: each one has its rules and its own folder. */
-export const IMAGE_PURPOSES = ["badge", "raffle-prize", "squad-prize", "squad-logo", "rank", "mission", "venue-plan", "stage-background", "speaker", "poll-option"] as const;
+export const IMAGE_PURPOSES = ["badge", "raffle-prize", "squad-prize", "squad-logo", "rank", "mission", "venue-plan", "stage-background", "speaker", "poll-option", "checkpoint"] as const;
 export type ImagePurpose = (typeof IMAGE_PURPOSES)[number];
 
 export type ImageFormat = "jpeg" | "png" | "webp" | "svg";
@@ -26,6 +26,8 @@ export const RULE_OF: Record<ImagePurpose, ImageRule> = {
   mission: "picture",
   speaker: "picture",
   "poll-option": "picture",
+  // A puesto's logo or photo, shown on its QR screen, to the cadet after scanning and to staff.
+  checkpoint: "picture",
   "squad-logo": "logo",
   "venue-plan": "plan",
   // A projector background is large, like the venue plan.

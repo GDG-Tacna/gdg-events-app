@@ -8,8 +8,15 @@ import { err, ok, type Result } from "@/shared/lib/result";
 import { checkInError, type CheckInError } from "../../domain/checkin-error";
 import { isCheckpointId, isCheckpointKind, type Checkpoint, type CheckpointId } from "../../domain/checkpoint";
 import type { CheckpointCatalog } from "../../domain/ports";
+import { imageRefOf } from "@/features/media/server";
 
 const nameOf = (id: string, name: unknown): string => (typeof name === "string" && name.trim() !== "" ? name.trim() : id);
+
+/** The description and the image address a puesto shows to the cadet and the staff (none for a talk or a puesto without them). */
+const extrasOf = (data: Record<string, unknown> | undefined) => ({
+  description: typeof data?.description === "string" ? data.description : "",
+  image: typeof data?.imagePath === "string" ? (imageRefOf(data.imagePath, "checkpoint")?.url ?? null) : null,
+});
 
 /**
  * Reads `events/{eventId}/checkpoints/{id}` (Admin SDK). A malformed document is treated as missing instead of
@@ -30,7 +37,7 @@ export class FirestoreCheckpointCatalog implements CheckpointCatalog {
 
       const data = snapshot.data();
       if (!isCheckpointKind(data?.kind)) return ok(null);
-      return ok({ id, kind: data.kind, name: nameOf(id, data.name), active: data.active === true });
+      return ok({ id, kind: data.kind, name: nameOf(id, data.name), active: data.active === true, ...extrasOf(data) });
     } catch (cause) {
       logServerError("checkins.catalog.find", cause);
       return err(checkInError("unknown"));
@@ -49,7 +56,7 @@ export class FirestoreCheckpointCatalog implements CheckpointCatalog {
         const data = doc.data();
         // A malformed document is skipped rather than guessed at.
         if (!isCheckpointId(doc.id) || !isCheckpointKind(data.kind)) continue;
-        checkpoints.push({ id: doc.id, kind: data.kind, name: nameOf(doc.id, data.name), active: true });
+        checkpoints.push({ id: doc.id, kind: data.kind, name: nameOf(doc.id, data.name), active: true, ...extrasOf(data) });
       }
       checkpoints.sort((a, b) => a.name.localeCompare(b.name));
       return ok(checkpoints);

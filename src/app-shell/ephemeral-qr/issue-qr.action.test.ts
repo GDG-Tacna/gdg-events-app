@@ -6,7 +6,7 @@ vi.mock("@/app-shell/composition/ephemeral-qr.server", () => ({ ephemeralQrDeps:
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
-const permissions = vi.hoisted(() => ({ mayEdit: vi.fn<(session: unknown, section: unknown) => Promise<boolean>>(async () => true), staffStations: vi.fn(async () => ["entrance", "catering"]) }));
+const permissions = vi.hoisted(() => ({ mayEdit: vi.fn<(session: unknown, section: unknown) => Promise<boolean>>(async () => true), staffStations: vi.fn(async () => ["entrance", "catering"]), staffCheckpoints: vi.fn<(session: unknown) => Promise<readonly string[] | undefined>>(async () => undefined) }));
 vi.mock("@/app-shell/permissions.server", () => permissions);
 
 const qrServer = { issueQr: vi.fn() };
@@ -27,6 +27,7 @@ describe("issueQrAction", () => {
     guards.getSession.mockResolvedValue(session("admin"));
     permissions.mayEdit.mockResolvedValue(true);
     permissions.staffStations.mockResolvedValue(["entrance", "catering"]);
+    permissions.staffCheckpoints.mockResolvedValue(undefined);
   });
 
   it("does nothing when check-ins are switched off, without reading the session", async () => {
@@ -78,6 +79,25 @@ describe("issueQrAction", () => {
 
     expect(qrServer.issueQr).toHaveBeenCalledWith({ marker: "deps" }, { uid: "a1", role: "staff", kinds: ["entrance", "catering"] }, { checkpointId: "entrada-norte" });
     expect(permissions.mayEdit).not.toHaveBeenCalled();
+  });
+
+  it("hands the use case the stations an admin limited the staff member to, read for the session", async () => {
+    guards.getSession.mockResolvedValue(session("staff"));
+    permissions.staffStations.mockResolvedValue(["stand"]);
+    permissions.staffCheckpoints.mockResolvedValue(["stand-louis"]);
+    qrServer.issueQr.mockResolvedValue({ ok: false, error: { code: "forbidden" } });
+
+    expect(await issueQrAction({ checkpointId: "stand-cloud" })).toEqual({ ok: false, code: "forbidden" });
+    expect(permissions.staffCheckpoints).toHaveBeenCalledWith(session("staff"));
+    expect(qrServer.issueQr).toHaveBeenCalledWith({ marker: "deps" }, { uid: "a1", role: "staff", kinds: ["stand"], checkpointIds: ["stand-louis"] }, { checkpointId: "stand-cloud" });
+  });
+
+  it("never limits an admin by a staff scope", async () => {
+    qrServer.issueQr.mockResolvedValue({ ok: false, error: { code: "forbidden" } });
+
+    await issueQrAction({ checkpointId: "stand-cloud" });
+    expect(permissions.staffCheckpoints).not.toHaveBeenCalled();
+    expect(qrServer.issueQr).toHaveBeenCalledWith({ marker: "deps" }, { uid: "a1", role: "admin" }, { checkpointId: "stand-cloud" });
   });
 
   it.each(["", "x".repeat(49), undefined as unknown as string, 5 as unknown as string])(

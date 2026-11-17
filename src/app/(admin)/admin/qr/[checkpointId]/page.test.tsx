@@ -56,7 +56,7 @@ describe("admin QR display page", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     guards.requireRole.mockResolvedValue({ uid: "a1", role: "admin", displayName: null, photoUrl: null });
-    qrServer.listScreenCheckpoints.mockResolvedValue({ ok: true, value: [{ id: "talk-keynote", name: "Keynote", kind: "talk" }, { id: "entrada-norte", name: "Entrada norte", kind: "entrance" }] });
+    qrServer.listScreenCheckpoints.mockResolvedValue({ ok: true, value: [{ id: "talk-keynote", name: "Keynote", kind: "talk" }, { id: "entrada-norte", name: "Entrada norte", kind: "entrance" }, { id: "stand-louis", name: "Stand Louis 3D", kind: "stand" }] });
   });
 
   it("checks the admin role itself before reading anything", async () => {
@@ -85,8 +85,15 @@ describe("admin QR display page", () => {
     expect(findElement(await page("talk-keynote"), QrDisplay)?.props.texts).toBeUndefined();
   });
 
+  it("shows a stand's screen with the stand's own hint, and leads back to Puestos", async () => {
+    const tree = await page("stand-louis");
+
+    expect(findElement(tree, QrDisplay)?.props).toMatchObject({ checkpointId: "stand-louis", name: "Stand Louis 3D", issue: issueQrAction, texts: { scanHint: copy.admin.qr.scanHintStand } });
+    expect(findAll(tree, ButtonLink)[0].props).toMatchObject({ href: "/admin/puestos", children: copy.admin.qr.backEntrance });
+  });
+
   it.each(["talk-unknown", "lunch-1", "talk-closed"])(
-    "is not found for %s: only open talks and entrances can show a code",
+    "is not found for %s: only open talks, entrances and stands can show a code",
     async (id) => {
       await expect(page(id)).rejects.toBeInstanceOf(NotFound);
     },

@@ -25,7 +25,7 @@ vi.mock("@/app-shell/modules.server", async () => {
   };
 });
 
-// Control center permissions: in tests an admin edits every section and staff operate every station; the edition's
+// Control center permissions: in tests an admin edits every section and staff operate every station, unlimited; the edition's
 // own permissions are tested in permissions.server.test.ts, which unmocks it.
 vi.mock("@/app-shell/permissions.server", async () => {
   const { ADMIN_SECTIONS, STAFF_STATIONS } = await import("@/features/event/domain/permissions");
@@ -36,5 +36,6 @@ vi.mock("@/app-shell/permissions.server", async () => {
     requireSection: async () => undefined,
     sectionLevels: async (session: { role: string | null }) => Object.fromEntries(ADMIN_SECTIONS.map((section) => [section, level(session)])),
     staffStations: async () => STAFF_STATIONS,
+    staffCheckpoints: async () => undefined,
   };
 });

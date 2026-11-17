@@ -10,7 +10,21 @@ import { ROUTES } from "@/shared/config/routes";
  * it is the one place that knows both: the page (server) cannot create a camera, and the feature does not
  * know which server action records a scan at a station.
  */
-export function ServeScreenBound({ checkpointId, kind, name, initialCount }: { checkpointId: string; kind: StationKind; name: string; initialCount: number | null }) {
+export function ServeScreenBound({
+  checkpointId,
+  kind,
+  name,
+  description,
+  image,
+  initialCount,
+}: {
+  checkpointId: string;
+  kind: StationKind;
+  name: string;
+  description?: string;
+  image?: string | null;
+  initialCount: number | null;
+}) {
   return (
     <ServeScreen
       camera={QrCodeCamera}
@@ -18,6 +32,8 @@ export function ServeScreenBound({ checkpointId, kind, name, initialCount }: { c
       checkpointId={checkpointId}
       kind={kind}
       name={name}
+      description={description}
+      image={image}
       initialCount={initialCount}
       backHref={ROUTES.staff}
     />

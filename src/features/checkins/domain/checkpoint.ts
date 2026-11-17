@@ -23,4 +23,8 @@ export interface Checkpoint {
   name: string;
   /** An inactive checkpoint is kept (old check-ins refer to it) but no longer accepts scans. */
   active: boolean;
+  /** What a puesto is, for the cadet and the staff (empty or absent when it has none; talks have none). */
+  description?: string;
+  /** The address of its logo or photo, or null/absent when it has none. */
+  image?: string | null;
 }

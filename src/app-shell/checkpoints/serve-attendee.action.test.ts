@@ -88,6 +88,16 @@ describe("serveAttendeeAction", () => {
     }
   });
 
+  it("hands the use case the stations an admin limited the staff member to", async () => {
+    const permissions = await import("@/app-shell/permissions.server");
+    vi.spyOn(permissions, "staffCheckpoints").mockResolvedValueOnce(["stand-louis"]);
+    guards.getSession.mockResolvedValue(session("staff"));
+    checkpointsServer.serveAttendee.mockResolvedValue({ ok: false, error: { code: "forbidden" } });
+
+    expect(await serveAttendeeAction(input)).toEqual({ ok: false, code: "forbidden" });
+    expect(checkpointsServer.serveAttendee).toHaveBeenLastCalledWith({ marker: "deps" }, { uid: "s1", role: "staff", kinds: ["entrance", "catering", "stand"], checkpointIds: ["stand-louis"] }, input);
+  });
+
   it("maps a use case failure to its code only", async () => {
     checkpointsServer.serveAttendee.mockResolvedValue({ ok: false, error: { code: "expired-code" } });
 

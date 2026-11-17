@@ -133,6 +133,11 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // The stations a staff account is limited to (Admin › Equipo): written and read by the server only.
+      match /staffScopes/{uid} {
+        allow read, write: if false;
+      }
+
       // Alias reservations are an implementation detail of the server.
       match /aliases/{alias} {
         allow read, write: if false;

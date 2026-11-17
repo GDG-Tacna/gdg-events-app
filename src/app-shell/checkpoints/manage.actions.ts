@@ -5,14 +5,23 @@ import { checkpointAdminDeps } from "@/app-shell/composition/checkpoint-admin.se
 import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { getSession } from "@/app-shell/guards";
 import type { DeleteCheckpointActionResult, ManageActionResult } from "@/features/checkpoints";
-import { createCheckpoint, deleteCheckpoint, renameCheckpoint, setCheckpointActive, setFoodRequirements, type ManageActor } from "@/features/checkpoints/server";
+import { DESCRIPTION_MAX_LENGTH, createCheckpoint, deleteCheckpoint, editCheckpoint, setCheckpointActive, type ManageActor } from "@/features/checkpoints/server";
 import { FEATURES } from "@/shared/config/features";
 import { mayEdit } from "@/app-shell/permissions.server";
 
-const createSchema = z.object({ name: z.string().max(200), id: z.string().max(100), kind: z.string().max(20) });
-const renameSchema = z.object({ id: z.string().max(100), name: z.string().max(200) });
+const descriptionSchema = z.string().max(DESCRIPTION_MAX_LENGTH);
+const imagePathSchema = z.string().max(300).nullable().optional();
+const createSchema = z.object({ name: z.string().max(200), id: z.string().max(100), kind: z.string().max(20), description: descriptionSchema.optional(), imagePath: imagePathSchema });
+const editSchema = z.object({
+  id: z.string().max(100),
+  name: z.string().max(200),
+  description: descriptionSchema,
+  imagePath: imagePathSchema,
+  kind: z.string().max(20).optional(),
+  newId: z.string().max(100).optional(),
+  requirements: z.object({ minLevel: z.number().nullable(), minTalks: z.number().nullable() }).optional(),
+});
 const activeSchema = z.object({ id: z.string().max(100), active: z.boolean() });
-const requirementsSchema = z.object({ id: z.string().max(100), minLevel: z.number().nullable(), minTalks: z.number().nullable() });
 
 /**
  * Server Actions behind the Puestos screen. They are public endpoints: the flags, the session and the
@@ -29,25 +38,46 @@ async function adminActor(): Promise<ManageActor | ManageActionResult> {
 
 const isResult = (value: unknown): value is ManageActionResult => typeof value === "object" && value !== null && "ok" in value;
 
-export async function createCheckpointAction(input: { name: string; id: string; kind: string }): Promise<ManageActionResult> {
+export async function createCheckpointAction(input: { name: string; id: string; kind: string; description?: string; imagePath?: string | null }): Promise<ManageActionResult> {
   const actor = await adminActor();
   if (isResult(actor)) return actor;
 
   const parsed = createSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, code: "invalid-name" };
+  if (!parsed.success) return { ok: false, code: parsed.error.issues.some((issue) => issue.path[0] === "description") ? "invalid-description" : "invalid-name" };
 
   const result = await createCheckpoint(checkpointAdminDeps, actor, parsed.data);
   return result.ok ? { ok: true, checkpoint: result.value } : { ok: false, code: result.error.code };
 }
 
-export async function renameCheckpointAction(input: { id: string; name: string }): Promise<ManageActionResult> {
+/**
+ * Saves the «Editar puesto» dialog: name, description, image and a meal's food gate always; a new kind or id only like
+ * deleting (a draft edition, or an admin of every edition), and the use case refuses them when anything refers to the
+ * puesto or it is a stand of the venue plan.
+ */
+export async function editCheckpointAction(input: {
+  id: string;
+  name: string;
+  description: string;
+  imagePath?: string | null;
+  kind?: string;
+  newId?: string;
+  requirements?: { minLevel: number | null; minTalks: number | null };
+}): Promise<ManageActionResult> {
   const actor = await adminActor();
   if (isResult(actor)) return actor;
 
-  const parsed = renameSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, code: "invalid-name" };
+  const parsed = editSchema.safeParse(input);
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
+    return { ok: false, code: field === "description" ? "invalid-description" : field === "requirements" ? "invalid-level" : field === "id" ? "not-found" : "invalid-name" };
+  }
+  // A published edition keeps what scans and reports refer to: changing the kind or id is gated like deleting.
+  if (parsed.data.kind !== undefined || parsed.data.newId !== undefined) {
+    const session = await getSession();
+    if (!session || !(await mayDeleteItems(session))) return { ok: false, code: "edition-locked" };
+  }
 
-  const result = await renameCheckpoint(checkpointAdminDeps, actor, parsed.data);
+  const result = await editCheckpoint(checkpointAdminDeps, actor, parsed.data);
   return result.ok ? { ok: true, checkpoint: result.value } : { ok: false, code: result.error.code };
 }
 
@@ -74,15 +104,4 @@ export async function deleteCheckpointAction(input: { id: string }): Promise<Del
 
   const result = await deleteCheckpoint(checkpointAdminDeps, actor, parsed.data);
   return result.ok ? { ok: true, name: result.value.name } : { ok: false, code: result.error.code };
-}
-
-export async function setFoodRequirementsAction(input: { id: string; minLevel: number | null; minTalks: number | null }): Promise<ManageActionResult> {
-  const actor = await adminActor();
-  if (isResult(actor)) return actor;
-
-  const parsed = requirementsSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, code: "invalid-level" };
-
-  const result = await setFoodRequirements(checkpointAdminDeps, actor, parsed.data);
-  return result.ok ? { ok: true, checkpoint: result.value } : { ok: false, code: result.error.code };
 }

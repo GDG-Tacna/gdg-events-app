@@ -21,11 +21,17 @@ vi.mock("@/shared/config/features", () => features);
 const server = { getServePoint: vi.fn() };
 vi.mock("@/features/checkpoints/server", () => server);
 
+const permissions = vi.hoisted(() => ({
+  staffStations: vi.fn(async () => ["entrance", "catering", "stand"]),
+  staffCheckpoints: vi.fn<(session: unknown) => Promise<readonly string[] | undefined>>(async () => undefined),
+}));
+vi.mock("@/app-shell/permissions.server", () => permissions);
+
 const { QrDisplay } = await import("@/features/ephemeral-qr");
 const { issueQrAction } = await import("@/app-shell/ephemeral-qr/issue-qr.action");
 const { ButtonLink } = await import("@/shared/ui");
 const { copy } = await import("@/shared/copy/es");
-const { default: StaffEntranceQrPage } = await import("./page");
+const { default: StaffScreenQrPage } = await import("./page");
 
 function findAll(node: ReactNode, type: unknown, found: Array<{ props: Record<string, unknown> }> = []): Array<{ props: Record<string, unknown> }> {
   if (Array.isArray(node)) {
@@ -38,12 +44,14 @@ function findAll(node: ReactNode, type: unknown, found: Array<{ props: Record<st
   return findAll(element.props.children as ReactNode, type, found);
 }
 
-const page = (checkpointId: string) => StaffEntranceQrPage({ params: Promise.resolve({ checkpointId }) } as unknown as Parameters<typeof StaffEntranceQrPage>[0]);
+const page = (checkpointId: string) => StaffScreenQrPage({ params: Promise.resolve({ checkpointId }) } as unknown as Parameters<typeof StaffScreenQrPage>[0]);
 const POINT = { id: "entrada-norte", kind: "entrance", name: "Entrada norte", servedCount: 3 };
 
-describe("staff entrance QR page", () => {
+describe("staff screen QR page", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    permissions.staffStations.mockResolvedValue(["entrance", "catering", "stand"]);
+    permissions.staffCheckpoints.mockResolvedValue(undefined);
     features.FEATURES.checkins = true;
     guards.requireRole.mockResolvedValue({ uid: "s1", role: "staff", displayName: null, photoUrl: null });
     server.getServePoint.mockResolvedValue({ ok: true, value: POINT });
@@ -70,17 +78,32 @@ describe("staff entrance QR page", () => {
     expect(findAll(tree, ButtonLink)[0].props).toMatchObject({ href: "/staff" });
   });
 
-  it("is not found for a meal or a stand: only the entrance has a code that changes on a screen", async () => {
+  it("reads the station with the stations an admin limited the staff member to", async () => {
+    permissions.staffCheckpoints.mockResolvedValue(["stand-louis"]);
+
+    await page("stand-louis");
+
+    expect(server.getServePoint).toHaveBeenCalledWith({ marker: "deps" }, { uid: "s1", role: "staff", kinds: ["entrance", "catering", "stand"], checkpointIds: ["stand-louis"] }, "stand-louis");
+  });
+
+  it("shows a stand's code on the stand's tablet with the stand's own hint", async () => {
+    server.getServePoint.mockResolvedValue({ ok: true, value: { id: "stand-louis", kind: "stand", name: "Stand Louis 3D", servedCount: 4 } });
+
+    const display = findAll(await page("stand-louis"), QrDisplay)[0];
+    expect(display.props).toMatchObject({ checkpointId: "stand-louis", name: "Stand Louis 3D", issue: issueQrAction, texts: { scanHint: copy.admin.qr.scanHintStand } });
+  });
+
+  it("is not found for a meal: the catering scans the cadet's pass, it has no code on a screen", async () => {
     server.getServePoint.mockResolvedValue({ ok: true, value: { ...POINT, kind: "catering" } });
     await expect(page("lunch-1")).rejects.toBeInstanceOf(NotFound);
-
-    server.getServePoint.mockResolvedValue({ ok: true, value: { ...POINT, kind: "stand" } });
-    await expect(page("stand-cloud")).rejects.toBeInstanceOf(NotFound);
   });
 
   it("is not found for an unknown, closed or not-allowed station, and surfaces a failed read", async () => {
     server.getServePoint.mockResolvedValue({ ok: false, error: { code: "not-found" } });
     await expect(page("ghost-1")).rejects.toBeInstanceOf(NotFound);
+    // Another stand than the one a limited account was given.
+    server.getServePoint.mockResolvedValue({ ok: false, error: { code: "forbidden" } });
+    await expect(page("stand-cloud")).rejects.toBeInstanceOf(NotFound);
 
     server.getServePoint.mockResolvedValue({ ok: false, error: { code: "unknown" } });
     await expect(page("entrada-norte")).rejects.toThrow("Could not read the serving point");

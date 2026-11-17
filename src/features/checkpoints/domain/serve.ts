@@ -30,6 +30,11 @@ export interface ServeActor {
   role: "attendee" | "staff" | "admin" | null;
   /** For staff: the kinds of station the edition lets them operate (all when absent). Admins operate every kind. */
   kinds?: readonly string[];
+  /**
+   * For staff an admin limited to some stations (Admin › Equipo): the only checkpoints they operate. Absent means no
+   * limit; an empty list means none (how a scope that could not be read is passed). Admins are never limited.
+   */
+  checkpointIds?: readonly string[];
 }
 
 /**
@@ -58,7 +63,10 @@ export interface ServeResult {
 }
 
 const canServe = (actor: ServeActor) => actor.role === "staff" || actor.role === "admin";
-const mayOperate = (actor: ServeActor, kind: StationKind) => actor.role === "admin" || actor.kinds === undefined || actor.kinds.includes(kind);
+/** An admin operates every station; staff only the kinds the edition gives them and, when limited, only their own stations. */
+const mayOperate = (actor: ServeActor, checkpoint: { id: string; kind: StationKind }) =>
+  actor.role === "admin" ||
+  ((actor.kinds === undefined || actor.kinds.includes(checkpoint.kind)) && (actor.checkpointIds === undefined || actor.checkpointIds.includes(checkpoint.id)));
 
 /** The checkpoint must exist, be open and be one staff operate (entrance, catering or stand). */
 async function loadServePoint(
@@ -94,7 +102,7 @@ export async function serveAttendee(
 
   const checkpoint = await loadServePoint(deps, input.checkpointId);
   if (!checkpoint.ok) return checkpoint;
-  if (!mayOperate(actor, checkpoint.value.kind)) return err(serveError("forbidden"));
+  if (!mayOperate(actor, checkpoint.value)) return err(serveError("forbidden"));
 
   const attendee = await deps.attendees.find(pass.value.uid);
   if (!attendee.ok) return err(serveError("unknown"));
@@ -138,12 +146,27 @@ export interface ServePoint {
   id: string;
   kind: StationKind;
   name: string;
+  /** What the puesto is, for the staff operating it (empty when it has none). */
+  description: string;
+  /** The address of its logo or photo, or null. */
+  image: string | null;
   servedCount: number | null;
 }
 
+/** The fields of a serve point that describe the puesto. */
+const pointOf = (checkpoint: StationCheckpoint, servedCount: number | null): ServePoint => ({
+  id: checkpoint.id,
+  kind: checkpoint.kind,
+  name: checkpoint.name,
+  description: checkpoint.description ?? "",
+  image: checkpoint.image ?? null,
+  servedCount,
+});
+
 /**
  * The stations staff can operate: open entrance, catering and stand checkpoints of the kinds the edition lets them
- * operate, grouped by kind in that order (then by name), each with how many cadets it has scanned.
+ * operate (only their own when an admin limited them), grouped by kind in that order (then by name), each with how
+ * many cadets it has scanned.
  */
 export async function listServePoints(
   deps: Pick<ServeDeps, "checkpoints" | "counter">,
@@ -155,18 +178,18 @@ export async function listServePoints(
   if (!active.ok) return err(serveError("unknown"));
 
   const stations = active.value
-    .flatMap((checkpoint) => (isStationKind(checkpoint.kind) && mayOperate(actor, checkpoint.kind) ? [{ ...checkpoint, kind: checkpoint.kind }] : []))
+    .flatMap((checkpoint) => (isStationKind(checkpoint.kind) && mayOperate(actor, { id: checkpoint.id, kind: checkpoint.kind }) ? [{ ...checkpoint, kind: checkpoint.kind }] : []))
     .sort((a, b) => STATION_KINDS.indexOf(a.kind) - STATION_KINDS.indexOf(b.kind) || a.name.localeCompare(b.name, "es"));
   const points = await Promise.all(
     stations.map(async (checkpoint) => {
       const counted = await deps.counter.count(checkpoint.id);
-      return { id: checkpoint.id, kind: checkpoint.kind, name: checkpoint.name, servedCount: counted.ok ? counted.value : null };
+      return pointOf(checkpoint, counted.ok ? counted.value : null);
     }),
   );
   return ok(points);
 }
 
-/** One station for the scanning screen: its kind, its name and how many cadets it has scanned so far. */
+/** One station for the scanning screen: its kind, its name, description and image, and how many cadets it has scanned so far. */
 export async function getServePoint(
   deps: Pick<ServeDeps, "checkpoints" | "counter">,
   actor: ServeActor,
@@ -176,8 +199,8 @@ export async function getServePoint(
 
   const checkpoint = await loadServePoint(deps, checkpointId);
   if (!checkpoint.ok) return checkpoint;
-  if (!mayOperate(actor, checkpoint.value.kind)) return err(serveError("forbidden"));
+  if (!mayOperate(actor, checkpoint.value)) return err(serveError("forbidden"));
 
   const counted = await deps.counter.count(checkpoint.value.id);
-  return ok({ id: checkpoint.value.id, kind: checkpoint.value.kind, name: checkpoint.value.name, servedCount: counted.ok ? counted.value : null });
+  return ok(pointOf(checkpoint.value, counted.ok ? counted.value : null));
 }

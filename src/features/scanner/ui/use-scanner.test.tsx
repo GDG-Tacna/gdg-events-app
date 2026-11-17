@@ -44,7 +44,7 @@ describe("useScanner", () => {
     expect(t.fake.paused()).toBe(true);
 
     await act(async () => answer(success));
-    expect(t.state()).toEqual({ status: "done", outcome: { ok: true, kind: "talk", recorded: true, firstEntrance: false, missions: [], talkCredits: 0, achievements: [] } });
+    expect(t.state()).toEqual({ status: "done", outcome: { ok: true, kind: "talk", recorded: true, firstEntrance: false, missions: [], talkCredits: 0, achievements: [], checkpoint: null } });
     // The answer is on screen: the camera stays paused until the cadet asks for another scan.
     expect(t.fake.paused()).toBe(true);
   });

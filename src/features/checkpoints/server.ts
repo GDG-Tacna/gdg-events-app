@@ -27,17 +27,23 @@ export {
   type ServeResult,
 } from "./domain/serve";
 export {
+  DESCRIPTION_MAX_LENGTH,
   NAME_MAX_LENGTH,
   NAME_MIN_LENGTH,
   createCheckpoint,
   deleteCheckpoint,
+  editCheckpoint,
   listCheckpoints,
+  listIdentityLocks,
+  normalizeDescription,
   normalizeName,
-  renameCheckpoint,
   setCheckpointActive,
-  setFoodRequirements,
   suggestId,
+  type CheckpointPatch,
   type CheckpointStore,
+  type EditCheckpointInput,
+  type IdentityLock,
+  type PlanStands,
   type ManageActor,
   type ManageAudit,
   type ManageAuditEntry,
@@ -57,5 +63,17 @@ export {
   type FoodRequirements,
   type FoodShortfall,
 } from "./domain/food-gate";
+export {
+  STAFF_SCOPE_MAX,
+  listStaffScopes,
+  setStaffScope,
+  staffScopeError,
+  type StaffScopeAudit,
+  type StaffScopeAuditEntry,
+  type StaffScopeDeps,
+  type StaffScopeError,
+  type StaffScopeStore,
+} from "./domain/staff-scope";
 export { AllowAllServeGate } from "./data/allow-all-serve-gate";
 export { FirestoreCheckpointStore } from "./data/server/firestore-checkpoint-store";
+export { FirestoreStaffScopeStore } from "./data/server/firestore-staff-scope-store";

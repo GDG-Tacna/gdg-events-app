@@ -13,8 +13,11 @@ vi.mock("next/navigation", () => ({
 }));
 const composition = vi.hoisted(() => ({ editionPermissions: vi.fn() }));
 vi.mock("./composition/event.server", () => composition);
+const scopes = vi.hoisted(() => ({ staffScopeStore: { read: vi.fn() } }));
+vi.mock("./composition/checkpoint-admin.server", () => scopes);
 
-const { accessTo, mayEdit, requireSection, sectionLevels, staffStations } = await import("./permissions.server");
+const { accessTo, mayEdit, requireSection, sectionLevels, staffCheckpoints, staffStations } = await import("./permissions.server");
+const { logServerError } = await import("@/shared/lib/log");
 const { DEFAULT_PERMISSIONS } = await import("@/features/event/domain/permissions");
 
 const GLOBAL = { role: "admin" as const, adminScope: "global" as const };
@@ -53,5 +56,32 @@ describe("control center permissions", () => {
 
   it("answers the stations the edition lets staff operate", async () => {
     expect(await staffStations()).toEqual(["stand"]);
+  });
+});
+
+describe("staff stations of one account", () => {
+  beforeEach(() => {
+    scopes.staffScopeStore.read.mockReset();
+    vi.mocked(logServerError).mockClear();
+  });
+
+  it("answers the stations an admin limited a staff member to, and no limit when there is none", async () => {
+    scopes.staffScopeStore.read.mockResolvedValueOnce({ ok: true, value: ["stand-louis"] }).mockResolvedValueOnce({ ok: true, value: null });
+
+    expect(await staffCheckpoints({ uid: "s1", role: "staff" })).toEqual(["stand-louis"]);
+    expect(scopes.staffScopeStore.read).toHaveBeenCalledWith("s1");
+    expect(await staffCheckpoints({ uid: "s2", role: "staff" })).toBeUndefined();
+  });
+
+  it("never limits an admin, without reading anything", async () => {
+    expect(await staffCheckpoints({ uid: "a1", role: "admin" })).toBeUndefined();
+    expect(scopes.staffScopeStore.read).not.toHaveBeenCalled();
+  });
+
+  it("limits staff to nothing when their stations cannot be read, and says so in the log", async () => {
+    scopes.staffScopeStore.read.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+
+    expect(await staffCheckpoints({ uid: "s3", role: "staff" })).toEqual([]);
+    expect(logServerError).toHaveBeenCalledWith("permissions.staff-scope", expect.any(Error));
   });
 });

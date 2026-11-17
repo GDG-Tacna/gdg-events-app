@@ -6,7 +6,7 @@ import { copy } from "@/shared/copy/es";
 import { rankWithLevel } from "@/shared/copy/rank-name";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, ButtonLink, Icon } from "@/shared/ui";
+import { Button, ButtonLink, Icon, Thumbnail } from "@/shared/ui";
 import type { StationKind } from "../domain/serve";
 import type { ServeAction, ServeActionResult } from "./action";
 
@@ -19,6 +19,10 @@ export interface ServeScreenProps {
   kind: StationKind;
   /** The station being operated, shown above the camera. */
   name: string;
+  /** What the station is, under its name (empty or absent when it has none). */
+  description?: string;
+  /** The address of its logo or photo, next to its name. */
+  image?: string | null;
   /** Cadets scanned here so far, or `null` when it could not be read. */
   initialCount: number | null;
   /** Where "Cambiar de puesto" goes. */
@@ -55,7 +59,7 @@ const VERDICT_CLASSES: Record<Verdict, string> = {
  * lists the missions it completed, to tell the cadet. It clears by itself after a moment or on a tap, and the
  * station's count stays on top. The server decides everything.
  */
-export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, initialCount, backHref }: ServeScreenProps) {
+export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, description, image, initialCount, backHref }: ServeScreenProps) {
   const [count, setCount] = useState(initialCount);
 
   const submit = useCallback(
@@ -90,9 +94,13 @@ export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, i
   return (
     <div className="gap-space-4 mx-auto flex w-full max-w-[520px] flex-col">
       <header className="gap-space-3 flex items-end justify-between">
-        <div className="min-w-0">
-          <p className="type-caption text-text-subtle">{copy.staff.title}</p>
-          <h1 className="type-title-xl text-foreground truncate">{name}</h1>
+        <div className="gap-space-3 flex min-w-0 items-center">
+          {image ? <Thumbnail url={image} size={48} /> : null}
+          <div className="min-w-0">
+            <p className="type-caption text-text-subtle">{copy.staff.title}</p>
+            <h1 className="type-title-xl text-foreground truncate">{name}</h1>
+            {description ? <p className="type-body-sm text-muted-foreground line-clamp-2">{description}</p> : null}
+          </div>
         </div>
         <div className="text-right">
           <p className="type-caption text-text-subtle">{copy.staff.counterLabel[kind]}</p>

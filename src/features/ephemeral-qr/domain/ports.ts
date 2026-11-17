@@ -15,8 +15,18 @@ export interface QrEncoder {
 
 /** The slice of the checkpoint catalog this feature needs; the check-ins catalog satisfies it. */
 export interface TalkLookup {
-  find(id: string): Promise<Result<{ id: string; kind: string; name: string; active: boolean } | null, { code: string }>>;
-  listActive(): Promise<Result<readonly { id: string; kind: string; name: string; active: boolean }[], { code: string }>>;
+  find(id: string): Promise<Result<LookedUpCheckpoint | null, { code: string }>>;
+  listActive(): Promise<Result<readonly LookedUpCheckpoint[], { code: string }>>;
+}
+
+/** A checkpoint as this feature reads it; a puesto may also have a description and an image address. */
+export interface LookedUpCheckpoint {
+  id: string;
+  kind: string;
+  name: string;
+  active: boolean;
+  description?: string;
+  image?: string | null;
 }
 
 export type { EphemeralQrError };

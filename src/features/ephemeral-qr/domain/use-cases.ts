@@ -24,23 +24,37 @@ export interface QrActor {
   role: "attendee" | "staff" | "admin" | null;
   /** For staff: the kinds of station the edition lets them operate (an admin needs none). */
   kinds?: readonly string[];
+  /**
+   * For staff limited to some stations (Admin › Equipo): the only checkpoints they may show. Absent means no limit;
+   * an admin is never limited.
+   */
+  checkpointIds?: readonly string[];
 }
 
-/** The checkpoints whose code is drawn on a screen: a talk's, in its room, and the entrance's, at the door. */
-const SCREEN_KINDS: readonly string[] = ["talk", "entrance"];
+/** The checkpoints whose code is drawn on a screen: a talk's in its room, the entrance's at the door and a stand's on its tablet. */
+const SCREEN_KINDS: readonly string[] = ["talk", "entrance", "stand"];
+
+/** The screen codes staff may show: the stations they also operate by scanning passes. A talk's is the admin's alone. */
+const STAFF_SCREEN_KINDS: readonly string[] = ["entrance", "stand"];
 
 /**
- * Who may put a checkpoint's code on a screen: an admin (an organizer is one) any of them; staff only the entrance's,
- * and only when the edition lets staff operate entrances. A talk's code never goes to staff.
+ * Who may put a checkpoint's code on a screen: an admin (an organizer is one) any of them; staff only an entrance's or a
+ * stand's, only when the edition lets staff operate that kind, and only a checkpoint within their own stations when an
+ * admin limited them to some. A talk's code never goes to staff.
  */
-function mayShow(actor: QrActor, kind: string): boolean {
+function mayShow(actor: QrActor, checkpoint: { id: string; kind: string }): boolean {
   if (actor.role === "admin") return true;
-  return actor.role === "staff" && kind === "entrance" && (actor.kinds ?? []).includes("entrance");
+  return (
+    actor.role === "staff" &&
+    STAFF_SCREEN_KINDS.includes(checkpoint.kind) &&
+    (actor.kinds ?? []).includes(checkpoint.kind) &&
+    (actor.checkpointIds === undefined || actor.checkpointIds.includes(checkpoint.id))
+  );
 }
 
 export interface IssuedQr {
   checkpointId: string;
-  /** The talk's or the entrance's name, to show next to the code. */
+  /** The talk's, the entrance's or the stand's name, to show next to the code. */
   name: string;
   /** What the QR contains. */
   payload: string;
@@ -73,9 +87,16 @@ export interface ScreenCheckpoint {
   id: string;
   name: string;
   kind: string;
+  /** What the puesto is, shown above its code (empty when it has none; talks have none). */
+  description: string;
+  /** The address of its logo or photo, shown above its code, or null. */
+  image: string | null;
 }
 
-/** The checkpoints this actor can put on a screen: every open talk and entrance for an admin, the entrances for allowed staff. */
+/**
+ * The checkpoints this actor can put on a screen: every open talk, entrance and stand for an admin; for staff, the open
+ * entrances and stands of the kinds the edition lets them operate, within their own stations when they are limited.
+ */
 export async function listScreenCheckpoints(
   deps: Pick<EphemeralQrDeps, "lookup">,
   actor: QrActor,
@@ -84,13 +105,14 @@ export async function listScreenCheckpoints(
 
   const active = await deps.lookup.listActive();
   if (!active.ok) return err(qrError("unknown"));
-  return ok(active.value.filter((checkpoint) => SCREEN_KINDS.includes(checkpoint.kind) && mayShow(actor, checkpoint.kind)).map(({ id, name, kind }) => ({ id, name, kind })));
+  return ok(active.value.filter((checkpoint) => SCREEN_KINDS.includes(checkpoint.kind) && mayShow(actor, checkpoint)).map(({ id, name, kind, description, image }) => ({ id, name, kind, description: description ?? "", image: image ?? null })));
 }
 
 /**
- * A signed code for a talk (two minutes) or an entrance (one minute), for whoever may show it. Nothing is stored: the code
- * carries its own expiry and signature, so issuing costs no database write, any server instance can verify it, and
- * every screen that asks gets a code of its own: two devices at the same door share nothing.
+ * A signed code for a talk (two minutes), an entrance or a stand (one minute each), for whoever may show it (see
+ * `mayShow`). Nothing is stored: the code carries its own expiry and signature, so issuing costs no database write, any
+ * server instance can verify it, and every screen that asks gets a code of its own: two devices at the same door share
+ * nothing.
  */
 export async function issueQr(
   deps: EphemeralQrDeps,
@@ -104,7 +126,7 @@ export async function issueQr(
   if (found.value === null) return err(qrError("checkpoint-not-found"));
   if (!found.value.active) return err(qrError("checkpoint-inactive"));
   if (!SCREEN_KINDS.includes(found.value.kind)) return err(qrError("not-shown-on-screen"));
-  if (!mayShow(actor, found.value.kind)) return err(qrError("forbidden"));
+  if (!mayShow(actor, found.value)) return err(qrError("forbidden"));
 
   try {
     const issuedAt = deps.now();

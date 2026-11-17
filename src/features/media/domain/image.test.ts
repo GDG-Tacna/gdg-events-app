@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { err, ok } from "@/shared/lib/result";
-import { IMAGE_PATH, IMAGE_RULES, MAX_UPLOAD_BYTES, chooseImage, copyImage, dropReplacedImage, removeImage, sniffFormat, storeImage, type MediaDeps } from "./image";
+import { IMAGE_PATH, IMAGE_RULES, MAX_UPLOAD_BYTES, chooseImage, copyImage, dropReplacedImage, isImagePathOf, removeImage, sniffFormat, storeImage, type MediaDeps } from "./image";
 
 const text = (value: string) => new TextEncoder().encode(value);
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0x10]);
@@ -59,6 +59,17 @@ describe("storeImage", () => {
     expect(deps.store.put).toHaveBeenCalledWith(path, text("webp-bytes"), "image/webp");
     expect(deps.audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "image.uploaded", actorUid: "a1", targetUid: path, details: { purpose: "badge", format: "webp", bytes: "10" } }));
     expect(IMAGE_PATH.test(path)).toBe(true);
+  });
+
+  it("stores a puesto's logo or photo as a picture in its own folder, never as SVG", async () => {
+    const deps = setup();
+
+    const stored = await storeImage(deps, ADMIN, { purpose: "checkpoint", bytes: PNG });
+
+    expect(stored.ok && stored.value.path).toBe("public/devfest-2026/checkpoint/0f8e2c1a-1111-4222-8333-944455556666.webp");
+    expect(deps.processor.raster).toHaveBeenCalledWith(PNG, IMAGE_RULES.picture.maxSide);
+    expect(await storeImage(setup(), ADMIN, { purpose: "checkpoint", bytes: SVG })).toEqual(err({ code: "unsupported-format" }));
+    expect(isImagePathOf("public/devfest-2026/checkpoint/0f8e2c1a-1111-4222-8333-944455556666.webp", "checkpoint")).toBe(true);
   });
 
   it("keeps a logo's SVG as SVG after cleaning it", async () => {

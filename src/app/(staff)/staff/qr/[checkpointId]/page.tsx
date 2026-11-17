@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { serveDeps } from "@/app-shell/composition/checkpoints.server";
 import { issueQrAction } from "@/app-shell/ephemeral-qr/issue-qr.action";
 import { requireRole } from "@/app-shell/guards";
-import { staffStations } from "@/app-shell/permissions.server";
+import { staffCheckpoints, staffStations } from "@/app-shell/permissions.server";
 import { getServePoint } from "@/features/checkpoints/server";
 import { QrDisplay } from "@/features/ephemeral-qr";
 import { FEATURES } from "@/shared/config/features";
@@ -11,25 +11,27 @@ import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { ButtonLink, ScreenEnter } from "@/shared/ui";
 
-export const metadata: Metadata = { title: copy.staff.showEntranceQr };
+export const metadata: Metadata = { title: copy.staff.screenQrTitle };
 
 /**
- * The entrance's code on a screen at the door, for cadets to scan. Staff (and admins) open it; every device that opens
- * it asks the server for its own code, so two screens at the same door do not depend on each other.
+ * An entrance's or a stand's code on a screen (the door, the stand's tablet), for cadets to scan. Staff (and admins)
+ * open it; every device that opens it asks the server for its own code, so two screens at the same place do not depend
+ * on each other. Staff limited to some stations only reach their own.
  */
-export default async function StaffEntranceQrPage({ params }: PageProps<"/staff/qr/[checkpointId]">) {
+export default async function StaffScreenQrPage({ params }: PageProps<"/staff/qr/[checkpointId]">) {
   if (!FEATURES.checkins) notFound();
   const session = await requireRole(["staff"]);
   const { checkpointId } = await params;
 
-  const point = await getServePoint(serveDeps, { uid: session.uid, role: session.role, kinds: session.role === "staff" ? await staffStations() : undefined }, checkpointId);
+  const point = await getServePoint(serveDeps, { uid: session.uid, role: session.role, kinds: session.role === "staff" ? await staffStations() : undefined, checkpointIds: await staffCheckpoints(session) }, checkpointId);
   if (!point.ok) {
     // Unknown, closed or not-allowed stations are simply not found; a failed read is a real error.
     if (point.error.code === "unknown") throw new Error("Could not read the serving point");
     notFound();
   }
-  // Only the entrance has a code that changes on a screen.
-  if (point.value.kind !== "entrance") notFound();
+  // Only the entrance and the stands have a code that changes on a screen; the catering scans the cadet's pass.
+  if (point.value.kind !== "entrance" && point.value.kind !== "stand") notFound();
+  const scanHint = point.value.kind === "stand" ? copy.admin.qr.scanHintStand : copy.admin.qr.scanHintEntrance;
 
   return (
     <ScreenEnter>
@@ -39,7 +41,7 @@ export default async function StaffEntranceQrPage({ params }: PageProps<"/staff/
             {copy.staff.entranceQrBack}
           </ButtonLink>
         </div>
-        <QrDisplay checkpointId={point.value.id} name={point.value.name} issue={issueQrAction} texts={{ scanHint: copy.admin.qr.scanHintEntrance, errors: copy.admin.qr.errors }} />
+        <QrDisplay checkpointId={point.value.id} name={point.value.name} description={point.value.description} image={point.value.image} issue={issueQrAction} texts={{ scanHint, errors: copy.admin.qr.errors }} />
       </div>
     </ScreenEnter>
   );

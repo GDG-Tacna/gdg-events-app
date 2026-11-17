@@ -84,6 +84,25 @@ describe("serveAttendee", () => {
     expect(t.recorder.record).not.toHaveBeenCalled();
   });
 
+  it("records a scan only at the stations an admin limited the staff member to, never an admin", async () => {
+    const own = setup({ found: ok(STAND) });
+    expect(await serveAttendee(own.deps, { ...STAFF, checkpointIds: ["stand-cloud"] }, { checkpointId: "stand-cloud", payload: "devfest:at:pass" })).toMatchObject({ ok: true, value: { kind: "stand" } });
+
+    const other = setup();
+    expect(await serveAttendee(other.deps, { ...STAFF, checkpointIds: ["stand-cloud"] }, { checkpointId: "lunch-1", payload: "devfest:at:pass" })).toEqual(err(serveError("forbidden")));
+    // A scope that could not be read arrives as an empty list: nothing at all.
+    expect(await serveAttendee(other.deps, { ...STAFF, checkpointIds: [] }, { checkpointId: "lunch-1", payload: "devfest:at:pass" })).toEqual(err(serveError("forbidden")));
+    expect(other.recorder.record).not.toHaveBeenCalled();
+
+    expect(await serveAttendee(setup().deps, { uid: "a1", role: "admin", checkpointIds: ["stand-cloud"] }, { checkpointId: "lunch-1", payload: "devfest:at:pass" })).toMatchObject({ ok: true });
+  });
+
+  it("needs both the kind and the station: a limited staff member's own stand is refused when the edition keeps staff off stands", async () => {
+    const t = setup({ found: ok(STAND) });
+
+    expect(await serveAttendee(t.deps, { ...STAFF, kinds: ["entrance"], checkpointIds: ["stand-cloud"] }, { checkpointId: "stand-cloud", payload: "devfest:at:pass" })).toEqual(err(serveError("forbidden")));
+  });
+
   it("stops a second ration: the same attendee answers already-served, with nothing counted twice", async () => {
     const t = setup({ recorded: ok({ kind: "already-recorded" }) });
 
@@ -204,10 +223,10 @@ describe("listServePoints", () => {
 
     expect(result).toEqual(
       ok([
-        { id: "entrance-main", kind: "entrance", name: "Entrada", servedCount: 3 },
-        { id: "lunch-1", kind: "catering", name: "Almuerzo", servedCount: 10 },
-        { id: "coffee-1", kind: "catering", name: "Coffee break", servedCount: 3 },
-        { id: "stand-cloud", kind: "stand", name: "Stand Cloud", servedCount: 3 },
+        { id: "entrance-main", kind: "entrance", name: "Entrada", description: "", image: null, servedCount: 3 },
+        { id: "lunch-1", kind: "catering", name: "Almuerzo", description: "", image: null, servedCount: 10 },
+        { id: "coffee-1", kind: "catering", name: "Coffee break", description: "", image: null, servedCount: 3 },
+        { id: "stand-cloud", kind: "stand", name: "Stand Cloud", description: "", image: null, servedCount: 3 },
       ]),
     );
     expect(t.counter.count).not.toHaveBeenCalledWith("talk-1");
@@ -222,10 +241,24 @@ describe("listServePoints", () => {
     expect(admin.ok && admin.value).toHaveLength(3);
   });
 
+  it("offers a limited staff member only their own stations, within the kinds the edition allows", async () => {
+    const other: ServeCheckpoint = { id: "stand-louis", kind: "stand", name: "Stand Louis 3D", active: true };
+    const t = setup({ active: ok([STAND, other, LUNCH, ENTRANCE]) });
+
+    const limited = await listServePoints(t.deps, { ...STAFF, checkpointIds: ["stand-louis"] });
+    expect(limited.ok && limited.value.map((point) => point.id)).toEqual(["stand-louis"]);
+    const offStands = await listServePoints(t.deps, { ...STAFF, kinds: ["catering"], checkpointIds: ["stand-louis"] });
+    expect(offStands).toEqual(ok([]));
+    const unreadable = await listServePoints(t.deps, { ...STAFF, checkpointIds: [] });
+    expect(unreadable).toEqual(ok([]));
+    const admin = await listServePoints(t.deps, { uid: "a1", role: "admin", checkpointIds: ["stand-louis"] });
+    expect(admin.ok && admin.value).toHaveLength(4);
+  });
+
   it("keeps a point on the list when only its count fails", async () => {
     const t = setup({ count: err({ code: "unknown" }) });
 
-    expect(await listServePoints(t.deps, STAFF)).toEqual(ok([{ id: "lunch-1", kind: "catering", name: "Almuerzo", servedCount: null }]));
+    expect(await listServePoints(t.deps, STAFF)).toEqual(ok([{ id: "lunch-1", kind: "catering", name: "Almuerzo", description: "", image: null, servedCount: null }]));
   });
 
   it("is for staff and admin only, and reports a failed read as unknown", async () => {
@@ -236,7 +269,14 @@ describe("listServePoints", () => {
 
 describe("getServePoint", () => {
   it("returns the name and the rations handed out so far", async () => {
-    expect(await getServePoint(setup().deps, STAFF, "lunch-1")).toEqual(ok({ id: "lunch-1", kind: "catering", name: "Almuerzo", servedCount: 42 }));
+    expect(await getServePoint(setup().deps, STAFF, "lunch-1")).toEqual(ok({ id: "lunch-1", kind: "catering", name: "Almuerzo", description: "", image: null, servedCount: 42 }));
+  });
+
+  it("carries the puesto's description and image to the staff", async () => {
+    const withLogo: ServeCheckpoint = { ...STAND, description: "Impresión 3D", image: "/media/logo.webp" };
+
+    expect(await getServePoint(setup({ found: ok(withLogo) }).deps, STAFF, "stand-cloud")).toMatchObject({ ok: true, value: { description: "Impresión 3D", image: "/media/logo.webp" } });
+    expect(await listServePoints(setup({ active: ok([withLogo]) }).deps, STAFF)).toMatchObject({ ok: true, value: [{ description: "Impresión 3D", image: "/media/logo.webp" }] });
   });
 
   it("returns an entrance or a stand with its kind", async () => {
@@ -246,6 +286,11 @@ describe("getServePoint", () => {
 
   it("refuses staff a station of a kind the edition does not let them operate", async () => {
     expect(await getServePoint(setup().deps, { ...STAFF, kinds: ["entrance"] }, "lunch-1")).toEqual(err(serveError("forbidden")));
+  });
+
+  it("opens only a limited staff member's own stations", async () => {
+    expect(await getServePoint(setup({ found: ok(STAND) }).deps, { ...STAFF, checkpointIds: ["stand-cloud"] }, "stand-cloud")).toMatchObject({ ok: true, value: { id: "stand-cloud" } });
+    expect(await getServePoint(setup().deps, { ...STAFF, checkpointIds: ["stand-cloud"] }, "lunch-1")).toEqual(err(serveError("forbidden")));
   });
 
   it("refuses a checkpoint that cannot serve, and anyone who may not", async () => {

@@ -24,6 +24,8 @@ export type RecordCheckInActionResult =
       kind: ScanKind;
       recorded: boolean;
       firstEntrance: boolean;
+      /** The scanned puesto as the cadet sees it (absent for a speaker's code). */
+      checkpoint?: { name: string; description: string; image: string | null };
       /** Missions tied to this checkpoint (talks and stands) or speaker. Absent or empty when there are none. */
       missions?: readonly ScanReward[];
       /** G-Credits this scan earned for attending a talk (0 or absent when none). */

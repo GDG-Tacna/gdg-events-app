@@ -8,22 +8,21 @@ vi.mock("@/app-shell/deletion.server", () => deletion);
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
-const server = { createCheckpoint: vi.fn(), renameCheckpoint: vi.fn(), setCheckpointActive: vi.fn(), setFoodRequirements: vi.fn(), deleteCheckpoint: vi.fn() };
+const server = { DESCRIPTION_MAX_LENGTH: 200, createCheckpoint: vi.fn(), editCheckpoint: vi.fn(), setCheckpointActive: vi.fn(), deleteCheckpoint: vi.fn() };
 vi.mock("@/features/checkpoints/server", () => server);
 
 const features = vi.hoisted(() => ({ FEATURES: { admin: true, checkins: true } }));
 vi.mock("@/shared/config/features", () => features);
 
-const { createCheckpointAction, deleteCheckpointAction, renameCheckpointAction, setCheckpointActiveAction, setFoodRequirementsAction } = await import("./manage.actions");
+const { createCheckpointAction, deleteCheckpointAction, editCheckpointAction, setCheckpointActiveAction } = await import("./manage.actions");
 
 const session = (role: "attendee" | "staff" | "admin" | null) => ({ uid: "a1", role, displayName: null, photoUrl: null });
 const LUNCH = { id: "lunch-1", kind: "catering", name: "Almuerzo", active: true };
 
 describe.each([
   ["createCheckpointAction", () => createCheckpointAction({ name: "Almuerzo", id: "lunch-1", kind: "catering" }), server.createCheckpoint],
-  ["renameCheckpointAction", () => renameCheckpointAction({ id: "lunch-1", name: "Otro" }), server.renameCheckpoint],
+  ["editCheckpointAction", () => editCheckpointAction({ id: "lunch-1", name: "Otro", description: "" }), server.editCheckpoint],
   ["setCheckpointActiveAction", () => setCheckpointActiveAction({ id: "lunch-1", active: false }), server.setCheckpointActive],
-  ["setFoodRequirementsAction", () => setFoodRequirementsAction({ id: "lunch-1", minLevel: 2, minTalks: null }), server.setFoodRequirements],
 ] as const)("%s", (_name, call, useCase) => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -80,20 +79,56 @@ describe("input validation", () => {
   it("rejects input that is not text or is absurdly long, before touching the use case", async () => {
     expect(await createCheckpointAction({ name: 5 as unknown as string, id: "x-1", kind: "talk" })).toMatchObject({ ok: false });
     expect(await createCheckpointAction({ name: "a".repeat(201), id: "x-1", kind: "talk" })).toMatchObject({ ok: false });
-    expect(await renameCheckpointAction({ id: undefined as unknown as string, name: "Otro" })).toMatchObject({ ok: false });
+    expect(await createCheckpointAction({ name: "Almuerzo", id: "x-1", kind: "stand", description: "d".repeat(201) })).toEqual({ ok: false, code: "invalid-description" });
+    expect(await editCheckpointAction({ id: undefined as unknown as string, name: "Otro", description: "" })).toMatchObject({ ok: false });
+    expect(await editCheckpointAction({ id: "lunch-1", name: "Otro", description: "d".repeat(201) })).toEqual({ ok: false, code: "invalid-description" });
+    expect(await editCheckpointAction({ id: "lunch-1", name: "Otro", description: "", requirements: { minLevel: "2" as unknown as number, minTalks: null } })).toEqual({ ok: false, code: "invalid-level" });
     expect(await setCheckpointActiveAction({ id: "lunch-1", active: "yes" as unknown as boolean })).toEqual({ ok: false, code: "not-found" });
     expect(server.createCheckpoint).not.toHaveBeenCalled();
-    expect(server.renameCheckpoint).not.toHaveBeenCalled();
-    expect(await setFoodRequirementsAction({ id: "lunch-1", minLevel: "2" as unknown as number, minTalks: null })).toEqual({ ok: false, code: "invalid-level" });
+    expect(server.editCheckpoint).not.toHaveBeenCalled();
     expect(server.setCheckpointActive).not.toHaveBeenCalled();
-    expect(server.setFoodRequirements).not.toHaveBeenCalled();
   });
 
-  it("hands the meal's requirements to the use case as given", async () => {
-    server.setFoodRequirements.mockResolvedValue({ ok: true, value: LUNCH });
+  it("hands the description, image and a meal's requirements to the use case as given", async () => {
+    server.createCheckpoint.mockResolvedValue({ ok: true, value: LUNCH });
+    server.editCheckpoint.mockResolvedValue({ ok: true, value: LUNCH });
+    const image = "public/e1/checkpoint/abcdef123456.webp";
 
-    await setFoodRequirementsAction({ id: "lunch-1", minLevel: null, minTalks: 3 });
-    expect(server.setFoodRequirements).toHaveBeenCalledWith({ marker: "deps" }, { uid: "a1", role: "admin" }, { id: "lunch-1", minLevel: null, minTalks: 3 });
+    await createCheckpointAction({ name: "Louis 3D", id: "louis-3d", kind: "stand", description: "3D", imagePath: image });
+    expect(server.createCheckpoint).toHaveBeenCalledWith({ marker: "deps" }, { uid: "a1", role: "admin" }, { name: "Louis 3D", id: "louis-3d", kind: "stand", description: "3D", imagePath: image });
+    await editCheckpointAction({ id: "lunch-1", name: "Almuerzo", description: "", imagePath: null, requirements: { minLevel: null, minTalks: 3 } });
+    expect(server.editCheckpoint).toHaveBeenCalledWith(
+      { marker: "deps" },
+      { uid: "a1", role: "admin" },
+      { id: "lunch-1", name: "Almuerzo", description: "", imagePath: null, requirements: { minLevel: null, minTalks: 3 } },
+    );
+    // Name, description, image and requirements never need the delete permission.
+    expect(deletion.mayDeleteItems).not.toHaveBeenCalled();
+  });
+});
+
+describe("editCheckpointAction kind and id", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    features.FEATURES.admin = true;
+    features.FEATURES.checkins = true;
+    guards.getSession.mockResolvedValue(session("admin"));
+    deletion.mayDeleteItems.mockResolvedValue(true);
+    server.editCheckpoint.mockResolvedValue({ ok: true, value: LUNCH });
+  });
+
+  it("changes the kind or the id where the admin may delete", async () => {
+    await editCheckpointAction({ id: "lunch-1", name: "Almuerzo", description: "", kind: "stand", newId: "stand-1" });
+
+    expect(deletion.mayDeleteItems).toHaveBeenCalled();
+    expect(server.editCheckpoint).toHaveBeenCalledWith({ marker: "deps" }, { uid: "a1", role: "admin" }, expect.objectContaining({ kind: "stand", newId: "stand-1" }));
+  });
+
+  it.each([[{ kind: "stand" }], [{ newId: "stand-1" }]])("refuses %j once the edition is published, unless the admin may delete there", async (change) => {
+    deletion.mayDeleteItems.mockResolvedValue(false);
+
+    expect(await editCheckpointAction({ id: "lunch-1", name: "Almuerzo", description: "", ...change })).toEqual({ ok: false, code: "edition-locked" });
+    expect(server.editCheckpoint).not.toHaveBeenCalled();
   });
 });
 

@@ -2,7 +2,7 @@
 
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
-import { Button, Card, InlineAlert, ProgressBar, Skeleton } from "@/shared/ui";
+import { Button, Card, InlineAlert, ProgressBar, Skeleton, Thumbnail } from "@/shared/ui";
 import type { EphemeralQrErrorCode } from "../domain/qr-error";
 import type { IssueQrAction } from "./action";
 import { QrCodeSvg } from "./QrCodeSvg";
@@ -12,6 +12,10 @@ export interface QrDisplayProps {
   checkpointId: string;
   /** Shown above the code. Known to the page, so it is there before the first code arrives. */
   name: string;
+  /** What the puesto is, shown under its name (a stand's pitch, the entrance's instructions). */
+  description?: string;
+  /** The address of the puesto's logo or photo, shown above its name. */
+  image?: string | null;
   issue: IssueQrAction;
   /** Words for a code that is not a talk's (a speaker's): what scanning it does, and its errors. */
   texts?: { scanHint: string; errors: Record<EphemeralQrErrorCode, string> };
@@ -26,10 +30,10 @@ export function formatCountdown(remainingMs: number): string {
 }
 
 /**
- * The projector screen: the talk's name, a big code, and how long it has left. The code renews itself
+ * The projector screen: the talk's or puesto's name (a puesto with its image and description), a big code, and how long it has left. The code renews itself
  * before it ends. Everything about the code comes from the server; this only draws it.
  */
-export function QrDisplay({ checkpointId, name, issue, texts }: QrDisplayProps) {
+export function QrDisplay({ checkpointId, name, description, image, issue, texts }: QrDisplayProps) {
   const { state, retry } = useEphemeralQr(issue, checkpointId);
   const words = texts ?? copy.admin.qr;
 
@@ -43,7 +47,11 @@ export function QrDisplay({ checkpointId, name, issue, texts }: QrDisplayProps) 
 
   return (
     <div className="gap-space-5 mx-auto flex w-full max-w-[640px] flex-col items-center text-center">
-      <h1 className="type-title-xl text-foreground">{name}</h1>
+      <header className="gap-space-3 flex flex-col items-center">
+        {image ? <Thumbnail url={image} size={96} /> : null}
+        <h1 className="type-title-xl text-foreground">{name}</h1>
+        {description ? <p className="type-body text-muted-foreground max-w-[52ch]">{description}</p> : null}
+      </header>
 
       <Card className="gap-space-5 flex w-full flex-col items-center">
         {state.status === "showing" ? (

@@ -5,12 +5,12 @@ export type { DeleteCheckpointAction, DeleteCheckpointActionResult } from "./ui/
 export type { ServeAction, ServeActionResult, StationMission } from "./ui/action";
 export type { ManageError, ManageErrorCode } from "./domain/manage-error";
 export type {
+  CheckpointLockReason,
   CheckpointView,
   CreateCheckpointAction,
+  EditCheckpointAction,
   ManageActionResult,
-  RenameCheckpointAction,
   SetCheckpointActiveAction,
-  SetFoodRequirementsAction,
 } from "./ui/manage-action";
 export {
   FOOD_LEVEL_MAX,
@@ -21,6 +21,6 @@ export {
   type FoodRequirements,
   type FoodShortfall,
 } from "./domain/food-gate";
-export { NAME_MAX_LENGTH, NAME_MIN_LENGTH, normalizeName, suggestId } from "./domain/manage";
+export { DESCRIPTION_MAX_LENGTH, NAME_MAX_LENGTH, NAME_MIN_LENGTH, normalizeName, suggestId } from "./domain/manage";
 export { CheckpointsAdminView, type CheckpointsAdminViewProps } from "./ui/CheckpointsAdminView";
 export { ServeScreen, type ServeScreenProps } from "./ui/ServeScreen";

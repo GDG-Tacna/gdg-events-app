@@ -36,7 +36,7 @@ describe("FirestoreCheckpointCatalog", () => {
   it("reads an active checkpoint", async () => {
     const { catalog, reads } = catalogWith({ "talk-1": { kind: "talk", active: true } });
 
-    expect(await catalog.find("talk-1")).toEqual({ ok: true, value: { id: "talk-1", kind: "talk", name: "talk-1", active: true } });
+    expect(await catalog.find("talk-1")).toEqual({ ok: true, value: { id: "talk-1", kind: "talk", name: "talk-1", active: true, description: "", image: null } });
     expect(reads).toEqual(["events/e1/checkpoints/talk-1"]);
   });
 
@@ -57,6 +57,16 @@ describe("FirestoreCheckpointCatalog", () => {
     expect(await catalog.find("talk-1")).toMatchObject({ value: { name: "Keynote de apertura" } });
     expect(await catalog.find("talk-2")).toMatchObject({ value: { name: "talk-2" } });
     expect(await catalog.find("talk-3")).toMatchObject({ value: { name: "talk-3" } });
+  });
+
+  it("reads a puesto's description and the address of its image, ignoring an image of another kind", async () => {
+    const { catalog } = catalogWith({
+      "louis-3d": { kind: "stand", active: true, description: "Impresión 3D", imagePath: "public/e1/checkpoint/abcdef123456.webp" },
+      "odd-img": { kind: "stand", active: true, imagePath: "public/e1/mission/abcdef123456.webp" },
+    });
+
+    expect(await catalog.find("louis-3d")).toMatchObject({ ok: true, value: { description: "Impresión 3D", image: "/media/public/e1/checkpoint/abcdef123456.webp" } });
+    expect(await catalog.find("odd-img")).toMatchObject({ ok: true, value: { description: "", image: null } });
   });
 
   it("returns null for a missing checkpoint", async () => {
@@ -102,9 +112,9 @@ describe("FirestoreCheckpointCatalog", () => {
     expect(result).toEqual({
       ok: true,
       value: [
-        { id: "talk-a", kind: "talk", name: "Alfa", active: true },
-        { id: "lunch-1", kind: "catering", name: "lunch-1", active: true },
-        { id: "talk-b", kind: "talk", name: "Zeta", active: true },
+        { id: "talk-a", kind: "talk", name: "Alfa", active: true, description: "", image: null },
+        { id: "lunch-1", kind: "catering", name: "lunch-1", active: true, description: "", image: null },
+        { id: "talk-b", kind: "talk", name: "Zeta", active: true, description: "", image: null },
       ],
     });
     expect(reads).toEqual(["events/e1/checkpoints?active==true"]);

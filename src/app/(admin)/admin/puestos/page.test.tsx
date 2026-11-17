@@ -7,11 +7,11 @@ const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }))
 vi.mock("@/app-shell/deletion.server", () => deletion);
 vi.mock("@/app-shell/checkpoints/manage.actions", () => ({
   createCheckpointAction: async () => ({ ok: false, code: "unknown" }),
-  renameCheckpointAction: async () => ({ ok: false, code: "unknown" }),
+  editCheckpointAction: async () => ({ ok: false, code: "unknown" }),
   setCheckpointActiveAction: async () => ({ ok: false, code: "unknown" }),
   deleteCheckpointAction: async () => ({ ok: false, code: "unknown" }),
-  setFoodRequirementsAction: async () => ({ ok: false, code: "unknown" }),
 }));
+vi.mock("@/app-shell/media/upload.action", () => ({ uploadImageAction: async () => ({ ok: false, code: "unknown" }) }));
 vi.mock("@/app-shell/composition/ranks.server", () => ({ rankDeps: { marker: "ranks" } }));
 const attendeeServer = { getEditionLadder: vi.fn() };
 vi.mock("@/features/attendee/server", () => attendeeServer);
@@ -19,11 +19,12 @@ vi.mock("@/features/attendee/server", () => attendeeServer);
 const guards = { requireRole: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
-const server = { listCheckpoints: vi.fn() };
+const server = { listCheckpoints: vi.fn(), listIdentityLocks: vi.fn() };
 vi.mock("@/features/checkpoints/server", () => server);
 
 const { CheckpointsAdminView } = await import("@/features/checkpoints");
 const actions = await import("@/app-shell/checkpoints/manage.actions");
+const media = await import("@/app-shell/media/upload.action");
 const { default: AdminCheckpointsPage } = await import("./page");
 
 function findElement(node: ReactNode, type: unknown): { props: Record<string, unknown> } | null {
@@ -48,6 +49,7 @@ describe("admin checkpoints page", () => {
     guards.requireRole.mockResolvedValue({ uid: "a1", role: "admin", displayName: null, photoUrl: null });
     deletion.mayDeleteItems.mockResolvedValue(true);
     server.listCheckpoints.mockResolvedValue({ ok: true, value: LIST });
+    server.listIdentityLocks.mockResolvedValue({ ok: true, value: { "lunch-1": null } });
     attendeeServer.getEditionLadder.mockResolvedValue([
       { id: "recruit", minXp: 0, level: 1 },
       { id: "cadete-pro", minXp: 80, level: 2, name: "Cadete Pro" },
@@ -70,11 +72,12 @@ describe("admin checkpoints page", () => {
     expect(view?.props).toMatchObject({
       checkpoints: LIST,
       create: actions.createCheckpointAction,
-      rename: actions.renameCheckpointAction,
+      edit: actions.editCheckpointAction,
       setActive: actions.setCheckpointActiveAction,
-      setRequirements: actions.setFoodRequirementsAction,
       remove: actions.deleteCheckpointAction,
+      upload: media.uploadImageAction,
       canDelete: true,
+      locks: { "lunch-1": null },
     });
     // The edition's ladder names the levels a meal can ask for.
     expect(attendeeServer.getEditionLadder).toHaveBeenCalledWith({ marker: "ranks" });
@@ -86,10 +89,28 @@ describe("admin checkpoints page", () => {
     expect(view?.props).not.toHaveProperty("hrefs");
   });
 
-  it("hides the delete buttons from a session that may not delete in this edition", async () => {
+  it("hides the delete buttons from a session that may not delete in this edition, and locks every kind and id there", async () => {
     deletion.mayDeleteItems.mockResolvedValueOnce(false);
 
-    expect(findElement(await AdminCheckpointsPage(), CheckpointsAdminView)?.props.canDelete).toBe(false);
+    const view = findElement(await AdminCheckpointsPage(), CheckpointsAdminView);
+    expect(view?.props.canDelete).toBe(false);
+    expect(view?.props.locks).toEqual({ "lunch-1": "edition-locked" });
+  });
+
+  it("passes the server's reason why a puesto's kind and id are locked, before the edition's", async () => {
+    deletion.mayDeleteItems.mockResolvedValueOnce(false);
+    server.listIdentityLocks.mockResolvedValue({ ok: true, value: { "lunch-1": "has-check-ins" } });
+
+    const view = findElement(await AdminCheckpointsPage(), CheckpointsAdminView);
+
+    expect(server.listIdentityLocks).toHaveBeenCalledWith({ marker: "deps" }, { uid: "a1", role: "admin" }, LIST);
+    expect(view?.props.locks).toEqual({ "lunch-1": "has-check-ins" });
+  });
+
+  it("surfaces a failed read of what refers to the puestos through the error boundary", async () => {
+    server.listIdentityLocks.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+
+    await expect(AdminCheckpointsPage()).rejects.toThrow();
   });
 
   it("leaves the talks out: they have their own screen (Charlas)", async () => {

@@ -83,6 +83,8 @@ export const RAFFLE_DRAWS_COLLECTION = "raffleDraws";
 export const EDITION_TEAM_COLLECTION = "team";
 /** Invitations to the team of one edition (`events/{eventId}/invites/{hash of the link}`). */
 export const INVITES_COLLECTION = "invites";
+/** The stations a staff account is limited to in one edition (`events/{eventId}/staffScopes/{uid}`); none means every station. */
+export const STAFF_SCOPES_COLLECTION = "staffScopes";
 
 export type EventCollection =
   | typeof SPEAKERS_COLLECTION
@@ -112,7 +114,8 @@ export type EventCollection =
   | typeof CHECKINS_COLLECTION
   | typeof CHECKPOINTS_COLLECTION
   | typeof EDITION_TEAM_COLLECTION
-  | typeof INVITES_COLLECTION;
+  | typeof INVITES_COLLECTION
+  | typeof STAFF_SCOPES_COLLECTION;
 
 /** The document of one edition itself (its name and when it ends). */
 export function eventDocument(db: Firestore, eventId: string) {

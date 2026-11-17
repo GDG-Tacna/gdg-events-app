@@ -329,3 +329,34 @@ describe("ScannerView accessibility", () => {
     expect((await axe(denied.container)).violations).toEqual([]);
   });
 });
+
+describe("ScannerView scanned puesto", () => {
+  it("shows the stand's name, logo and description under the result", async () => {
+    const { scanner, see } = fakeScanner();
+    const record = vi.fn<RecordCheckInAction>(async () =>
+      result({ checkpointId: "louis-3d", kind: "stand", checkpoint: { name: "Louis 3D", description: "Impresión 3D en vivo", image: "/media/logo.webp" } }),
+    );
+    const { container } = await renderView(scanner, record);
+
+    await see("devfest:eq:louis-3d");
+
+    const place = screen.getByRole("group", { name: copy.scanner.placeLabel });
+    expect(place).toHaveTextContent("Louis 3D");
+    expect(place).toHaveTextContent("Impresión 3D en vivo");
+    expect(container.querySelector('img[src="/media/logo.webp"]')).not.toBeNull();
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(copy.scanner.success.stand.title);
+  });
+
+  it("shows the entrance by name even without a description or image, and nothing for a talk", async () => {
+    const entrance = fakeScanner();
+    const view = await renderView(entrance.scanner, vi.fn<RecordCheckInAction>(async () => result({ kind: "entrance", checkpoint: { name: "Puerta norte", description: "", image: null } })));
+    await entrance.see("devfest:eq:entrance-main");
+    expect(screen.getByRole("group", { name: copy.scanner.placeLabel })).toHaveTextContent("Puerta norte");
+    view.unmount();
+
+    const talk = fakeScanner();
+    await renderView(talk.scanner, vi.fn<RecordCheckInAction>(async () => result({ kind: "talk", checkpoint: { name: "Keynote", description: "", image: null } })));
+    await talk.see("devfest:eq:talk-1");
+    expect(screen.queryByRole("group", { name: copy.scanner.placeLabel })).not.toBeInTheDocument();
+  });
+});
