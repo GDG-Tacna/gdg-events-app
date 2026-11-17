@@ -81,6 +81,13 @@ export function normalizeKeyword(value: string): string {
 const SLUG = /^[a-z0-9][a-z0-9-]{1,39}$/;
 export const isMissionId = (value: unknown): value is string => typeof value === "string" && SLUG.test(value);
 
+/**
+ * The id of something a mission points to (a talk or stand checkpoint, a speaker). Those features allow 48 characters,
+ * and a talk's id is made from its title, so a mission's own 40 would refuse real talks.
+ */
+const REFERENCE_ID = /^[a-z0-9][a-z0-9-]{1,47}$/;
+const isReferenceId = (value: unknown): value is string => typeof value === "string" && REFERENCE_ID.test(value);
+
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const text = (value: unknown, min: number, max: number): string | null => {
   if (typeof value !== "string") return null;
@@ -113,9 +120,9 @@ function checkConfig(input: unknown): Checked<MissionConfig> {
   switch (input.type) {
     case "talk":
     case "stand":
-      return isMissionId(input.checkpointId) ? { ok: true, value: { type: input.type, checkpointId: input.checkpointId } } : fail("invalid-checkpoint");
+      return isReferenceId(input.checkpointId) ? { ok: true, value: { type: input.type, checkpointId: input.checkpointId } } : fail("invalid-checkpoint");
     case "speaker":
-      return isMissionId(input.speakerId) ? { ok: true, value: { type: "speaker", speakerId: input.speakerId } } : fail("invalid-speaker");
+      return isReferenceId(input.speakerId) ? { ok: true, value: { type: "speaker", speakerId: input.speakerId } } : fail("invalid-speaker");
     case "quiz": {
       const question = text(input.question, 5, 160);
       if (!question) return fail("invalid-question");

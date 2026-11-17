@@ -30,6 +30,19 @@ describe("parseMission", () => {
     });
   });
 
+  it("accepts the ids of long talks and speakers (48 characters, like their own features), but not longer ones", () => {
+    const talk = "the-agentic-software-engineer-quien-maneja-este";
+    const full = "podemos-construir-jarvis-hoy-gemini-live-jev-y-c";
+    expect(talk.length).toBe(47);
+    expect(full.length).toBe(48);
+    expect(parseMission("talk-1", input({ config: { type: "talk", checkpointId: full } }))?.config).toEqual({ type: "talk", checkpointId: full });
+    expect(parseMission("stand-1", input({ config: { type: "stand", checkpointId: talk } }))?.config).toEqual({ type: "stand", checkpointId: talk });
+    expect(parseMission("meet-1", input({ config: { type: "speaker", speakerId: full } }))?.config).toEqual({ type: "speaker", speakerId: full });
+    expect(checkMission("talk-1", input({ config: { type: "talk", checkpointId: `${full}x` } }))).toEqual({ ok: false, code: "invalid-checkpoint" });
+    // The mission's own id keeps its 40.
+    expect(checkMission(`${"a".repeat(40)}b`, input({ config: { type: "talk", checkpointId: full } }))).toEqual({ ok: false, code: "invalid-id" });
+  });
+
   it("reads each type's config, normalizing and de-duplicating keywords", () => {
     expect(parseMission("t", input({ config: { type: "talk", checkpointId: "talk-keynote" } }))).toBeNull(); // id too short
     expect(parseMission("talk-1", input({ config: { type: "talk", checkpointId: "talk-keynote" } }))?.config).toEqual({ type: "talk", checkpointId: "talk-keynote" });
