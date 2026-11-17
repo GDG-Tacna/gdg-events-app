@@ -82,6 +82,7 @@ const FIELD_OF: Partial<Record<MissionAdminErrorCode, Field>> = {
   "invalid-credits": "credits",
   "invalid-checkpoint": "checkpoint",
   "unknown-checkpoint": "checkpoint",
+  "wrong-checkpoint-kind": "checkpoint",
   "invalid-speaker": "checkpoint",
   "unknown-speaker": "checkpoint",
   "invalid-question": "question",

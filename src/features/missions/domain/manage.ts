@@ -9,8 +9,10 @@ export type MissionAdminErrorCode =
   | "unknown-quadrant"
   /** The picture is not an upload made for a mission. */
   | "invalid-image"
-  /** A talk or stand mission points to a checkpoint that does not exist or is of another kind. */
+  /** A talk or stand mission points to a checkpoint that does not exist in the edition. */
   | "unknown-checkpoint"
+  /** A talk or stand mission points to a checkpoint of another kind (a meal for a stand, say). */
+  | "wrong-checkpoint-kind"
   /** A speaker mission points to someone who is not an active speaker of the edition. */
   | "unknown-speaker"
   /** The mini-game is not one of the games built in code. */
@@ -157,7 +159,8 @@ async function checkDraft(deps: MissionAdminDeps, id: string, draft: MissionDraf
   if (mission.config.type === "talk" || mission.config.type === "stand") {
     const kind = await deps.checkpoints.kindOf(mission.config.checkpointId);
     if (!kind.ok) return err(missionAdminError("unknown"));
-    if (kind.value !== mission.config.type) return err(missionAdminError("unknown-checkpoint"));
+    if (kind.value === null) return err(missionAdminError("unknown-checkpoint"));
+    if (kind.value !== mission.config.type) return err(missionAdminError("wrong-checkpoint-kind"));
   }
   if (mission.config.type === "speaker") {
     const speakers = await deps.speakers.activeIds();

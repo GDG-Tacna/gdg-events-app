@@ -209,7 +209,7 @@ describe("mission admin", () => {
 
       expect(await createMission(ctx.deps, ADMIN, { id: "talk-1", draft: talk })).toMatchObject({ ok: true });
       expect(await createMission(ctx.deps, ADMIN, { id: "stand-1", draft: stand })).toMatchObject({ ok: true });
-      expect(await createMission(ctx.deps, ADMIN, { id: "talk-2", draft: { ...talk, config: { type: "talk", checkpointId: "stand-ai-1" } } })).toEqual(err({ code: "unknown-checkpoint" }));
+      expect(await createMission(ctx.deps, ADMIN, { id: "talk-2", draft: { ...talk, config: { type: "talk", checkpointId: "stand-ai-1" } } })).toEqual(err({ code: "wrong-checkpoint-kind" }));
       expect(await createMission(ctx.deps, ADMIN, { id: "stand-2", draft: { ...stand, config: { type: "stand", checkpointId: "ghost" } } })).toEqual(err({ code: "unknown-checkpoint" }));
     });
 

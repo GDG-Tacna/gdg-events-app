@@ -224,10 +224,10 @@ describe("CheckpointsAdminView create", () => {
     expect(idField()).toHaveValue("lunch-2");
   });
 
-  it("starts with catering selected and shows what each kind is for", async () => {
+  it("starts with no kind selected and shows what each kind is for", async () => {
     await setupCreate();
 
-    expect(screen.getByRole("radio", { name: new RegExp(copy.admin.checkpoints.kinds.catering) })).toBeChecked();
+    for (const radio of screen.getAllByRole("radio")) expect(radio).not.toBeChecked();
     expect(screen.getByText(copy.admin.checkpoints.kindHelp.stand)).toBeInTheDocument();
     // Talks are created in Charlas, with their speaker and schedule.
     expect(screen.queryByRole("radio", { name: new RegExp(copy.admin.checkpoints.kinds.talk) })).not.toBeInTheDocument();
@@ -242,6 +242,16 @@ describe("CheckpointsAdminView create", () => {
 
     expect(create).not.toHaveBeenCalled();
     expect(nameField()).toHaveAccessibleDescription(expect.stringContaining(copy.admin.checkpoints.errors["invalid-name"]));
+  });
+
+  it("asks for a kind instead of creating a meal by default", async () => {
+    const { create, user } = await setupCreate();
+
+    await user.type(nameField(), "Stand de Gemini");
+    await user.click(submit());
+
+    expect(create).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.admin.checkpoints.kindRequired);
   });
 
   it("creates the checkpoint with the chosen kind, announces it, clears the form and refreshes", async () => {
@@ -264,6 +274,7 @@ describe("CheckpointsAdminView create", () => {
     const { user } = await setupCreate([LUNCH], { create: { ok: false, code: "already-exists" } });
 
     await user.type(nameField(), "Almuerzo");
+    await user.click(screen.getByRole("radio", { name: new RegExp(copy.admin.checkpoints.kinds.catering) }));
     await user.click(submit());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.checkpoints.errors["already-exists"]);
@@ -279,6 +290,7 @@ describe("CheckpointsAdminView create", () => {
     await user.click(screen.getByRole("button", { name: copy.admin.checkpoints.createTitle }));
 
     await user.type(screen.getAllByLabelText(copy.admin.checkpoints.nameLabel)[0], "Almuerzo");
+    await user.click(screen.getByRole("radio", { name: new RegExp(copy.admin.checkpoints.kinds.catering) }));
     await user.click(screen.getByRole("button", { name: copy.admin.checkpoints.create }));
 
     expect(screen.getByRole("button", { name: copy.admin.checkpoints.creating })).toBeDisabled();

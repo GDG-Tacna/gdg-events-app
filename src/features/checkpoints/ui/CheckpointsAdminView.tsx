@@ -47,7 +47,7 @@ const chip = "type-caption border-line-strong text-foreground px-space-3 rounded
 /** The line icon of each kind of checkpoint. */
 const KIND_ICON: Record<CheckpointKind, IconName> = { entrance: "door", catering: "coffee", stand: "store", talk: "mic" };
 
-function KindChoice({ value, onChange, disabled }: { value: CheckpointKind; onChange: (kind: CheckpointKind) => void; disabled: boolean }) {
+function KindChoice({ value, onChange, disabled, error }: { value: CheckpointKind | null; onChange: (kind: CheckpointKind) => void; disabled: boolean; error?: string | null }) {
   return (
     <fieldset className="gap-space-2 flex flex-col" disabled={disabled}>
       <legend className="type-label text-foreground mb-space-2">{copy.admin.checkpoints.kindLegend}</legend>
@@ -71,6 +71,11 @@ function KindChoice({ value, onChange, disabled }: { value: CheckpointKind; onCh
           </label>
         ))}
       </div>
+      {error ? (
+        <p role="alert" className="type-caption text-destructive">
+          {error}
+        </p>
+      ) : null}
     </fieldset>
   );
 }
@@ -92,13 +97,15 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
 
   const [name, setName] = useState("");
   const [idDraft, setIdDraft] = useState<string | null>(null);
-  const [kind, setKind] = useState<CheckpointKind>("catering");
+  // No kind is preselected: it cannot change later, and a stand made as a meal by default never shows in stand missions.
+  const [kind, setKind] = useState<CheckpointKind | null>(null);
   const [touched, setTouched] = useState(false);
   const [renameDraft, setRenameDraft] = useState("");
 
   const id = idDraft ?? suggestId(name);
   const nameError = touched && normalizeName(name) === null ? t.errors["invalid-name"] : null;
   const idError = touched && !isCheckpointId(id) ? t.errors["invalid-id"] : null;
+  const kindError = touched && kind === null ? t.kindRequired : null;
 
   function openDialog(next: OpenDialog) {
     setNotice(null);
@@ -155,12 +162,13 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
     event.preventDefault();
     if (busy) return;
     setTouched(true);
-    if (normalizeName(name) === null || !isCheckpointId(id)) return;
+    if (normalizeName(name) === null || !isCheckpointId(id) || kind === null) return;
 
     const done = await run("create", () => create({ name, id, kind }), (checkpoint) => interpolate(t.created, { name: checkpoint.name }));
     if (done) {
       setName("");
       setIdDraft(null);
+      setKind(null);
       setTouched(false);
       setDialog(null);
     }
@@ -308,7 +316,7 @@ export function CheckpointsAdminView({ checkpoints, create, rename, setActive, r
             onChange={(event) => setIdDraft(event.target.value)}
             onBlur={() => setTouched(true)}
           />
-          <KindChoice value={kind} onChange={setKind} disabled={busy !== null} />
+          <KindChoice value={kind} onChange={setKind} disabled={busy !== null} error={kindError} />
           <Button type="submit" block loading={busy === "create"} disabled={busy !== null}>
             {busy === "create" ? t.creating : t.create}
           </Button>
