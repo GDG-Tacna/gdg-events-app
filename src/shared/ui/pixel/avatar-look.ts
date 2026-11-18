@@ -60,6 +60,8 @@ export interface AvatarLook {
   beard: Beard;
   glasses: Glasses;
   helmet: number;
+  /** False draws the head without the helmet, so the whole face and hairstyle show. */
+  helmetOn: boolean;
   suit: number;
 }
 
@@ -89,6 +91,7 @@ export function lookFromSeed(seed: string): AvatarLook {
     beard: "none",
     glasses: "none",
     helmet: Math.floor(value / 25) % HELMET_COLORS.length,
+    helmetOn: true,
     suit: 0,
   };
 }
@@ -102,7 +105,10 @@ export function parseLook(input: unknown): AvatarLook | null {
   const data = input as Record<string, unknown>;
   if (!isIndex(data.skin, SKIN_TONES.length) || !isIndex(data.hairColor, HAIR_COLORS.length) || !isIndex(data.helmet, HELMET_COLORS.length) || !isIndex(data.suit, SUIT_COLORS.length)) return null;
   if (!isOneOf(data.hairStyle, HAIR_STYLES) || !isOneOf(data.beard, BEARDS) || !isOneOf(data.glasses, GLASSES)) return null;
-  return { skin: data.skin, hairStyle: data.hairStyle, hairColor: data.hairColor, beard: data.beard, glasses: data.glasses, helmet: data.helmet, suit: data.suit };
+  // A look saved before the helmet could come off has no such choice: it keeps its helmet.
+  const helmetOn = data.helmetOn === undefined ? true : data.helmetOn;
+  if (typeof helmetOn !== "boolean") return null;
+  return { skin: data.skin, hairStyle: data.hairStyle, hairColor: data.hairColor, beard: data.beard, glasses: data.glasses, helmet: data.helmet, helmetOn, suit: data.suit };
 }
 
 /** A random look (the editor's "Aleatorio"); `random` returns 0..1. */
@@ -115,9 +121,11 @@ export function randomLook(random: () => number = Math.random): AvatarLook {
     beard: BEARDS[pick(BEARDS.length)],
     glasses: GLASSES[pick(GLASSES.length)],
     helmet: pick(HELMET_COLORS.length),
+    // Most random looks keep the helmet; some show the face.
+    helmetOn: random() < 0.7,
     suit: pick(SUIT_COLORS.length),
   };
 }
 
 export const sameLook = (a: AvatarLook, b: AvatarLook) =>
-  a.skin === b.skin && a.hairStyle === b.hairStyle && a.hairColor === b.hairColor && a.beard === b.beard && a.glasses === b.glasses && a.helmet === b.helmet && a.suit === b.suit;
+  a.skin === b.skin && a.hairStyle === b.hairStyle && a.hairColor === b.hairColor && a.beard === b.beard && a.glasses === b.glasses && a.helmet === b.helmet && a.helmetOn === b.helmetOn && a.suit === b.suit;

@@ -9,7 +9,7 @@ vi.mock("@/shared/lib/log", () => ({ logServerError: vi.fn() }));
 
 const { FirestoreAvatarStore } = await import("./firestore-avatar-store");
 
-const LOOK: AvatarLook = { skin: 1, hairStyle: "curly", hairColor: 6, beard: "mustache", glasses: "none", helmet: 3, suit: 2 };
+const LOOK: AvatarLook = { skin: 1, hairStyle: "curly", hairColor: 6, beard: "mustache", glasses: "none", helmet: 3, helmetOn: true, suit: 2 };
 const AT = new Date("2026-10-24T15:00:00Z");
 
 describe("FirestoreAvatarStore", () => {
