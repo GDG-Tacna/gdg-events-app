@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
+import { SignOutButton } from "@/features/auth";
 import { FEATURES } from "@/shared/config/features";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
-import { BottomNav, type BottomNavItem } from "@/shared/ui";
+import { BottomNav, BrandMark, type BottomNavItem } from "@/shared/ui";
 import { moduleOn } from "./modules.server";
 
 /**
@@ -11,6 +12,9 @@ import { moduleOn } from "./modules.server";
  * 760px). Onboarding and the squad reveal do not use it: they happen before the attendee has an app to move around.
  * Tabs join as their phase ships: Misiones next to Inicio and Mapa on the right (phase 3), Logros after Mapa (phase 4).
  * A tab shows only while its module is on for the edition.
+ *
+ * Every tab starts with the same header: the event's brand and the way out, so the cadet can sign out from any view.
+ * The header keeps the phone's top inset, so the pages below it only add their own spacing.
  */
 export async function AttendeeShell({ children }: { children: ReactNode }) {
   const start: BottomNavItem[] = [
@@ -29,6 +33,12 @@ export async function AttendeeShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="pb-[calc(5.5rem+env(safe-area-inset-bottom))] min-[760px]:pb-0 min-[760px]:pl-24">
+      <header className="px-space-4 pt-safe-space-4 mx-auto flex w-full max-w-[520px] items-start justify-between gap-space-3 min-[760px]:max-w-[880px]">
+        <BrandMark />
+        <div className="gap-space-2 flex shrink-0 items-center">
+          <SignOutButton variant="icon" />
+        </div>
+      </header>
       {children}
       <BottomNav
         label={copy.nav.label}

@@ -6,7 +6,7 @@ import { SignOutButton, useAuthActions, useGoogleSignIn } from "@/features/auth"
 import { homeFor } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
-import { BrandMark, Button, Card, InlineAlert } from "@/shared/ui";
+import { Button, Card, InlineAlert, PlatformMark } from "@/shared/ui";
 import type { InviteErrorCode, InviteState } from "../domain/invites";
 import type { ManagedRole } from "../domain/team";
 import type { AcceptInviteAction } from "./invite-actions";
@@ -89,7 +89,7 @@ export function InviteAcceptPanel({ secret, role, maskedEmail, state, signedIn, 
 
   return (
     <Card tone="cyan" className="gap-space-5 flex flex-col">
-      <BrandMark />
+      <PlatformMark />
       <div className="gap-space-2 flex flex-col">
         <h1 className="type-title text-foreground">{t.title}</h1>
         <p className="type-body text-muted-foreground">{interpolate(t.intro, { role: t.roles[role], email: maskedEmail })}</p>

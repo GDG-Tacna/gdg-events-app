@@ -6,6 +6,7 @@ export { Card, type CardProps } from "./Card";
 export { Icon, type IconName, type IconProps } from "./Icon";
 export { InlineAlert, type InlineAlertProps } from "./InlineAlert";
 export { BrandMark, type BrandMarkProps } from "./BrandMark";
+export { PlatformMark, type PlatformMarkProps } from "./PlatformMark";
 export { ProgressBar, type ProgressBarProps } from "./ProgressBar";
 export { RankChip, type RankChipProps } from "./RankChip";
 export { ScreenEnter } from "./ScreenEnter";
