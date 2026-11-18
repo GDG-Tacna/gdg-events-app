@@ -14,9 +14,12 @@ import {
   MISSION_TYPES,
   QUIZ_OPTIONS_MAX,
   QUIZ_OPTIONS_MIN,
+  TEAM_ROLES,
+  isTeamRole,
   type Mission,
   type MissionConfig,
   type MissionType,
+  type TeamRole,
 } from "../domain/mission";
 import type { AdminOption, MinigameOption, SaveMissionAction } from "./admin-actions";
 
@@ -63,6 +66,7 @@ type Field =
   | "xp"
   | "credits"
   | "checkpoint"
+  | "teamRole"
   | "question"
   | "options"
   | "answer"
@@ -85,6 +89,7 @@ const FIELD_OF: Partial<Record<MissionAdminErrorCode, Field>> = {
   "wrong-checkpoint-kind": "checkpoint",
   "invalid-speaker": "checkpoint",
   "unknown-speaker": "checkpoint",
+  "invalid-team-role": "teamRole",
   "invalid-question": "question",
   "invalid-options": "options",
   "invalid-answer": "answer",
@@ -94,6 +99,9 @@ const FIELD_OF: Partial<Record<MissionAdminErrorCode, Field>> = {
   "invalid-minigame-difficulty": "minigameDifficulty",
   "invalid-image": "image",
 };
+
+/** The speaker select's choice that means «any speaker» (a speaker mission with no speaker id). */
+const ANY_SPEAKER = "__any__";
 
 /** The mission's config when it is of the given type (to prefill that type's fields). */
 const configOf = <T extends MissionType>(mission: Mission | undefined, type: T) =>
@@ -121,8 +129,10 @@ export function MissionForm({ mode, mission, initial, save, upload, quadrants, c
   const keyword = configOf(seed, "keyword");
   const scan = seed && (seed.config.type === "talk" || seed.config.type === "stand") ? seed.config : null;
   const met = configOf(seed, "speaker");
-  // What a scan mission points to: a checkpoint for talks and stands, a speaker for «Conoce al speaker».
-  const [checkpointId, setCheckpointId] = useState(scan?.checkpointId ?? met?.speakerId ?? "");
+  const team = configOf(seed, "team");
+  // What a scan mission points to: a checkpoint for talks and stands, a speaker (or any) for «Conoce al speaker».
+  const [checkpointId, setCheckpointId] = useState(scan?.checkpointId ?? (met ? (met.speakerId ?? ANY_SPEAKER) : ""));
+  const [teamRole, setTeamRole] = useState<TeamRole>(team?.role ?? "volunteer");
   const [question, setQuestion] = useState(quiz?.question ?? "");
   const [options, setOptions] = useState<string[]>(quiz ? [...quiz.options] : ["", ""]);
   const [answer, setAnswer] = useState(quiz?.answer ?? 0);
@@ -140,7 +150,7 @@ export function MissionForm({ mode, mission, initial, save, upload, quadrants, c
   const [error, setError] = useState<MissionAdminErrorCode | null>(null);
 
   const id = mode === "edit" && mission ? mission.id : (idDraft ?? suggestId(title));
-  const scanOptions = type === "talk" || type === "stand" ? checkpoints[type] : type === "speaker" ? speakers : [];
+  const scanOptions = type === "talk" || type === "stand" ? checkpoints[type] : type === "speaker" ? [{ id: ANY_SPEAKER, name: copy.admin.missions.form.anySpeaker }, ...speakers] : [];
   const scanned = type === "talk" || type === "stand" || type === "speaker";
   const field = error ? FIELD_OF[error] : undefined;
   const fieldError = (name: Field) => (field === name && error ? copy.admin.missions.errors[error] : null);
@@ -157,8 +167,14 @@ export function MissionForm({ mode, mission, initial, save, upload, quadrants, c
       case "talk":
       case "stand":
         return { type, checkpointId: checkpointId || (scanOptions[0]?.id ?? "") };
-      case "speaker":
-        return { type, speakerId: checkpointId || (scanOptions[0]?.id ?? "") };
+      case "speaker": {
+        const chosen = checkpointId || (scanOptions[0]?.id ?? "");
+        return { type, speakerId: chosen === ANY_SPEAKER ? null : chosen };
+      }
+      case "team":
+        return { type, role: teamRole };
+      case "squads":
+        return { type };
       case "quiz":
         return { type, question, options, answer };
       case "keyword":
@@ -333,6 +349,20 @@ export function MissionForm({ mode, mission, initial, save, upload, quadrants, c
               <InlineAlert>{copy.admin.missions.form.noCheckpoints[type]}</InlineAlert>
             )
           ) : null}
+
+          {type === "team" ? (
+            <SelectField
+              label={copy.admin.missions.form.teamRole}
+              hint={copy.admin.missions.form.teamRoleHint}
+              options={TEAM_ROLES.map((role) => ({ value: role, label: copy.admin.missions.form.teamRoles[role] }))}
+              value={teamRole}
+              disabled={pending}
+              error={fieldError("teamRole")}
+              onChange={(event) => isTeamRole(event.target.value) && setTeamRole(event.target.value)}
+            />
+          ) : null}
+
+          {type === "squads" ? <InlineAlert>{copy.admin.missions.form.squadsHint}</InlineAlert> : null}
 
           {type === "quiz" ? (
             <QuizFields

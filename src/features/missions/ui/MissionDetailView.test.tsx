@@ -182,6 +182,41 @@ describe("MissionDetailView", () => {
     expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
   });
 
+  it("sends a «Conoce a un organizador / voluntario» mission to the scanner, with the words of the role it asks for", () => {
+    const { unmount } = renderView({ ...STAND, id: "meet-org", type: "team", config: { type: "team", role: "organizer" } });
+
+    expect(screen.getByText(copy.missions.howTo.organizer)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: copy.missions.scan })).toHaveAttribute("href", "/scan");
+    expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
+    unmount();
+
+    renderView({ ...STAND, id: "meet-vol", type: "team", config: { type: "team", role: "volunteer" } });
+    expect(screen.getByText(copy.missions.howTo.volunteer)).toBeInTheDocument();
+    expect(screen.queryByText(copy.missions.howTo.organizer)).not.toBeInTheDocument();
+  });
+
+  it("shows how many squads a «Conoce a cada escuadrón» mission has met, and sends the cadet to the scanner", () => {
+    const squads: BoardMission = { ...STAND, id: "meet-squads", type: "squads", config: { type: "squads" }, progress: { done: 1, total: 2 } };
+    const { unmount } = renderView(squads);
+
+    expect(screen.getByText(copy.missions.howTo.squads)).toBeInTheDocument();
+    expect(screen.getByText("1 de 2 escuadrones")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: copy.missions.scan })).toHaveAttribute("href", "/scan");
+    unmount();
+
+    // Without progress (nothing to meet yet, or it could not be read) only the explanation shows.
+    renderView({ ...squads, progress: undefined });
+    expect(screen.getByText(copy.missions.howTo.squads)).toBeInTheDocument();
+    expect(screen.queryByText(/escuadrones$/)).not.toBeInTheDocument();
+  });
+
+  it("offers no scan for a completed «Conoce a…» mission", () => {
+    renderView({ ...STAND, id: "meet-org", type: "team", config: { type: "team", role: "organizer" }, status: "completed", xpEarned: 30 });
+
+    expect(screen.queryByText(copy.missions.howTo.organizer)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: copy.missions.scan })).not.toBeInTheDocument();
+  });
+
   it("sends a stand mission to the scanner (the stand's screen), and also offers the cadet's own QR for staff to scan", () => {
     const { unmount } = renderView(STAND);
 

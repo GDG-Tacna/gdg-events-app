@@ -166,6 +166,29 @@ export function MissionDetailView({ mission, answer, backHref, scanHref, passHre
           ) : null}
         </Card>
       ) : null}
+
+      {answerable && mission.config.type === "team" ? (
+        <Card className="gap-space-4 flex flex-col">
+          <p className="type-body text-foreground">{copy.missions.howTo[mission.config.role]}</p>
+          <ButtonLink href={scanHref} variant="primary">
+            {copy.missions.scan}
+          </ButtonLink>
+        </Card>
+      ) : null}
+
+      {answerable && mission.config.type === "squads" ? (
+        <Card className="gap-space-4 flex flex-col">
+          <p className="type-body text-foreground">{copy.missions.howTo.squads}</p>
+          {mission.progress ? (
+            <p className="type-label text-primary tabular-nums">
+              {interpolate(copy.missions.squadsProgress, { done: String(mission.progress.done), total: String(mission.progress.total) })}
+            </p>
+          ) : null}
+          <ButtonLink href={scanHref} variant="primary">
+            {copy.missions.scan}
+          </ButtonLink>
+        </Card>
+      ) : null}
     </div>
   );
 }

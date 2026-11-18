@@ -20,6 +20,8 @@ export type ConnectContactActionResult =
       xpEarned: number;
       creditsEarned: number;
       capReached: boolean;
+      /** Missions this contact completed for the cadet (built by the app shell; the network knows nothing about missions). */
+      missions?: ReadonlyArray<{ id: string; title: string; xpEarned: number; creditsEarned: number; justCompleted: boolean }>;
       achievements: ReadonlyArray<{ id: string; name: string; tone: string; imageUrl?: string | null }>;
     }
   | { ok: false; code: NetworkErrorCode };

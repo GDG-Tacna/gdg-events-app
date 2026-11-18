@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkMission, normalizeKeyword, parseMission, publicConfig } from "./mission";
+import { checkMission, normalizeKeyword, parseMission, publicConfig, TEAM_ROLES } from "./mission";
 
 const quiz = { type: "quiz", question: "¿Qué es Firestore?", options: ["Una base de datos", "Un lenguaje"], answer: 0 };
 const input = (extra: Record<string, unknown> = {}) => ({
@@ -54,6 +54,25 @@ describe("parseMission", () => {
       prompt: "Pide la clave",
       keywords: ["fuego azul", "nube"],
     });
+  });
+
+  it("reads a speaker mission with no speaker as «any speaker», but not one with a missing id", () => {
+    expect(parseMission("meet-any", input({ config: { type: "speaker", speakerId: null } }))?.config).toEqual({ type: "speaker", speakerId: null });
+    expect(checkMission("meet-any", input({ config: { type: "speaker" } }))).toEqual({ ok: false, code: "invalid-speaker" });
+    expect(checkMission("meet-any", input({ config: { type: "speaker", speakerId: "" } }))).toEqual({ ok: false, code: "invalid-speaker" });
+  });
+
+  it("reads team missions by the role they ask to meet, and squads missions without fields", () => {
+    for (const role of TEAM_ROLES) expect(parseMission("meet-team", input({ config: { type: "team", role } }))?.config).toEqual({ type: "team", role });
+    expect(checkMission("meet-team", input({ config: { type: "team", role: "admin" } }))).toEqual({ ok: false, code: "invalid-team-role" });
+    expect(checkMission("meet-team", input({ config: { type: "team" } }))).toEqual({ ok: false, code: "invalid-team-role" });
+    expect(parseMission("meet-squads", input({ config: { type: "squads", extra: "x" } }))?.config).toEqual({ type: "squads" });
+  });
+
+  it("shows attendees a team mission's role and nothing but the type of a squads one", () => {
+    expect(publicConfig({ type: "team", role: "volunteer" })).toEqual({ type: "team", role: "volunteer" });
+    expect(publicConfig({ type: "squads" })).toEqual({ type: "squads" });
+    expect(publicConfig({ type: "speaker", speakerId: null })).toEqual({ type: "speaker" });
   });
 
   it("reads its own G-Credits, or none to use the edition's default", () => {

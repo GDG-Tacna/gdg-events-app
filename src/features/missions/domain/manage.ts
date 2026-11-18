@@ -162,7 +162,8 @@ async function checkDraft(deps: MissionAdminDeps, id: string, draft: MissionDraf
     if (kind.value === null) return err(missionAdminError("unknown-checkpoint"));
     if (kind.value !== mission.config.type) return err(missionAdminError("wrong-checkpoint-kind"));
   }
-  if (mission.config.type === "speaker") {
+  // A speaker mission without a speaker id accepts any speaker, so there is nothing to look up.
+  if (mission.config.type === "speaker" && mission.config.speakerId !== null) {
     const speakers = await deps.speakers.activeIds();
     if (!speakers.ok) return err(missionAdminError("unknown"));
     if (!speakers.value.has(mission.config.speakerId)) return err(missionAdminError("unknown-speaker"));

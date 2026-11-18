@@ -18,7 +18,7 @@ export interface MissionFormOptions {
   /** The edition's active speakers, for «Conoce al speaker» missions. */
   speakers: AdminOption[];
   /** G-Credits per mission type in this edition, or absent when credits are switched off. */
-  creditDefaults?: Record<"talk" | "stand" | "speaker" | "quiz" | "keyword", number>;
+  creditDefaults?: Record<"talk" | "stand" | "speaker" | "team" | "squads" | "quiz" | "keyword", number>;
   /** Every mini-game built, with whether the edition offers it and its difficulty; absent when mini-games are off. */
   minigames?: MinigameOption[];
 }

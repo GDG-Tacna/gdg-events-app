@@ -36,3 +36,13 @@ export interface AttemptLimiter {
 export interface CreditRules {
   creditsFor(type: string, own: number | null): Promise<number>;
 }
+
+/** The squads a cadet has met through contacts, and the ones a «Conoce a alguien de cada escuadrón» mission asks for. */
+export interface SquadProgress {
+  /** Squad ids of the cadets they are in contact with. */
+  met: readonly string[];
+  /** Every other active squad: the catalog's active squads without the cadet's own (empty when the cadet has no squad). */
+  required: readonly string[];
+}
+
+export type SquadProgressSource = (uid: string) => Promise<Result<SquadProgress, { code: string }>>;

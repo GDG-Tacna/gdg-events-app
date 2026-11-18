@@ -13,7 +13,7 @@ import {
 } from "./settings";
 import type { XpGrantOutcome } from "./xp";
 
-const OWN: EconomySettings = { creditsEnabled: true, missionCredits: { talk: 20, stand: 15, speaker: 12, quiz: 3, keyword: 4 }, talkCredits: 8, squadCreditsEnabled: false, squadRatio: 0.5, contactXp: 15, contactCredits: 3, contactCap: 8 };
+const OWN: EconomySettings = { creditsEnabled: true, missionCredits: { talk: 20, stand: 15, speaker: 12, team: 6, squads: 30, quiz: 3, keyword: 4 }, talkCredits: 8, squadCreditsEnabled: false, squadRatio: 0.5, contactXp: 15, contactCredits: 3, contactCap: 8 };
 const ADMIN = { uid: "a1", role: "admin" } as const;
 
 function store(saved: EconomySettings | null = null) {
@@ -61,6 +61,14 @@ describe("economy settings", () => {
     expect(parseEconomySettings({ ...OWN, missionCredits: older })).toEqual({ ...OWN, missionCredits: { ...OWN.missionCredits, speaker: 10 } });
   });
 
+  it("reads settings saved before team and squads missions with their default credits", () => {
+    const older: Partial<EconomySettings["missionCredits"]> = { ...OWN.missionCredits };
+    delete older.team;
+    delete older.squads;
+
+    expect(parseEconomySettings({ ...OWN, missionCredits: older })).toEqual({ ...OWN, missionCredits: { ...OWN.missionCredits, team: 10, squads: 20 } });
+  });
+
   it("pays contacts their XP and, only while credits are on, their G-Credits, up to the cap", () => {
     expect(contactRewardFor(OWN)).toEqual({ xp: 15, credits: 3, cap: 8 });
     expect(contactRewardFor({ ...OWN, creditsEnabled: false })).toEqual({ xp: 15, credits: 0, cap: 8 });
@@ -93,7 +101,7 @@ describe("economy settings", () => {
       action: "economy.updated",
       actorUid: "a1",
       targetUid: "economy",
-      details: { credits: "on", missionCredits: "talk:20,stand:15,speaker:12,quiz:3,keyword:4", talkCredits: "8", squadCredits: "off", contacts: "xp:15,credits:3,cap:8" },
+      details: { credits: "on", missionCredits: "talk:20,stand:15,speaker:12,team:6,squads:30,quiz:3,keyword:4", talkCredits: "8", squadCredits: "off", contacts: "xp:15,credits:3,cap:8" },
       at: new Date(0),
     });
 

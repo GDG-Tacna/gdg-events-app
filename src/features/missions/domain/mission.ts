@@ -1,10 +1,15 @@
 import type { ImageRef } from "@/features/media/constants";
 /** Mission types: a closed set, because each one's proof is checked by code on the server. */
-export const MISSION_TYPES = ["talk", "stand", "speaker", "quiz", "keyword"] as const;
+export const MISSION_TYPES = ["talk", "stand", "speaker", "team", "squads", "quiz", "keyword"] as const;
 export type MissionType = (typeof MISSION_TYPES)[number];
 
+/** Who a «Conoce al equipo» mission asks the cadet to meet: an organizer, or a volunteer (staff). */
+export const TEAM_ROLES = ["organizer", "volunteer"] as const;
+export type TeamRole = (typeof TEAM_ROLES)[number];
+export const isTeamRole = (value: unknown): value is TeamRole => typeof value === "string" && (TEAM_ROLES as readonly string[]).includes(value);
+
 /** XP a new mission of each type starts with; the admin can change it per mission. */
-export const DEFAULT_XP: Record<MissionType, number> = { talk: 50, stand: 30, speaker: 40, quiz: 40, keyword: 40 };
+export const DEFAULT_XP: Record<MissionType, number> = { talk: 50, stand: 30, speaker: 40, team: 30, squads: 60, quiz: 40, keyword: 40 };
 
 export const MISSION_XP_MAX = 500;
 export const MISSION_CREDITS_MAX = 1000;
@@ -25,8 +30,15 @@ export type MissionConfig =
   | { type: "talk"; checkpointId: string }
   /** Completed by scanning the printed QR of this stand. */
   | { type: "stand"; checkpointId: string }
-  /** Completed by scanning the code of this speaker (shown by an admin or by the speaker on their phone). */
-  | { type: "speaker"; speakerId: string }
+  /** Completed by scanning the code of this speaker (shown by an admin or by the speaker on their phone); `null` accepts any speaker. */
+  | { type: "speaker"; speakerId: string | null }
+  /** Completed by scanning the code of a team member with this role (shown from their staff or admin session). */
+  | { type: "team"; role: TeamRole }
+  /**
+   * Cumulative: completed once the cadet has made a contact with someone from every other active squad. The target is
+   * derived from the squads catalog and the cadet's own squad, so nothing is stored here.
+   */
+  | { type: "squads" }
   /** Two attempts; a right second answer earns half the XP. `answer` is the index of the right option. */
   | { type: "quiz"; question: string; options: readonly string[]; answer: number }
   /** A word given at a stand or by a speaker. Stored normalized (`normalizeKeyword`). */
@@ -57,6 +69,8 @@ export type PublicMissionConfig =
   | { type: "talk" }
   | { type: "stand" }
   | { type: "speaker" }
+  | { type: "team"; role: TeamRole }
+  | { type: "squads" }
   | { type: "quiz"; question: string; options: readonly string[] }
   | { type: "keyword"; prompt: string };
 
@@ -65,7 +79,10 @@ export function publicConfig(config: MissionConfig): PublicMissionConfig {
     case "talk":
     case "stand":
     case "speaker":
+    case "squads":
       return { type: config.type };
+    case "team":
+      return { type: "team", role: config.role };
     case "quiz":
       return { type: "quiz", question: config.question, options: config.options };
     case "keyword":
@@ -105,6 +122,7 @@ export type MissionDataErrorCode =
   | "invalid-type"
   | "invalid-checkpoint"
   | "invalid-speaker"
+  | "invalid-team-role"
   | "invalid-question"
   | "invalid-options"
   | "invalid-answer"
@@ -122,7 +140,13 @@ function checkConfig(input: unknown): Checked<MissionConfig> {
     case "stand":
       return isReferenceId(input.checkpointId) ? { ok: true, value: { type: input.type, checkpointId: input.checkpointId } } : fail("invalid-checkpoint");
     case "speaker":
+      // An explicit null means «any speaker»; a missing or malformed id is never read as that.
+      if (input.speakerId === null) return { ok: true, value: { type: "speaker", speakerId: null } };
       return isReferenceId(input.speakerId) ? { ok: true, value: { type: "speaker", speakerId: input.speakerId } } : fail("invalid-speaker");
+    case "team":
+      return isTeamRole(input.role) ? { ok: true, value: { type: "team", role: input.role } } : fail("invalid-team-role");
+    case "squads":
+      return { ok: true, value: { type: "squads" } };
     case "quiz": {
       const question = text(input.question, 5, 160);
       if (!question) return fail("invalid-question");

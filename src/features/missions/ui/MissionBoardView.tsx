@@ -152,6 +152,9 @@ function statusLine(mission: BoardMission): string {
       ? copy.missions.attemptsLeft.one
       : interpolate(copy.missions.attemptsLeft.other, { n: String(mission.attemptsLeft) });
   }
+  if (mission.progress && mission.status === "open") {
+    return interpolate(copy.missions.squadsProgress, { done: String(mission.progress.done), total: String(mission.progress.total) });
+  }
   return copy.missions.status[mission.status];
 }
 

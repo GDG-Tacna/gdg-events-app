@@ -1,8 +1,8 @@
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { attemptsLeft, evaluate, type CompletionStatus, type MissionCompletion, type MissionProof } from "./completion";
-import { publicConfig, type Mission, type MissionType, type PublicMissionConfig } from "./mission";
-import type { AttemptLimiter, CompletionStore, CreditRules, MissionSource, XpGranter } from "./ports";
+import { publicConfig, type Mission, type MissionType, type PublicMissionConfig, type TeamRole } from "./mission";
+import type { AttemptLimiter, CompletionStore, CreditRules, MissionSource, SquadProgressSource, XpGranter } from "./ports";
 
 export type MissionErrorCode =
   | "not-found"
@@ -40,6 +40,8 @@ export interface BoardMission {
   xpEarned: number;
   creditsEarned: number;
   attemptsLeft: number | null;
+  /** How far a cumulative mission (squads) is, while it is still open; absent for the rest. */
+  progress?: { done: number; total: number };
 }
 
 export interface MissionBoard {
@@ -55,6 +57,8 @@ export interface MissionReadDeps {
   completions: CompletionStore;
   /** The edition's economy; without it missions give no G-Credits. */
   credits?: CreditRules;
+  /** The squads a cadet has met; without it squads missions show no progress and are never completed. */
+  squadProgress?: SquadProgressSource;
 }
 
 export interface SubmitProofDeps extends MissionReadDeps {
@@ -83,6 +87,10 @@ export async function getMissionBoard(deps: MissionReadDeps, uid: string): Promi
   const byMission = new Map(completions.value.map((completion) => [completion.missionId, completion]));
   const active = missions.value.filter((mission) => mission.active).sort(byOrder);
   const credits = await Promise.all(active.map((mission) => creditsOf(deps, mission)));
+  // Only an open cumulative mission needs the cadet's squad progress, and it is read once for all of them.
+  const needsProgress = deps.squadProgress !== undefined && active.some((mission) => mission.config.type === "squads" && byMission.get(mission.id)?.status !== "completed");
+  const squads = needsProgress ? await deps.squadProgress!(uid) : null;
+  const progress = squads?.ok && squads.value.required.length > 0 ? squadsDone(squads.value) : null;
   const board = active.map((mission, index): BoardMission => {
       const completion = byMission.get(mission.id) ?? null;
       return {
@@ -100,6 +108,7 @@ export async function getMissionBoard(deps: MissionReadDeps, uid: string): Promi
         xpEarned: completion?.xpEarned ?? 0,
         creditsEarned: completion?.creditsEarned ?? 0,
         attemptsLeft: attemptsLeft(mission, completion),
+        ...(mission.config.type === "squads" && completion?.status !== "completed" && progress ? { progress } : {}),
       };
     });
 
@@ -110,6 +119,12 @@ export async function getMissionBoard(deps: MissionReadDeps, uid: string): Promi
     xpEarned: board.reduce((sum, mission) => sum + mission.xpEarned, 0),
     creditsEarned: board.reduce((sum, mission) => sum + mission.creditsEarned, 0),
   });
+}
+
+/** How many of the required squads a cadet has met, counting only the required ones. */
+function squadsDone({ met, required }: { met: readonly string[]; required: readonly string[] }): { done: number; total: number } {
+  const seen = new Set(met);
+  return { done: required.filter((squadId) => seen.has(squadId)).length, total: required.length };
 }
 
 export type SubmitOutcome =
@@ -144,7 +159,7 @@ export async function submitMissionProof(
   proof: MissionProof,
 ): Promise<Result<SubmitOutcome, MissionError>> {
   // Typed answers are limited; scans already went through the check-in limiter.
-  if (proof.kind !== "checkpoint" && proof.kind !== "speaker" && !(await deps.limiter.consume(uid))) return err(missionError("rate-limited"));
+  if (!isScanProof(proof) && !(await deps.limiter.consume(uid))) return err(missionError("rate-limited"));
 
   const missions = await offeredMissions(deps);
   if (!missions.ok) return missions;
@@ -168,6 +183,11 @@ export async function submitMissionProof(
   if (!paid.ok) return paid;
   return ok({ kind: "answered", status: after!.status, xpEarned: after!.xpEarned, creditsEarned: after!.creditsEarned, attemptsLeft: attemptsLeft(mission, after) });
 }
+
+/** The proofs that come from a verified scan (or the cadet's contacts) rather than from something the cadet typed. */
+type ScanProof = Extract<MissionProof, { kind: "checkpoint" | "speaker" | "team" | "squads" }>;
+const isScanProof = (proof: MissionProof): proof is ScanProof =>
+  proof.kind === "checkpoint" || proof.kind === "speaker" || proof.kind === "team" || proof.kind === "squads";
 
 /** A mission a scan completed (or had completed before), for the scanner to show. */
 export interface ScanMission {
@@ -199,14 +219,55 @@ export async function completeByCheckpoint(
 }
 
 /**
- * After a verified scan of a speaker's code: completes every active «Conoce al speaker» mission for that speaker. Like
- * `completeByCheckpoint`, a failure on one mission never hides the others, and scanning again retries it.
+ * After a verified scan of a speaker's code: completes every active «Conoce al speaker» mission for that speaker, and
+ * the ones that accept any speaker. Like `completeByCheckpoint`, a failure on one mission never hides the others, and
+ * scanning again retries it.
  */
 export async function completeBySpeaker(deps: SubmitProofDeps, uid: string, speakerId: string): Promise<Result<readonly ScanMission[], MissionError>> {
   const missions = await offeredMissions(deps);
   if (!missions.ok) return missions;
-  const tied = missions.value.filter((mission) => mission.active && mission.config.type === "speaker" && mission.config.speakerId === speakerId);
+  const tied = missions.value.filter(
+    (mission) => mission.active && mission.config.type === "speaker" && (mission.config.speakerId === null || mission.config.speakerId === speakerId),
+  );
   return completeTied(deps, uid, tied, { kind: "speaker", speakerId });
+}
+
+/**
+ * After a verified scan of a team member's code: completes every active «Conoce a un organizador / voluntario» mission
+ * for that role. Same failure rules as the other scans.
+ */
+export async function completeByTeam(deps: SubmitProofDeps, uid: string, role: TeamRole): Promise<Result<readonly ScanMission[], MissionError>> {
+  const missions = await offeredMissions(deps);
+  if (!missions.ok) return missions;
+  const tied = missions.value.filter((mission) => mission.active && mission.config.type === "team" && mission.config.role === role);
+  return completeTied(deps, uid, tied, { kind: "team", role });
+}
+
+/**
+ * After a contact: completes the cadet's active «Conoce a alguien de cada escuadrón» missions once they have met every
+ * required squad. Cheap when there is nothing to do: with no open squads mission nothing else is read. A mission that is
+ * already completed is skipped (the scan that completed it already retried its payment).
+ */
+export async function completeBySquads(deps: SubmitProofDeps, uid: string): Promise<Result<readonly ScanMission[], MissionError>> {
+  if (!deps.squadProgress) return ok([]);
+  const missions = await offeredMissions(deps);
+  if (!missions.ok) return missions;
+  const tied = missions.value.filter((mission) => mission.active && mission.config.type === "squads");
+  if (tied.length === 0) return ok([]);
+
+  const completions = await deps.completions.listFor(uid);
+  if (!completions.ok) return err(missionError("unknown"));
+  const done = new Set(completions.value.filter((completion) => completion.status === "completed").map((completion) => completion.missionId));
+  const open = tied.filter((mission) => !done.has(mission.id));
+  if (open.length === 0) return ok([]);
+
+  const progress = await deps.squadProgress(uid);
+  if (!progress.ok) return err(missionError("unknown"));
+  const { met, required } = progress.value;
+  const seen = new Set(met);
+  // Not there yet: nothing is stored, so the mission stays open (and its board card shows the progress).
+  if (required.length === 0 || !required.every((squadId) => seen.has(squadId))) return ok([]);
+  return completeTied(deps, uid, open, { kind: "squads", met, required });
 }
 
 /** Hands the same scan proof to each mission it is tied to, in board order, and answers the completed ones. */
@@ -214,7 +275,7 @@ async function completeTied(
   deps: SubmitProofDeps,
   uid: string,
   tied: readonly Mission[],
-  proof: Extract<MissionProof, { kind: "checkpoint" | "speaker" }>,
+  proof: ScanProof,
 ): Promise<Result<readonly ScanMission[], MissionError>> {
   const completed: ScanMission[] = [];
   for (const mission of [...tied].sort(byOrder)) {

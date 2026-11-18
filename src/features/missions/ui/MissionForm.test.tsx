@@ -157,10 +157,60 @@ describe("MissionForm", () => {
     expect(save.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerId: "luis" } });
     cleanup();
 
-    renderForm();
+    // With no speakers yet, «any speaker» is still there to choose, and it is what a new speaker mission starts with.
+    const none = renderForm();
     type(f.type, "speaker");
-    expect(screen.getByText(f.noCheckpoints.speaker)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: f.save })).toBeDisabled();
+    type(f.title, "Conoce a un speaker");
+    expect(screen.getByLabelText(f.checkpoint.speaker)).toHaveValue("__any__");
+    expect(screen.getByRole("button", { name: f.save })).toBeEnabled();
+    submit();
+
+    await waitFor(() => expect(none).toHaveBeenCalled());
+    expect(none.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerId: null } });
+  });
+
+  it("offers «any speaker» next to the speakers, and keeps it when editing a mission that accepts any", async () => {
+    const speakers = [{ id: "ana-torres", name: "Ana Torres" }];
+    const save = renderForm({
+      mode: "edit",
+      speakers,
+      mission: { ...quizMission({ id: "meet-any", title: "Conoce a un speaker", xp: 40 }), config: { type: "speaker", speakerId: null } },
+    });
+
+    expect(screen.getByLabelText(f.checkpoint.speaker)).toHaveValue("__any__");
+    expect(screen.getByRole("option", { name: f.anySpeaker })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Ana Torres" })).toBeInTheDocument();
+    submit();
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerId: null } });
+  });
+
+  it("asks which role a «Conoce al equipo» mission asks to meet, and sends it", async () => {
+    const save = renderForm();
+
+    type(f.type, "team");
+    expect(screen.getByLabelText(f.xp)).toHaveValue("30");
+    expect(screen.getByLabelText(f.teamRole)).toHaveValue("volunteer");
+    type(f.teamRole, "organizer");
+    type(f.title, "Conoce a un organizador");
+    submit();
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].draft).toMatchObject({ xp: 30, config: { type: "team", role: "organizer" } });
+  });
+
+  it("needs nothing more than texts for a «Conoce a cada escuadrón» mission", async () => {
+    const save = renderForm();
+
+    type(f.type, "squads");
+    expect(screen.getByLabelText(f.xp)).toHaveValue("60");
+    expect(screen.getByText(f.squadsHint)).toBeInTheDocument();
+    type(f.title, "Conoce a cada escuadrón");
+    submit();
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].draft).toMatchObject({ xp: 60, config: { type: "squads" } });
   });
 
   it("offers G-Credits only when the edition gives them, with the type's default as the hint, and sends what was typed", async () => {

@@ -224,6 +224,16 @@ describe("mission admin", () => {
       expect(await createMission(ctx.deps, ADMIN, { id: "meet-2", draft: meet })).toEqual(err({ code: "unknown" }));
     });
 
+    it("accepts a speaker mission with no speaker (any speaker) without looking speakers up, and a team or squads mission", async () => {
+      const draft = (config: unknown) => ({ ...QUIZ_DRAFT, config });
+
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-any", draft: draft({ type: "speaker", speakerId: null }) })).toMatchObject({ ok: true, value: { config: { type: "speaker", speakerId: null } } });
+      expect(ctx.deps.speakers.activeIds).not.toHaveBeenCalled();
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-org", draft: draft({ type: "team", role: "organizer" }) })).toMatchObject({ ok: true, value: { config: { type: "team", role: "organizer" } } });
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-squads", draft: draft({ type: "squads" }) })).toMatchObject({ ok: true, value: { config: { type: "squads" } } });
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-bad", draft: draft({ type: "team", role: "speaker" }) })).toEqual(err({ code: "invalid-team-role" }));
+    });
+
     it("never takes an id that exists", async () => {
       expect(await createMission(ctx.deps, ADMIN, { id: "aa", draft: QUIZ_DRAFT })).toEqual(err({ code: "already-exists" }));
     });

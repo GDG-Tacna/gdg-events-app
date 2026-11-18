@@ -1,4 +1,4 @@
-import { normalizeKeyword, QUIZ_ATTEMPTS, type Mission } from "./mission";
+import { normalizeKeyword, QUIZ_ATTEMPTS, type Mission, type TeamRole } from "./mission";
 
 /** What an attendee did with a mission: still trying, done (with what it earned) or failed for good. */
 export type CompletionStatus = "in-progress" | "completed" | "failed";
@@ -19,10 +19,16 @@ export interface MissionCompletion {
 /** Completion document id: one per attendee and mission, the idempotency key. */
 export const completionId = (uid: string, missionId: string) => `${uid}_${missionId}`;
 
-/** What the attendee hands in. Checkpoint and speaker proofs come from a verified scan, never from a form. */
+/**
+ * What the attendee hands in. Checkpoint, speaker, team and squads proofs come from a verified scan (the squads one from the
+ * cadet's contacts), never from a form.
+ */
 export type MissionProof =
   | { kind: "checkpoint"; checkpointId: string }
   | { kind: "speaker"; speakerId: string }
+  | { kind: "team"; role: TeamRole }
+  /** The squads the cadet has met so far and the ones they must meet (every other active squad). */
+  | { kind: "squads"; met: readonly string[]; required: readonly string[] }
   | { kind: "choice"; option: number }
   | { kind: "keyword"; value: string };
 
@@ -63,8 +69,21 @@ export function evaluate(mission: Mission, proof: MissionProof, previous: Missio
       return next("completed", attempts, "full");
 
     case "speaker":
-      if (proof.kind !== "speaker" || proof.speakerId !== config.speakerId) return { kind: "wrong-proof" };
+      // A mission without a speaker id accepts any speaker's code.
+      if (proof.kind !== "speaker" || (config.speakerId !== null && proof.speakerId !== config.speakerId)) return { kind: "wrong-proof" };
       return next("completed", attempts, "full");
+
+    case "team":
+      if (proof.kind !== "team" || proof.role !== config.role) return { kind: "wrong-proof" };
+      return next("completed", attempts, "full");
+
+    case "squads": {
+      if (proof.kind !== "squads" || proof.required.length === 0) return { kind: "wrong-proof" };
+      // Cumulative: it stays open until every required squad has been met, and an incomplete proof stores nothing.
+      const met = new Set(proof.met);
+      if (!proof.required.every((squadId) => met.has(squadId))) return { kind: "wrong-proof" };
+      return next("completed", attempts, "full");
+    }
 
     case "quiz": {
       if (proof.kind !== "choice" || !Number.isInteger(proof.option) || proof.option < 0 || proof.option >= config.options.length) {

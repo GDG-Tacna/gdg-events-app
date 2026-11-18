@@ -105,6 +105,65 @@ describe("evaluate: speaker", () => {
   });
 });
 
+describe("evaluate: speaker with no speaker chosen", () => {
+  const ANY = mission({ type: "speaker", speakerId: null }, 40);
+
+  it("completes with the code of any speaker, but not with another kind of proof", () => {
+    expect(evaluate(ANY, { kind: "speaker", speakerId: "ana-torres" }, null)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 40, creditsEarned: 0 });
+    expect(evaluate(ANY, { kind: "speaker", speakerId: "luis" }, null)).toMatchObject({ status: "completed" });
+    expect(evaluate(ANY, { kind: "team", role: "organizer" }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(ANY, { kind: "checkpoint", checkpointId: "ana-torres" }, null)).toEqual({ kind: "wrong-proof" });
+  });
+});
+
+describe("evaluate: team", () => {
+  const ORGANIZER = mission({ type: "team", role: "organizer" }, 30);
+  const VOLUNTEER = mission({ type: "team", role: "volunteer" }, 30);
+
+  it("completes with the code of someone with the role it asks for, and only that", () => {
+    expect(evaluate(ORGANIZER, { kind: "team", role: "organizer" }, null, 10)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 30, creditsEarned: 10 });
+    expect(evaluate(VOLUNTEER, { kind: "team", role: "volunteer" }, null)).toMatchObject({ status: "completed", xpEarned: 30 });
+    expect(evaluate(ORGANIZER, { kind: "team", role: "volunteer" }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(VOLUNTEER, { kind: "team", role: "organizer" }, null)).toEqual({ kind: "wrong-proof" });
+  });
+
+  it("refuses a speaker's code, a checkpoint and a typed answer", () => {
+    expect(evaluate(ORGANIZER, { kind: "speaker", speakerId: "organizer" }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(ORGANIZER, { kind: "checkpoint", checkpointId: "organizer" }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(ORGANIZER, { kind: "keyword", value: "organizer" }, null)).toEqual({ kind: "wrong-proof" });
+  });
+
+  it("changes nothing once completed", () => {
+    expect(evaluate(ORGANIZER, { kind: "team", role: "organizer" }, done("completed", 0, 30))).toEqual({ kind: "closed" });
+  });
+});
+
+describe("evaluate: squads", () => {
+  const SQUADS = mission({ type: "squads" }, 60);
+  const squads = (met: readonly string[], required: readonly string[]) => ({ kind: "squads", met, required }) as const;
+
+  it("completes once every required squad has been met", () => {
+    expect(evaluate(SQUADS, squads(["firebase", "gemini"], ["firebase", "gemini"]), null, 20)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 60, creditsEarned: 20 });
+    // Squads met beyond the required ones (the cadet's own, a retired one) do no harm.
+    expect(evaluate(SQUADS, squads(["angular", "firebase", "gemini", "old"], ["firebase", "gemini"]), null)).toMatchObject({ status: "completed" });
+  });
+
+  it("stays open, storing nothing, while a required squad is missing", () => {
+    expect(evaluate(SQUADS, squads(["firebase"], ["firebase", "gemini"]), null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(SQUADS, squads([], ["firebase", "gemini"]), null)).toEqual({ kind: "wrong-proof" });
+  });
+
+  it("never completes with nothing required (a cadet with no squad), however much was met", () => {
+    expect(evaluate(SQUADS, squads(["firebase"], []), null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(SQUADS, squads([], []), null)).toEqual({ kind: "wrong-proof" });
+  });
+
+  it("refuses other proofs, and changes nothing once completed", () => {
+    expect(evaluate(SQUADS, { kind: "team", role: "organizer" }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(SQUADS, squads([], []), done("completed", 0, 60))).toEqual({ kind: "closed" });
+  });
+});
+
 describe("evaluate: talk and stand", () => {
   it("completes with the scan of its own checkpoint", () => {
     expect(evaluate(STAND, { kind: "checkpoint", checkpointId: "stand-ai-1" }, null)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 30, creditsEarned: 0 });

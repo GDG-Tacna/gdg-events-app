@@ -7,6 +7,10 @@ const speakers = vi.hoisted(() => ({ speakerCodeDeps: { marker: "speaker-codes",
 vi.mock("@/app-shell/composition/speakers.server", () => speakers);
 const speakersServer = vi.hoisted(() => ({ verifySpeakerCode: vi.fn() }));
 vi.mock("@/features/speakers/server", () => speakersServer);
+const teamCodes = vi.hoisted(() => ({ teamCodeDeps: { marker: "team-codes" } }));
+vi.mock("@/app-shell/composition/team-code.server", () => teamCodes);
+const teamServer = vi.hoisted(() => ({ verifyTeamCode: vi.fn() }));
+vi.mock("@/features/team-code/server", () => teamServer);
 vi.mock("@/app-shell/composition/missions.server", () => ({ missionDeps: { marker: "missions" } }));
 const achievements = vi.hoisted(() => ({ unlockAchievements: vi.fn() }));
 vi.mock("@/app-shell/composition/achievements.server", () => achievements);
@@ -15,7 +19,7 @@ vi.mock("@/app-shell/composition/economy.server", () => economy);
 const economyServer = { rewardTalk: vi.fn() };
 vi.mock("@/features/economy/server", () => economyServer);
 
-const missionsServer = { completeByCheckpoint: vi.fn(), completeBySpeaker: vi.fn() };
+const missionsServer = { completeByCheckpoint: vi.fn(), completeBySpeaker: vi.fn(), completeByTeam: vi.fn() };
 vi.mock("@/features/missions/server", () => missionsServer);
 
 const guards = { getSession: vi.fn() };
@@ -98,10 +102,19 @@ describe("recordCheckInAction", () => {
       recorded: true,
       firstEntrance: false,
       contact: { card, created: true, xpEarned: 20, creditsEarned: 5, capReached: false },
+      missions: [],
       achievements: [{ id: "a", name: "Red", tone: "cyan" }],
     });
     expect(network.connectContactAction).toHaveBeenCalledWith("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA");
     expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("hands the scanner the missions a contact completed (the squads mission), as it does for any scan", async () => {
+    const card = { alias: "Bruno", squad: "Gemini", links: { linkedin: null, github: null, web: null } };
+    const missions = [{ id: "meet-squads", title: "Conoce a cada escuadrón", xpEarned: 60, creditsEarned: 20, justCompleted: true }];
+    network.connectContactAction.mockResolvedValue({ ok: true, card, created: true, xpEarned: 20, creditsEarned: 5, capReached: false, missions, achievements: [] });
+
+    expect(await recordCheckInAction("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA")).toMatchObject({ ok: true, kind: "contact", missions });
   });
 
   it("answers a contact repeated as not recorded, and translates what the Red refuses", async () => {
@@ -309,5 +322,79 @@ describe("recordCheckInAction with a speaker's code", () => {
     features.FEATURES.missions = true;
     missionsServer.completeBySpeaker.mockResolvedValueOnce({ ok: false, error: { code: "not-registered" } });
     expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "not-registered" });
+  });
+});
+
+describe("recordCheckInAction with a team member's code", () => {
+  const CODE = "devfest:tm:uid-staff-123456.volunteer.1800000000.sig_xxxxxxxxxxxxxxxx";
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    features.FEATURES.checkins = true;
+    features.FEATURES.missions = true;
+    achievements.unlockAchievements.mockResolvedValue([]);
+    guards.getSession.mockResolvedValue(session("attendee"));
+    checkIns.checkInDeps.limiter.consume.mockResolvedValue(true);
+    teamServer.verifyTeamCode.mockReturnValue({ ok: true, uid: "uid-staff-123456", role: "volunteer" });
+    missionsServer.completeByTeam.mockResolvedValue({ ok: true, value: [{ id: "meet-volunteer", title: "Conoce a un voluntario", xpEarned: 30, creditsEarned: 10, justCompleted: true }] });
+  });
+
+  it("completes the missions of the role the code carries, without recording a check-in", async () => {
+    expect(await recordCheckInAction(CODE)).toEqual({
+      ok: true,
+      checkpointId: "volunteer",
+      kind: "team",
+      recorded: true,
+      firstEntrance: false,
+      missions: [{ id: "meet-volunteer", title: "Conoce a un voluntario", xpEarned: 30, creditsEarned: 10, justCompleted: true }],
+      talkCredits: 0,
+      achievements: [],
+    });
+    expect(teamServer.verifyTeamCode).toHaveBeenCalledWith(teamCodes.teamCodeDeps, CODE);
+    expect(missionsServer.completeByTeam).toHaveBeenCalledWith({ marker: "missions" }, "u1", "volunteer");
+    expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
+    expect(achievements.unlockAchievements).toHaveBeenCalledWith("u1");
+  });
+
+  it("completes the organizer missions for an organizer's code", async () => {
+    teamServer.verifyTeamCode.mockReturnValue({ ok: true, uid: "uid-admin-123456", role: "organizer" });
+
+    expect(await recordCheckInAction("devfest:tm:uid-admin-123456.organizer.1800000000.sig_xxxxxxxxxxxxxxxx")).toMatchObject({ ok: true, kind: "team", checkpointId: "organizer" });
+    expect(missionsServer.completeByTeam).toHaveBeenCalledWith({ marker: "missions" }, "u1", "organizer");
+  });
+
+  it("is only for cadets, and goes through the scan limiter", async () => {
+    guards.getSession.mockResolvedValue(session("staff"));
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "forbidden" });
+
+    guards.getSession.mockResolvedValue(session("attendee"));
+    checkIns.checkInDeps.limiter.consume.mockResolvedValue(false);
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "rate-limited" });
+    expect(teamServer.verifyTeamCode).not.toHaveBeenCalled();
+  });
+
+  it("passes a bad or old code through and completes nothing", async () => {
+    teamServer.verifyTeamCode.mockReturnValueOnce({ ok: false, code: "expired-code" });
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "expired-code" });
+
+    teamServer.verifyTeamCode.mockReturnValueOnce({ ok: false, code: "invalid-code" });
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "invalid-code" });
+    expect(missionsServer.completeByTeam).not.toHaveBeenCalled();
+  });
+
+  it("still answers the meeting when missions are off for the edition, and asks for a profile when there is none", async () => {
+    features.FEATURES.missions = false;
+    expect(await recordCheckInAction(CODE)).toMatchObject({ ok: true, kind: "team", missions: [] });
+    expect(missionsServer.completeByTeam).not.toHaveBeenCalled();
+
+    features.FEATURES.missions = true;
+    missionsServer.completeByTeam.mockResolvedValueOnce({ ok: false, error: { code: "not-registered" } });
+    expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "not-registered" });
+  });
+
+  it("keeps the meeting when the missions fail for another reason", async () => {
+    missionsServer.completeByTeam.mockResolvedValueOnce({ ok: false, error: { code: "unknown" } });
+
+    expect(await recordCheckInAction(CODE)).toMatchObject({ ok: true, kind: "team", missions: [] });
   });
 });

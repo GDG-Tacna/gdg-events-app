@@ -33,6 +33,8 @@ const TYPE_ICON: Record<MissionType, IconName> = {
   talk: "qr",
   stand: "map-pin",
   speaker: "person",
+  team: "users",
+  squads: "flag",
   quiz: "question",
   keyword: "key",
 };

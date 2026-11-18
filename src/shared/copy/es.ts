@@ -212,6 +212,8 @@ export const copy = {
       talk: "QR de charla",
       stand: "Visita a stand",
       speaker: "Conoce al speaker",
+      team: "Conoce al equipo",
+      squads: "Conoce a cada escuadrón",
       quiz: "Pregunta",
       keyword: "Palabra clave",
     },
@@ -234,7 +236,12 @@ export const copy = {
       talk: "Esta misión se completa escaneando el QR que aparece en pantalla durante la charla.",
       stand: "Esta misión se completa al visitar el stand: escanea el QR que muestra la pantalla del stand.",
       speaker: "Esta misión se completa al conocer al speaker: escanea el QR que te muestra en su teléfono o en pantalla.",
+      organizer: "Esta misión se completa al conocer a un organizador: pídele que te muestre su código «Mi código» y escanéalo.",
+      volunteer: "Esta misión se completa al conocer a un voluntario: pídele que te muestre su código «Mi código» y escanéalo.",
+      squads: "Esta misión se completa al conectar con un cadete de cada escuadrón distinto al tuyo: escanea sus códigos desde la Red.",
     },
+    /** A cumulative mission's progress. Placeholders: {done}, {total}. */
+    squadsProgress: "{done} de {total} escuadrones",
     scan: "Escanear QR",
     showQr: "Mostrar mi QR",
     /** The tags on a mission card and its screen. */
@@ -349,6 +356,7 @@ export const copy = {
       catering: { title: "¡Suministros registrados!", body: "Tu paso por este puesto quedó registrado." },
       stand: { title: "¡Stand visitado!", body: "Tu visita a este stand quedó registrada." },
       speaker: { title: "¡Speaker encontrado!", body: "Escaneaste el código de este speaker." },
+      team: { title: "¡Equipo encontrado!", body: "Escaneaste el código de un miembro del equipo." },
       contact: { title: "¡Nuevo contacto!", body: "Ya están conectados. Su tarjeta está en tus contactos." },
     },
     alreadyContact: { title: "Ya eran contactos", body: "Este cadete ya estaba en tu red: no suma dos veces." },
@@ -1682,6 +1690,12 @@ export const copy = {
           stand: "El stand cuyo QR en pantalla completa la misión (también cuenta si el staff escanea el QR del cadete).",
           speaker: "El speaker cuyo QR completa la misión. Lo muestra desde Speakers o desde su teléfono.",
         },
+        /** The «any speaker» choice of a speaker mission. */
+        anySpeaker: "Cualquier speaker",
+        teamRole: "A quién hay que conocer",
+        teamRoleHint: "Quienes son del equipo muestran su código desde «Mi código». Los voluntarios son el staff de Equipo; los organizadores, sus organizadores y admins.",
+        teamRoles: { organizer: "Un organizador", volunteer: "Un voluntario" },
+        squadsHint: "Se completa al conectar, desde la Red, con un cadete de cada escuadrón activo distinto al del cadete. Necesita el módulo Red encendido.",
         noCheckpoints: {
           talk: "No hay charlas activas. Créalas primero en Puestos.",
           stand: "No hay stands activos. Créalos primero en Puestos.",
@@ -1720,6 +1734,7 @@ export const copy = {
         "invalid-type": "Elige un tipo de misión.",
         "invalid-checkpoint": "Elige el puesto que completa la misión.",
         "invalid-speaker": "Elige el speaker que completa la misión.",
+        "invalid-team-role": "Elige a quién hay que conocer: un organizador o un voluntario.",
         "invalid-question": "La pregunta debe tener entre 5 y 160 caracteres.",
         "invalid-options": "Escribe de 2 a 4 opciones distintas, de hasta 80 caracteres.",
         "invalid-answer": "Marca cuál es la respuesta correcta.",
@@ -2577,6 +2592,27 @@ export const copy = {
       disabled: "Los speakers no están disponibles por ahora.",
       unknown: "No pudimos abrir tu QR. Inténtalo de nuevo.",
       signIn: "No pudimos entrar con Google. Inténtalo de nuevo.",
+    },
+  },
+  /** «Mi código»: the code staff and organizers show so cadets can meet them. */
+  teamCode: {
+    title: "Mi código",
+    back: "Volver",
+    intro: "Muéstralo a los cadetes que quieran conocerte: al escanearlo completan su misión. Cambia cada dos minutos.",
+    roles: { organizer: "Organizador", volunteer: "Voluntario" },
+    /** The entry point on the staff and admin homes. */
+    open: "Mostrar mi código",
+    qr: {
+      scanHint: "Los cadetes escanean este código con la app para completar «Conoce a un organizador» o «Conoce a un voluntario».",
+      errors: {
+        "checkpoint-not-found": "Ese código no existe.",
+        "checkpoint-inactive": "Ese código ya no está disponible.",
+        "not-shown-on-screen": "Ese código no se muestra en pantalla.",
+        unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
+        forbidden: "Solo el staff y los organizadores tienen un código.",
+        disabled: "Los códigos del equipo no están disponibles por ahora.",
+        unknown: "No pudimos generar el código. Revisa la clave de firma del servidor e inténtalo de nuevo.",
+      },
     },
   },
   speakerHome: {
