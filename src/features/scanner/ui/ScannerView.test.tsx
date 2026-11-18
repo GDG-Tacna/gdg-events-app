@@ -215,18 +215,60 @@ describe("ScannerView results", () => {
   );
 
   it("goes back to looking for the next code", async () => {
-    const { scanner, see, fake } = fakeScanner();
+    const { scanner, see } = fakeScanner();
     await renderView(scanner);
     await see("code-1");
-    expect(fake.paused()).toBe(true);
+    // Only the answer shows: the camera, with the last picture it held, is gone.
+    expect(screen.queryByTestId("qr-camera")).not.toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: copy.scanner.scanAgain }));
     });
 
-    expect(fake.paused()).toBe(false);
+    expect(screen.getByTestId("qr-camera")).toHaveAttribute("data-paused", "false");
     expect(screen.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
     expect(screen.getByText(copy.scanner.hint)).toBeInTheDocument();
+  });
+
+  it("shows only the message of a problem, without the camera", async () => {
+    const { scanner, see } = fakeScanner();
+    render(<ScannerView camera={scanner} record={vi.fn(async () => ({ ok: false, code: "expired-code" }) as const)} homeHref="/dashboard" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await see("old-code");
+
+    expect(screen.queryByTestId("qr-camera")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: copy.scanner.errors["expired-code"].title })).toBeInTheDocument();
+  });
+
+  it("shows how the XP bar moved: the XP the scan gave, the bar and the rank", async () => {
+    const { scanner, see } = fakeScanner();
+    const progress = { xpGained: 35, from: { percent: 20, level: 1, name: "Recluta" }, to: { percent: 55, level: 1, name: "Recluta" }, rankUp: false };
+    await renderView(scanner, vi.fn(async () => result({ progress, missions: [{ id: "m1", title: "Asiste", xpEarned: 35, creditsEarned: 0, justCompleted: true }] })));
+    await see("code-1");
+
+    expect(screen.getByRole("progressbar", { name: copy.scanner.xpBar })).toHaveAttribute("aria-valuenow", "55");
+    expect(screen.getByText("Recluta")).toBeInTheDocument();
+    expect(screen.queryByText(copy.scanner.rankUp)).not.toBeInTheDocument();
+  });
+
+  it("announces a new rank when the scan took the cadet up", async () => {
+    const { scanner, see } = fakeScanner();
+    const progress = { xpGained: 50, from: { percent: 90, level: 1, name: "Recluta" }, to: { percent: 10, level: 2, name: "Piloto" }, rankUp: true };
+    await renderView(scanner, vi.fn(async () => result({ progress })));
+    await see("code-1");
+
+    expect(screen.getByRole("status")).toHaveTextContent(copy.scanner.rankUp);
+    expect(screen.getByText("Piloto")).toBeInTheDocument();
+  });
+
+  it("leaves the bar out when the scan gave no XP", async () => {
+    const { scanner, see } = fakeScanner();
+    await renderView(scanner);
+    await see("code-1");
+
+    expect(screen.queryByRole("progressbar", { name: copy.scanner.xpBar })).not.toBeInTheDocument();
   });
 
   it("offers to try again after a refusal", async () => {

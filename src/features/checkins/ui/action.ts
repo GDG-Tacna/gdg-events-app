@@ -27,6 +27,17 @@ export interface ScanContact {
   capReached: boolean;
 }
 
+/** How a scan moved the cadet's XP bar: filled in by the app shell (check-ins know nothing about ranks). */
+export interface ScanProgress {
+  /** The XP this scan gave in all (missions and contacts). */
+  xpGained: number;
+  /** The bar before and after, as a percent of the rank each is in, with that rank's level and name. */
+  from: { percent: number; level: number; name: string };
+  to: { percent: number; level: number; name: string };
+  /** The scan took the cadet to a higher rank. */
+  rankUp: boolean;
+}
+
 export type RecordCheckInActionResult =
   | {
       ok: true;
@@ -41,6 +52,8 @@ export type RecordCheckInActionResult =
       checkpoint?: { name: string; description: string; image: string | null };
       /** Missions tied to this checkpoint (talks and stands) or speaker. Absent or empty when there are none. */
       missions?: readonly ScanReward[];
+      /** How the XP bar moved, when the scan gave XP (absent otherwise, or when it could not be read). */
+      progress?: ScanProgress;
       /** G-Credits this scan earned for attending a talk (0 or absent when none). */
       talkCredits?: number;
       /** Badges this scan unlocked (absent or empty when none). */

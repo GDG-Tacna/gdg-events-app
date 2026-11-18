@@ -1,4 +1,4 @@
-import type { CheckInErrorCode, ScanContact, ScanKind, ScanReward } from "@/features/checkins";
+import type { CheckInErrorCode, ScanContact, ScanKind, ScanProgress, ScanReward } from "@/features/checkins";
 import type { CameraErrorCode } from "./camera";
 
 /** The scanned puesto as the cadet sees it: its name, description and image address. */
@@ -22,6 +22,8 @@ export type ScanOutcome =
       checkpoint?: ScannedPlace | null;
       /** The other cadet, for a contact code. */
       contact?: ScanContact | null;
+      /** How the XP bar moved, when the scan gave XP. */
+      progress?: ScanProgress | null;
     }
   | { ok: false; code: CheckInErrorCode };
 
