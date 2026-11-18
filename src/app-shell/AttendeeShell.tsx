@@ -33,7 +33,7 @@ export async function AttendeeShell({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div className="pb-[calc(5.5rem+env(safe-area-inset-bottom))] min-[760px]:pb-0 min-[760px]:pl-24">
+    <div className="pb-[calc(6rem+env(safe-area-inset-bottom))] min-[760px]:pb-0 min-[760px]:pl-24">
       <header className="bg-surface border-border pt-safe sticky top-0 z-30 border-b supports-[backdrop-filter]:bg-surface/90 supports-[backdrop-filter]:backdrop-blur">
         <div className="px-space-4 py-space-2 gap-space-3 mx-auto flex w-full max-w-[520px] items-center justify-between min-[760px]:max-w-[880px]">
           <BrandMark compact />
