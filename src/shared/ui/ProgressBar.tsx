@@ -35,7 +35,7 @@ export function ProgressBar({ value, max = 100, label, valueText, className }: P
       className={cn("bg-secondary h-3 w-full overflow-hidden rounded-pill", className)}
     >
       <div
-        className="from-violet to-cyan animate-progress-grow h-full rounded-pill bg-linear-to-r transition-[width] duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
+        className="from-violet via-lime to-gold animate-progress-grow h-full rounded-pill bg-linear-to-r transition-[width] duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]"
         style={{ width: `${percent}%` }}
       />
     </div>

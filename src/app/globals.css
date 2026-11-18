@@ -5,24 +5,36 @@
  * Dark-only theme: values live in :root; components never hardcode colors.
  */
 :root {
-  --bg-deep: #050816;
-  --bg: #0a0f24;
-  --bg-violet: #150f38;
-  --surface: #111833;
-  --surface-raised: #18214a;
-  --line: #232c57;
-  --line-strong: #5b6ab8;
-  --text: #f4f6ff;
-  --text-muted: #b4bde0;
-  --text-subtle: #8f9ac4;
-  --on-accent: #04121a;
-  --cyan: #22d3ee;
-  --violet: #8b5cf6;
-  --violet-soft: #b9a3ff;
-  --magenta: #e879f9;
-  --lime: #a3e635;
-  --gold: #fbbf24;
-  --danger: #fb7185;
+  /*
+   * Look and feel aligned with the DevFest Tacna site (devfest.gdgtacna.com, 2026-11-17): coal canvas, flat panels,
+   * 2px ink borders, solid pill buttons and the Google brand colors as accents. Token names are kept so components
+   * and features did not change; only their values did.
+   */
+  --bg-deep: #171717;
+  --bg: #1e1e1e;
+  --bg-violet: #1e1e1e;
+  --surface: #2a2a2a;
+  --surface-raised: #383838;
+  --line: #f0f0f029;
+  --line-strong: #f0f0f06b;
+  --ink: #f0f0f0;
+  --text: #f0f0f0;
+  --text-muted: #c6c6c6;
+  --text-subtle: #a0a0a0;
+  --on-accent: #1e1e1e;
+  /* Google palette: cyan → halftone blue, violet → Google blue, magenta → halftone red, lime → halftone green, gold → Google yellow. */
+  --cyan: #57caff;
+  --violet: #4285f4;
+  --violet-soft: #8ab4f8;
+  --magenta: #ff7daf;
+  --lime: #5cdb6d;
+  --gold: #f9ab00;
+  --danger: #f28b82;
+  /* Pastels used for hover fills (text on them is coal). */
+  --pastel-blue: #c3ecf6;
+  --pastel-green: #ccf6c5;
+  --pastel-yellow: #ffe7a5;
+  --pastel-red: #f8d8d8;
 
   color-scheme: dark;
 }
@@ -35,7 +47,8 @@
   --color-card-foreground: var(--text);
   --color-popover: var(--surface);
   --color-popover-foreground: var(--text);
-  --color-primary: var(--cyan);
+  /* The site's main action is a solid ink pill (hover turns Google yellow). */
+  --color-primary: var(--ink);
   --color-primary-foreground: var(--on-accent);
   --color-secondary: var(--surface-raised);
   --color-secondary-foreground: var(--text);
@@ -47,6 +60,11 @@
   --color-border: var(--line);
   --color-input: var(--line-strong);
   --color-ring: var(--cyan);
+  --color-ink: var(--ink);
+  --color-pastel-blue: var(--pastel-blue);
+  --color-pastel-green: var(--pastel-green);
+  --color-pastel-yellow: var(--pastel-yellow);
+  --color-pastel-red: var(--pastel-red);
 
   /* Design System palette */
   --color-bg-deep: var(--bg-deep);
@@ -67,22 +85,25 @@
   --color-danger: var(--danger);
 
   /* Typography */
-  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
-  --font-body: var(--font-inter), system-ui, sans-serif;
-  --font-pixel: var(--font-tiny5), ui-monospace, monospace;
+  --font-display: var(--font-google-sans), system-ui, sans-serif;
+  --font-body: var(--font-google-sans), system-ui, sans-serif;
+  /* The pixel styles now use Google Sans Code, the site's mono face for eyebrows, times and tags. */
+  --font-pixel: var(--font-google-sans-code), ui-monospace, monospace;
+  --font-mono: var(--font-google-sans-code), ui-monospace, monospace;
 }
 
 /* Literal tokens: Tailwind emits these as CSS variables and generates rounded-*, shadow-* and p-space-* utilities. */
 @theme {
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
   --radius-pill: 999px;
 
-  --shadow-card: 0 8px 24px rgba(3, 6, 20, 0.45);
-  --shadow-glow-cyan: 0 0 0 1px rgba(34, 211, 238, 0.55), 0 0 24px rgba(34, 211, 238, 0.18);
-  --shadow-glow-magenta: 0 0 0 1px rgba(232, 121, 249, 0.5), 0 0 24px rgba(232, 121, 249, 0.16);
-  --shadow-glow-gold: 0 0 0 1px rgba(251, 191, 36, 0.55), 0 0 24px rgba(251, 191, 36, 0.18);
+  /* Flat like the site: no drop shadows; the "glow" is a solid 2px brand-color ring. */
+  --shadow-card: 0 0 #0000;
+  --shadow-glow-cyan: 0 0 0 2px #57caff;
+  --shadow-glow-magenta: 0 0 0 2px #ff7daf;
+  --shadow-glow-gold: 0 0 0 2px #f9ab00;
 
   /* Spacing scale: space-1..space-8 are the Design System steps (4, 8, 12, 16, 20, 24, 32) */
   --spacing-space-1: 4px;
@@ -138,12 +159,14 @@
   font-size: 26px;
   line-height: 30px;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 @utility type-title {
   font-family: var(--font-display);
   font-size: 20px;
   line-height: 26px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 @utility type-heading {
   font-family: var(--font-display);
@@ -156,6 +179,7 @@
   font-size: 28px;
   line-height: 32px;
   font-weight: 700;
+  letter-spacing: -0.02em;
 }
 @utility type-body {
   font-family: var(--font-body);
@@ -182,35 +206,38 @@
   font-weight: 500;
 }
 /*
- * Pixel accent: game tags, one callout per screen, and (since 2026-10-12, chosen by the organizer) the "DevFest"
- * wordmark and section headings. Never paragraphs, buttons or card text. Sizes are multiples of 8px so pixels stay crisp.
+ * Former pixel accents, restyled after the DevFest Tacna site (2026-11-17). The names stay so call sites did not change:
+ * - pixel-title / pixel-callout: the bold Google Sans wordmark with tight tracking ("DevFest").
+ * - pixel-heading: the mono uppercase eyebrow ("AGENDA · 21 NOV 2026").
+ * - pixel-tag: the mono game tag ("+100 XP", "NV 3"), like the agenda times.
  */
 @utility type-pixel-title {
-  font-family: var(--font-pixel);
+  font-family: var(--font-display);
   font-size: 32px;
-  line-height: 32px;
-  font-weight: 400;
-  letter-spacing: 0.02em;
+  line-height: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 @utility type-pixel-heading {
-  font-family: var(--font-pixel);
-  font-size: 16px;
-  line-height: 20px;
-  font-weight: 400;
-  letter-spacing: 0.06em;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 @utility type-pixel-tag {
-  font-family: var(--font-pixel);
-  font-size: 16px;
+  font-family: var(--font-mono);
+  font-size: 14px;
   line-height: 16px;
-  font-weight: 400;
+  font-weight: 600;
 }
 @utility type-pixel-callout {
-  font-family: var(--font-pixel);
+  font-family: var(--font-display);
   font-size: 32px;
-  line-height: 32px;
-  font-weight: 400;
+  line-height: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 @utility pt-safe {

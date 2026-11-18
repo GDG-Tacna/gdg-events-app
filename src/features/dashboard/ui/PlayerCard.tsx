@@ -48,7 +48,7 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
   return (
     <section
       aria-label={copy.dashboard.attendeeCardLabel}
-      className="border-cyan/60 from-surface to-bg-violet/50 shadow-card gap-space-4 p-space-4 flex flex-col rounded-lg border bg-gradient-to-br"
+      className="border-ink bg-surface gap-space-4 p-space-4 flex flex-col rounded-lg border-2"
     >
       <div className="gap-space-4 flex items-center">
         {avatarHref ? (
@@ -56,15 +56,15 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
             href={avatarHref}
             aria-label={copy.avatar.edit}
             title={copy.avatar.edit}
-            className="border-cyan/70 bg-gradient-to-b from-[#16306e] to-bg-deep shadow-[0_0_0_3px_rgba(34,211,238,0.12)] focus-visible:ring-ring relative grid size-[88px] shrink-0 place-items-center rounded-md border-2 focus-visible:ring-[3px] focus-visible:outline-none"
+            className="border-ink bg-pastel-blue focus-visible:ring-ring relative grid size-[88px] shrink-0 place-items-center rounded-md border-2 focus-visible:ring-[3px] focus-visible:outline-none"
           >
             <PixelAvatar seed={overview.alias} look={avatarLook} scale={2} />
-            <span aria-hidden="true" className="bg-primary text-primary-foreground absolute -right-2 -bottom-2 grid size-7 place-items-center rounded-full">
+            <span aria-hidden="true" className="bg-gold text-on-accent border-ink absolute -right-2 -bottom-2 grid size-7 place-items-center rounded-full border-2">
               <Icon name="edit" size={14} />
             </span>
           </Link>
         ) : (
-          <div className="border-cyan/70 bg-gradient-to-b from-[#16306e] to-bg-deep shadow-[0_0_0_3px_rgba(34,211,238,0.12)] grid size-[88px] shrink-0 place-items-center rounded-md border-2">
+          <div className="border-ink bg-pastel-blue grid size-[88px] shrink-0 place-items-center rounded-md border-2">
             <PixelAvatar seed={overview.alias} look={avatarLook} scale={2} />
           </div>
         )}

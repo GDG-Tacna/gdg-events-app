@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/font/google", () => {
   const font = () => ({ variable: "font-var" });
-  return { Inter: font, Space_Grotesk: font, Tiny5: font };
+  return { Google_Sans: font, Google_Sans_Code: font };
 });
 vi.mock("./globals.css", () => ({}));
 
@@ -56,7 +56,7 @@ describe("root layout", () => {
   });
 
   it("matches the manifest: same theme color for the status bar, and safe-area aware", () => {
-    expect(viewport.themeColor).toBe("#0a0f24");
+    expect(viewport.themeColor).toBe("#1e1e1e");
     expect(viewport.viewportFit).toBe("cover");
     expect(metadata.title).toBeTruthy();
   });
