@@ -17,7 +17,7 @@ export function RankChip({ level, name, className }: RankChipProps) {
         className,
       )}
     >
-      <span className="type-pixel-tag text-gold">NV {level}</span>
+      <span className="type-pixel-tag text-gold-ink">NV {level}</span>
       <span className="type-label text-foreground">{name}</span>
     </span>
   );

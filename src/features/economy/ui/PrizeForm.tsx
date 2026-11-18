@@ -102,7 +102,7 @@ export function PrizeForm({ prize, onSave, onCancel, upload }: PrizeFormProps) {
   return (
     <form onSubmit={submit} noValidate aria-label={prize ? f.editTitle : f.createTitle} className="gap-space-4 flex flex-col">
       {error && error.field === null ? (
-        <p role="alert" className="type-body-sm text-danger">
+        <p role="alert" className="type-body-sm text-danger-ink">
           {t.errors[error.code]}
         </p>
       ) : null}
@@ -149,7 +149,7 @@ export function PrizeForm({ prize, onSave, onCancel, upload }: PrizeFormProps) {
         }}
       />
       {fieldError("image") ? (
-        <p role="alert" className="type-body-sm text-danger">
+        <p role="alert" className="type-body-sm text-danger-ink">
           {fieldError("image")}
         </p>
       ) : null}

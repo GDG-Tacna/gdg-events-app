@@ -2,6 +2,10 @@
 export const copy = {
   /** Words shared by several screens. */
   common: {
+    theme: {
+      toLight: "Cambiar a modo claro",
+      toDark: "Cambiar a modo oscuro",
+    },
     close: "Cerrar",
     cancel: "Cancelar",
     modalHint: "Pulsa Escape o Cerrar para volver a la lista.",

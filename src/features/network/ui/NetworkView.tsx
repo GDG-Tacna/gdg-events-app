@@ -71,7 +71,7 @@ export function NetworkView({ me, contacts, reward, issue, connect, saveLinks, c
         <p className="type-body text-muted-foreground">{t.subtitle}</p>
         {parts.length > 0 && reward.cap > 0 ? (
           <div className="gap-space-1 flex flex-col">
-            <p className="type-label text-accent">{interpolate(t.reward, { parts: parts.join(" · ") })}</p>
+            <p className="type-label text-lime-ink">{interpolate(t.reward, { parts: parts.join(" · ") })}</p>
             <p className="type-caption text-text-subtle">{interpolate(t.cap, { n: formatNumber(Math.min(contacts.length, reward.cap)), cap: formatNumber(reward.cap) })}</p>
           </div>
         ) : null}

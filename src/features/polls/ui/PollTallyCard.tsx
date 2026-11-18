@@ -74,8 +74,8 @@ export function PollTallyCard({ poll, tally: initial, myVote, refresh, every = 1
               <div className="gap-space-3 flex items-center">
                 {option.image ? <Thumbnail url={option.image.url} size={40} /> : null}
                 <span className="gap-space-2 flex min-w-0 flex-1 flex-wrap items-center">
-                  <span className={cn("type-label", leading ? "text-accent" : "text-foreground")}>{option.text}</span>
-                  {option.id === myVote ? <span className="type-caption text-cyan">{t.yourVoteTag}</span> : null}
+                  <span className={cn("type-label", leading ? "text-lime-ink" : "text-foreground")}>{option.text}</span>
+                  {option.id === myVote ? <span className="type-caption text-cyan-ink">{t.yourVoteTag}</span> : null}
                 </span>
                 <span className="type-body-sm text-muted-foreground tabular-nums">{countText}</span>
               </div>

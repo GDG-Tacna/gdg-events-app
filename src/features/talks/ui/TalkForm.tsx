@@ -197,7 +197,7 @@ function SpeakerPicker({
       <p id="talk-speakers-hint" className="type-caption text-text-subtle">
         {f.speakerHint}
       </p>
-      {legacy && chosen.length === 0 ? <p className="type-caption text-gold">{interpolate(f.speakerLegacy, { name: legacy })}</p> : null}
+      {legacy && chosen.length === 0 ? <p className="type-caption text-gold-ink">{interpolate(f.speakerLegacy, { name: legacy })}</p> : null}
       {chosen.length > 0 ? (
         <ul aria-label={f.speaker} className="gap-space-2 flex flex-wrap">
           {chosen.map((id) => (
@@ -237,7 +237,7 @@ function SpeakerPicker({
           }}
         />
       ) : error ? (
-        <p role="alert" className="type-caption text-destructive">
+        <p role="alert" className="type-caption text-danger-ink">
           {error}
         </p>
       ) : null}

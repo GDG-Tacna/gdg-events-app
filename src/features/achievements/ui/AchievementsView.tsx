@@ -54,7 +54,7 @@ export function AchievementsView({ badges }: AchievementsViewProps) {
                       <div className="gap-space-1 flex min-w-0 flex-col">
                         <h3 className="type-label text-foreground">{badge.name}</h3>
                         <p className="type-caption text-muted-foreground">{badge.description}</p>
-                        {earnedAt ? <p className="type-caption text-accent">{interpolate(t.earnedOn, { date: formatDate(earnedAt) })}</p> : null}
+                        {earnedAt ? <p className="type-caption text-lime-ink">{interpolate(t.earnedOn, { date: formatDate(earnedAt) })}</p> : null}
                       </div>
                     </Card>
                   </li>

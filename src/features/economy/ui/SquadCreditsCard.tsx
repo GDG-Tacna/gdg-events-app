@@ -37,7 +37,7 @@ export function SquadCreditsCard({ balance, prizes }: SquadCreditsCardProps) {
                     </div>
                     {prize.description ? <span className="type-caption text-muted-foreground">{prize.description}</span> : null}
                     <span className="type-caption">
-                      {missing <= 0 ? <span className="text-accent">{t.reachable}</span> : <span className="text-text-subtle">{interpolate(t.missing, { n: formatNumber(missing) })}</span>}
+                      {missing <= 0 ? <span className="text-lime-ink">{t.reachable}</span> : <span className="text-text-subtle">{interpolate(t.missing, { n: formatNumber(missing) })}</span>}
                       {prize.stock === null ? null : <span className="text-text-subtle"> · {interpolate(t.stock, { n: formatNumber(prize.stock) })}</span>}
                     </span>
                   </div>

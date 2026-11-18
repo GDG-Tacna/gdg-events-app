@@ -24,6 +24,7 @@ vi.mock("@/shared/config/features", () => features);
 
 const { AdminShell } = await import("@/features/admin");
 const { SignOutButton } = await import("@/features/auth");
+const { ThemeToggle } = await import("@/shared/ui");
 const { EditionSwitcher, WorkingEditionNotice } = await import("@/features/event");
 const { chooseWorkingEditionAction } = await import("@/app-shell/event/working-edition.actions");
 const { default: AdminLayout, metadata } = await import("./layout");
@@ -112,10 +113,15 @@ describe("admin layout", () => {
       "/admin/sorteo",
       "/admin/escenario",
     ]);
-    expect((shell.props.accountActions as { type: unknown }).type).toBe(SignOutButton);
-    const compact = shell.props.compactAccountActions as { type: unknown; props: { variant?: string } };
-    expect(compact.type).toBe(SignOutButton);
-    expect(compact.props.variant).toBe("icon");
+    type El = { type: unknown; props: { variant?: string; children?: unknown } };
+    const kids = (el: unknown) => [(el as El).props.children].flat() as El[];
+    const full = kids(shell.props.accountActions);
+    expect(full[0].type).toBe(ThemeToggle);
+    expect(kids(full[1])[0].type).toBe(SignOutButton);
+    const compact = kids(shell.props.compactAccountActions);
+    expect(compact[0].type).toBe(ThemeToggle);
+    expect(compact[1].type).toBe(SignOutButton);
+    expect(compact[1].props.variant).toBe("icon");
     expect(shell.props.accountPhotoUrl).toBeNull();
     expect((shell.props.children as ReactNode[])[0]).toBe(child);
   });

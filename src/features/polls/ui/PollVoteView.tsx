@@ -26,7 +26,7 @@ export function LivePollCard({ poll, href }: { poll: CadetPoll; href: string }) 
   const reward = rewardLine(poll.reward);
   return (
     <Card className="gap-space-3 border-cyan/60 flex flex-col">
-      <p className="type-caption text-cyan">{t.cardTitle}</p>
+      <p className="type-caption text-cyan-ink">{t.cardTitle}</p>
       <p className="type-heading text-foreground">{poll.poll.question}</p>
       {reward && !poll.myVote ? <p className="type-body-sm text-muted-foreground">{reward}</p> : null}
       <ButtonLink href={href} variant={poll.myVote ? "secondary" : "primary"}>
@@ -118,7 +118,7 @@ export function PollVoteView({ current, vote, homeHref, initialTally = null, tal
         </ButtonLink>
       </div>
       <div className="gap-space-1 flex flex-col">
-        <p className="type-caption text-cyan">{t.title}</p>
+        <p className="type-caption text-cyan-ink">{t.title}</p>
         <h1 className="type-title text-foreground">{poll.question}</h1>
         <p className="type-body-sm text-muted-foreground">{poll.changeable ? t.changeable : t.fixed}</p>
         {reward ? <p className="type-body-sm text-foreground">{reward}</p> : null}

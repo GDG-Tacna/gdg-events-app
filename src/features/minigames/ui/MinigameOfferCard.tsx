@@ -38,7 +38,7 @@ export function MinigameOfferCard({ offer, playHref }: MinigameOfferCardProps) {
           </ButtonLink>
         </>
       ) : null}
-      {offer.state === "won" ? <p className="type-label text-accent">{interpolate(t.offer.won, { xp })}</p> : null}
+      {offer.state === "won" ? <p className="type-label text-lime-ink">{interpolate(t.offer.won, { xp })}</p> : null}
       {offer.state === "lost" ? <p className="type-body-sm text-muted-foreground">{t.offer.lost}</p> : null}
     </Card>
   );

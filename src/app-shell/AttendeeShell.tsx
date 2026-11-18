@@ -3,7 +3,7 @@ import { SignOutButton } from "@/features/auth";
 import { FEATURES } from "@/shared/config/features";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
-import { BottomNav, BrandMark, type BottomNavItem } from "@/shared/ui";
+import { BottomNav, BrandMark, ThemeToggle, type BottomNavItem } from "@/shared/ui";
 import { moduleOn } from "./modules.server";
 
 /**
@@ -38,6 +38,7 @@ export async function AttendeeShell({ children }: { children: ReactNode }) {
         <div className="px-space-4 py-space-2 gap-space-3 mx-auto flex w-full max-w-[520px] items-center justify-between min-[760px]:max-w-[880px]">
           <BrandMark compact />
           <div className="gap-space-2 flex shrink-0 items-center">
+            <ThemeToggle />
             <SignOutButton variant="icon" />
           </div>
         </div>

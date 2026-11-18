@@ -21,8 +21,8 @@ export interface TerminalCardProps {
 }
 
 const TONES = {
-  cyan: { card: "border-ink bg-surface", tile: "border-cyan/60 bg-cyan/10 text-cyan", title: "text-foreground" },
-  gold: { card: "border-gold bg-surface", tile: "border-gold/70 bg-gold/10 text-gold", title: "text-gold" },
+  cyan: { card: "border-ink bg-surface", tile: "border-cyan/60 bg-cyan/10 text-cyan-ink", title: "text-foreground" },
+  gold: { card: "border-gold bg-surface", tile: "border-gold/70 bg-gold/10 text-gold-ink", title: "text-gold-ink" },
 } as const;
 
 /**
@@ -39,8 +39,8 @@ export function TerminalCard({ icon, title, body, badge, tag, tone = "cyan", act
       <span className="gap-space-1 flex min-w-0 flex-1 flex-col">
         <span className="gap-space-2 flex flex-wrap items-center">
           <span className={cn("type-label tracking-wide uppercase", t.title)}>{title}</span>
-          {badge ? <span className="type-caption border-lime/60 text-lime rounded-sm border px-1.5 tracking-wider uppercase">{badge}</span> : null}
-          {tag ? <span className="type-pixel-tag border-gold/60 text-gold bg-gold/10 rounded-sm border px-1.5 text-[14px] leading-5">{tag}</span> : null}
+          {badge ? <span className="type-caption border-lime/60 text-lime-ink rounded-sm border px-1.5 tracking-wider uppercase">{badge}</span> : null}
+          {tag ? <span className="type-pixel-tag border-gold/60 text-gold-ink bg-gold/10 rounded-sm border px-1.5 text-[14px] leading-5">{tag}</span> : null}
         </span>
         <span className="type-body-sm text-muted-foreground">{body}</span>
       </span>
@@ -55,7 +55,7 @@ export function TerminalCard({ icon, title, body, badge, tag, tone = "cyan", act
         className={cn(frame, "gap-space-3 hover:border-cyan focus-visible:ring-ring flex items-center focus-visible:ring-[3px] focus-visible:outline-none")}
       >
         {content}
-        <span aria-hidden="true" className={cn("border-ink grid size-10 shrink-0 place-items-center rounded-full border-2", tone === "gold" ? "text-gold" : "text-cyan")}>
+        <span aria-hidden="true" className={cn("border-ink grid size-10 shrink-0 place-items-center rounded-full border-2", tone === "gold" ? "text-gold-ink" : "text-cyan-ink")}>
           <Icon name="right" size={20} />
         </span>
       </Link>

@@ -108,14 +108,14 @@ export function MissionDetailView({ mission, answer, backHref, scanHref, passHre
 
       <header className="gap-space-3 flex flex-col">
         <div className="gap-space-3 flex items-start">
-          <span aria-hidden="true" className="border-cyan/50 text-cyan bg-bg-deep relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md border">
+          <span aria-hidden="true" className="border-cyan/50 text-cyan-ink bg-bg-deep relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md border">
             {mission.imageUrl ? <Image src={mission.imageUrl} alt="" fill unoptimized sizes="56px" className="object-cover" /> : <Icon name={MISSION_TYPE_ICON[mission.type]} size={26} />}
           </span>
           <div className="gap-space-1 flex min-w-0 flex-1 flex-col">
             <h1 className="type-title text-foreground">{mission.title}</h1>
             <span className="gap-space-2 flex items-center">
               <span className="type-pixel-tag text-primary">{interpolate(copy.missions.xp, { xp: formatNumber(mission.xp) })}</span>
-              {mission.credits > 0 ? <span className="type-pixel-tag text-gold">{interpolate(copy.missions.credits, { n: formatNumber(mission.credits) })}</span> : null}
+              {mission.credits > 0 ? <span className="type-pixel-tag text-gold-ink">{interpolate(copy.missions.credits, { n: formatNumber(mission.credits) })}</span> : null}
             </span>
           </div>
         </div>
@@ -130,7 +130,7 @@ export function MissionDetailView({ mission, answer, backHref, scanHref, passHre
             tabIndex={-1}
             className={cn(
               "type-label gap-space-2 p-space-3 flex items-center rounded-md border focus-visible:outline-none",
-              feedback.tone === "success" ? "border-accent/60 text-accent bg-accent/10" : "border-line-strong text-foreground bg-surface-raised",
+              feedback.tone === "success" ? "border-accent/60 text-lime-ink bg-accent/10" : "border-line-strong text-foreground bg-surface-raised",
             )}
           >
             <Icon name={feedback.tone === "success" ? "check" : progress.status === "failed" ? "failed" : "alert"} size={20} />
@@ -203,7 +203,7 @@ function ClosedNote({ status, xpEarned, creditsEarned }: { status: "open" | Comp
     <p
       className={cn(
         "type-label gap-space-2 p-space-3 flex items-center rounded-md border",
-        completed ? "border-accent/60 text-accent bg-accent/10" : "border-line-strong text-muted-foreground bg-surface-raised",
+        completed ? "border-accent/60 text-lime-ink bg-accent/10" : "border-line-strong text-muted-foreground bg-surface-raised",
       )}
     >
       <Icon name={completed ? "check" : "failed"} size={20} />

@@ -179,7 +179,7 @@ function MissionCard({ mission, quadrant, minigame, href }: { mission: BoardMiss
         aria-hidden="true"
         className={cn(
           "bg-bg-deep relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-md border",
-          completed ? "border-accent/70 text-accent" : failed ? "border-border text-text-subtle" : "border-cyan/50 text-cyan",
+          completed ? "border-accent/70 text-lime-ink" : failed ? "border-border text-text-subtle" : "border-cyan/50 text-cyan-ink",
         )}
       >
         {mission.imageUrl ? (
@@ -205,7 +205,7 @@ function MissionCard({ mission, quadrant, minigame, href }: { mission: BoardMiss
           </h3>
           <span className="gap-space-1 flex shrink-0 flex-col items-end">
             <span className="type-pixel-tag text-primary">{interpolate(copy.missions.xp, { xp: formatNumber(mission.xp) })}</span>
-            {mission.credits > 0 ? <span className="type-pixel-tag text-gold">{interpolate(copy.missions.credits, { n: formatNumber(mission.credits) })}</span> : null}
+            {mission.credits > 0 ? <span className="type-pixel-tag text-gold-ink">{interpolate(copy.missions.credits, { n: formatNumber(mission.credits) })}</span> : null}
           </span>
         </div>
         {mission.description ? <p className="type-body-sm text-muted-foreground line-clamp-2">{mission.description}</p> : null}
@@ -213,7 +213,7 @@ function MissionCard({ mission, quadrant, minigame, href }: { mission: BoardMiss
         <p
           className={cn(
             "type-caption gap-space-1 mt-auto inline-flex items-center",
-            completed ? "text-accent" : failed ? "text-text-subtle" : "text-muted-foreground",
+            completed ? "text-lime-ink" : failed ? "text-text-subtle" : "text-muted-foreground",
           )}
         >
           {failed ? <Icon name="failed" size={16} /> : null}

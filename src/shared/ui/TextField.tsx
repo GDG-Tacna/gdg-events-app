@@ -60,7 +60,7 @@ export function TextField({ label, hint, error, counter, className, ...props }: 
         </div>
       ) : null}
       {error ? (
-        <p id={errorId} role="alert" className="type-body-sm text-danger">
+        <p id={errorId} role="alert" className="type-body-sm text-danger-ink">
           {error}
         </p>
       ) : null}

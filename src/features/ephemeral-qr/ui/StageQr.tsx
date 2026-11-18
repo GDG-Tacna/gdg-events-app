@@ -50,7 +50,7 @@ export function StageQr({ checkpointId, name, issue }: StageQrProps) {
       ) : null}
 
       {state.status === "error" ? (
-        <p role="alert" className="text-destructive text-[clamp(1rem,2.4vh,2rem)]">
+        <p role="alert" className="text-danger-ink text-[clamp(1rem,2.4vh,2rem)]">
           {copy.admin.qr.errors[state.code]}
         </p>
       ) : null}

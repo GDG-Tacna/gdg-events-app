@@ -2,25 +2,28 @@
 
 /*
  * Design System tokens (docs/DESIGN-SYSTEM.md, CLAUDE.md "Design System").
- * Dark-only theme: values live in :root; components never hardcode colors.
+ * Light and dark themes (like the DevFest Tacna site); components never hardcode colors.
  */
 :root {
   /*
-   * Look and feel aligned with the DevFest Tacna site (devfest.gdgtacna.com, 2026-11-17): coal canvas, flat panels,
-   * 2px ink borders, solid pill buttons and the Google brand colors as accents. Token names are kept so components
-   * and features did not change; only their values did.
+   * Look and feel aligned with the DevFest Tacna site (devfest.gdgtacna.com): light and dark themes like the site.
+   * Light is the base (:root); `.dark` on <html> switches to the coal palette. The theme follows the system until the
+   * person picks one (next-themes, stored under "theme"). Token names are kept so components did not change.
+   * Accent fills (bg-*) keep the bright Google colors in both themes; accent text uses the *-ink tokens, which are
+   * darker in light mode so they stay readable on the light canvas (values from the site's --g-*-ink).
    */
-  --bg-deep: #171717;
-  --bg: #1e1e1e;
-  --bg-violet: #1e1e1e;
-  --surface: #2a2a2a;
-  --surface-raised: #383838;
-  --line: #f0f0f029;
-  --line-strong: #f0f0f06b;
-  --ink: #f0f0f0;
-  --text: #f0f0f0;
-  --text-muted: #c6c6c6;
-  --text-subtle: #a0a0a0;
+  --bg-deep: #e2e2e2;
+  --bg: #f0f0f0;
+  --bg-violet: #f0f0f0;
+  --surface: #ffffff;
+  --surface-raised: #e2e2e2;
+  --line: #1e1e1e24;
+  --line-strong: #1e1e1e66;
+  --ink: #1e1e1e;
+  --on-ink: #f0f0f0;
+  --text: #1e1e1e;
+  --text-muted: #555555;
+  --text-subtle: #696969;
   --on-accent: #1e1e1e;
   /* Google palette: cyan → halftone blue, violet → Google blue, magenta → halftone red, lime → halftone green, gold → Google yellow. */
   --cyan: #57caff;
@@ -30,14 +33,49 @@
   --lime: #5cdb6d;
   --gold: #f9ab00;
   --danger: #f28b82;
+  /* Accent text colors. */
+  --cyan-ink: #1a56c4;
+  --violet-ink: #1a56c4;
+  --violet-soft-ink: #1a56c4;
+  --magenta-ink: #b3261e;
+  --lime-ink: #1b7430;
+  --gold-ink: #855c00;
+  --danger-ink: #b3261e;
   /* Pastels used for hover fills (text on them is coal). */
   --pastel-blue: #c3ecf6;
   --pastel-green: #ccf6c5;
   --pastel-yellow: #ffe7a5;
   --pastel-red: #f8d8d8;
 
+  color-scheme: light;
+}
+
+.dark {
+  --bg-deep: #171717;
+  --bg: #1e1e1e;
+  --bg-violet: #1e1e1e;
+  --surface: #2a2a2a;
+  --surface-raised: #383838;
+  --line: #f0f0f029;
+  --line-strong: #f0f0f06b;
+  --ink: #f0f0f0;
+  --on-ink: #1e1e1e;
+  --text: #f0f0f0;
+  --text-muted: #c6c6c6;
+  --text-subtle: #a0a0a0;
+  --cyan-ink: #57caff;
+  --violet-ink: #4285f4;
+  --violet-soft-ink: #8ab4f8;
+  --magenta-ink: #ff7daf;
+  --lime-ink: #5cdb6d;
+  --gold-ink: #f9ab00;
+  --danger-ink: #f28b82;
+
   color-scheme: dark;
 }
+
+/* Tailwind's dark: variant follows the .dark class (next-themes), not only the media query. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   /* Semantic colors (shadcn names mapped to the Design System) */
@@ -49,7 +87,7 @@
   --color-popover-foreground: var(--text);
   /* The site's main action is a solid ink pill (hover turns Google yellow). */
   --color-primary: var(--ink);
-  --color-primary-foreground: var(--on-accent);
+  --color-primary-foreground: var(--on-ink);
   --color-secondary: var(--surface-raised);
   --color-secondary-foreground: var(--text);
   --color-muted: var(--surface-raised);
@@ -61,6 +99,14 @@
   --color-input: var(--line-strong);
   --color-ring: var(--cyan);
   --color-ink: var(--ink);
+  --color-on-ink: var(--on-ink);
+  --color-cyan-ink: var(--cyan-ink);
+  --color-violet-ink: var(--violet-ink);
+  --color-violet-soft-ink: var(--violet-soft-ink);
+  --color-magenta-ink: var(--magenta-ink);
+  --color-lime-ink: var(--lime-ink);
+  --color-gold-ink: var(--gold-ink);
+  --color-danger-ink: var(--danger-ink);
   --color-pastel-blue: var(--pastel-blue);
   --color-pastel-green: var(--pastel-green);
   --color-pastel-yellow: var(--pastel-yellow);

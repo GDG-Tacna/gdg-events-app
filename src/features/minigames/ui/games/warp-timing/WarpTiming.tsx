@@ -88,7 +88,7 @@ export function WarpTiming({ difficulty, paused, onFinish, random = Math.random,
           <div className="bg-primary absolute inset-y-0 w-1.5 -translate-x-1/2" style={{ left: `${position * 100}%` }} />
         </div>
         <p className="type-caption text-text-subtle">{interpolate(t.jumpOf, { n: String(Math.min(jump + 1, JUMPS)) })}</p>
-        <p aria-live="polite" className={cn("type-label min-h-6", feedback === "hit" ? "text-accent" : "text-muted-foreground")}>
+        <p aria-live="polite" className={cn("type-label min-h-6", feedback === "hit" ? "text-lime-ink" : "text-muted-foreground")}>
           {feedback === "hit" ? t.hit : feedback === "miss" ? t.miss : ""}
         </p>
       </div>

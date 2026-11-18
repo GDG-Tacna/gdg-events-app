@@ -81,7 +81,7 @@ export function PeoplePicker({ legend, texts, people, value, onChange, disabled 
       ) : null}
 
       {error ? (
-        <p role="alert" className="type-body-sm text-danger">
+        <p role="alert" className="type-body-sm text-danger-ink">
           {error}
         </p>
       ) : null}

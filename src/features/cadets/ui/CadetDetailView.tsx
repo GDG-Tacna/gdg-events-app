@@ -120,7 +120,7 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban
         <p className="type-body text-muted-foreground">
           {cadet.squadName ?? t.noSquad} · {interpolate(t.xp, { xp: formatNumber(cadet.xp) })} · {interpolate(t.credits, { n: formatNumber(cadet.credits) })}
         </p>
-        {cadet.banned ? <p className="type-label text-danger">{t.banned}</p> : null}
+        {cadet.banned ? <p className="type-label text-danger-ink">{t.banned}</p> : null}
       </header>
 
       {notice?.kind === "success" ? (
@@ -215,7 +215,7 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban
       {mayDeleteNow ? (
         <Card className="gap-space-3 border-danger/60 flex flex-col border">
           <form onSubmit={(event) => void submitDelete(event)} noValidate className="gap-space-3 flex flex-col">
-            <h2 className="type-heading text-danger">{t.deleteTitle}</h2>
+            <h2 className="type-heading text-danger-ink">{t.deleteTitle}</h2>
             <p className="type-body-sm text-muted-foreground">{t.deleteHelp}</p>
             <TextField
               label={interpolate(t.deleteConfirmLabel, { alias: cadet.alias })}

@@ -144,7 +144,7 @@ export function TeamView({ members, currentUid, grant, revoke, assignable = MANA
             const name = member.displayName ?? member.email;
             return (
               <li key={member.uid} className="gap-space-3 py-space-3 flex items-center first:pt-0 last:pb-0">
-                <span aria-hidden="true" className="bg-bg-deep border-line-strong type-label text-cyan grid size-10 shrink-0 place-items-center rounded-full border uppercase">
+                <span aria-hidden="true" className="bg-bg-deep border-line-strong type-label text-cyan-ink grid size-10 shrink-0 place-items-center rounded-full border uppercase">
                   {name.trim().charAt(0)}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -190,7 +190,7 @@ export function TeamView({ members, currentUid, grant, revoke, assignable = MANA
                       setScopeNotice(null);
                       setRemoving(member);
                     }}
-                    className="text-muted-foreground hover:text-danger hover:bg-secondary focus-visible:ring-ring grid size-11 shrink-0 place-items-center rounded-md focus-visible:ring-[3px] focus-visible:outline-none disabled:opacity-50"
+                    className="text-muted-foreground hover:text-danger-ink hover:bg-secondary focus-visible:ring-ring grid size-11 shrink-0 place-items-center rounded-md focus-visible:ring-[3px] focus-visible:outline-none disabled:opacity-50"
                   >
                     <Icon name="trash" size={20} />
                   </button>

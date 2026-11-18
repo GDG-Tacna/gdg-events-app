@@ -92,7 +92,7 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
         )}
         {state.status === "sending" ? (
           <div className="bg-bg-deep/70 absolute inset-0 grid place-items-center">
-            <Icon name="loading" size={40} className="text-cyan" />
+            <Icon name="loading" size={40} className="text-cyan-ink" />
           </div>
         ) : null}
       </div>
@@ -106,7 +106,7 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
               <Icon
                 name={state.status === "camera-error" || !succeeded ? "alert" : "check"}
                 size={28}
-                className={succeeded ? "text-lime" : "text-danger"}
+                className={succeeded ? "text-lime-ink" : "text-danger-ink"}
               />
               <div className="gap-space-1 flex min-w-0 flex-col">
                 <h2 ref={resultRef} tabIndex={-1} className="type-title text-foreground focus-visible:outline-none">
@@ -131,7 +131,7 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
             {done?.ok ? <UnlockedBadges badges={done.achievements} href={achievementsHref} /> : null}
 
             {done?.ok && done.talkCredits > 0 ? (
-              <p className="type-label text-gold gap-space-2 flex items-center">
+              <p className="type-label text-gold-ink gap-space-2 flex items-center">
                 <PixelCoin scale={2} />
                 {interpolate(copy.scanner.talkCredits, { n: formatNumber(done.talkCredits) })}
               </p>
@@ -148,9 +148,9 @@ export function ScannerView({ camera: Camera, record, homeHref, achievementsHref
                       <span className="type-label text-foreground">{mission.title}</span>
                     </span>
                     {mission.justCompleted && mission.xpEarned + mission.creditsEarned > 0 ? (
-                      <span className="type-pixel-tag text-accent gap-space-1 flex shrink-0 flex-col items-end">
+                      <span className="type-pixel-tag text-lime-ink gap-space-1 flex shrink-0 flex-col items-end">
                         {mission.xpEarned > 0 ? <span>{interpolate(copy.scanner.missions.xp, { xp: formatNumber(mission.xpEarned) })}</span> : null}
-                        {mission.creditsEarned > 0 ? <span className="text-gold">{interpolate(copy.scanner.missions.credits, { n: formatNumber(mission.creditsEarned) })}</span> : null}
+                        {mission.creditsEarned > 0 ? <span className="text-gold-ink">{interpolate(copy.scanner.missions.credits, { n: formatNumber(mission.creditsEarned) })}</span> : null}
                       </span>
                     ) : null}
                   </li>

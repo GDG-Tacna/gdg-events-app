@@ -17,7 +17,7 @@ export function OfflineBanner() {
       className="bg-surface-raised border-line-strong px-space-4 pt-safe-space-2 pb-space-2 fixed inset-x-0 top-0 z-50 border-b"
     >
       <div className="gap-space-3 mx-auto flex w-full max-w-[520px] items-center">
-        <Icon name="wifi-off" size={20} className="text-gold" />
+        <Icon name="wifi-off" size={20} className="text-gold-ink" />
         <p className="type-body-sm text-foreground">
           <span className="font-semibold">{copy.pwa.offlineTitle}.</span> {copy.pwa.offlineBody}
         </p>

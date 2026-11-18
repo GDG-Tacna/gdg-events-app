@@ -9,9 +9,9 @@ export interface ScanReticleProps {
 }
 
 const TONE: Record<NonNullable<ScanReticleProps["tone"]>, string> = {
-  idle: "text-cyan",
-  success: "text-lime",
-  error: "text-danger",
+  idle: "text-cyan-ink",
+  success: "text-lime-ink",
+  error: "text-danger-ink",
 };
 
 /**

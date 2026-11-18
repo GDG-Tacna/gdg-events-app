@@ -47,7 +47,7 @@ function AccountAvatar({ name, photoUrl }: { name: ReactNode; photoUrl?: string 
   }
   const initial = typeof name === "string" ? name.trim().charAt(0).toUpperCase() : "";
   return (
-    <span aria-hidden="true" className="bg-bg-deep border-line-strong type-label text-cyan grid size-10 shrink-0 place-items-center rounded-full border">
+    <span aria-hidden="true" className="bg-bg-deep border-line-strong type-label text-cyan-ink grid size-10 shrink-0 place-items-center rounded-full border">
       {initial || "·"}
     </span>
   );

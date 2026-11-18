@@ -321,8 +321,8 @@ describe("PollTallyCard", () => {
     const refresh = vi.fn<PollTallyAction>(async () => ({ ok: false, code: "closed" }));
     render(<PollTallyCard poll={open()} tally={{ counts: { o1: 1, o2: 4 }, total: 5 }} myVote="o1" refresh={refresh} every={1000} />);
 
-    expect(screen.getByText("Firebase")).toHaveClass("text-accent");
-    expect(screen.getByText("Keynote")).not.toHaveClass("text-accent");
+    expect(screen.getByText("Firebase")).toHaveClass("text-lime-ink");
+    expect(screen.getByText("Keynote")).not.toHaveClass("text-lime-ink");
     expect(screen.getByText(new RegExp(c.results.live))).toBeInTheDocument();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000);

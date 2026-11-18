@@ -26,11 +26,11 @@ export function BrandMark({ titleAs: Title = "p", compact = false, className }: 
           <span aria-hidden="true">{copy.brand.wordmark}</span>
           <span className="sr-only">{copy.brand.name}</span>
         </Title>
-        <p aria-hidden="true" className="type-caption text-cyan font-semibold tracking-[0.18em] uppercase">
+        <p aria-hidden="true" className="type-caption text-cyan-ink font-semibold tracking-[0.18em] uppercase">
           {copy.brand.arcade}
         </p>
         {compact ? null : (
-          <p className="type-caption text-gold gap-space-1 flex items-center">
+          <p className="type-caption text-gold-ink gap-space-1 flex items-center">
             <span aria-hidden="true">★</span>
             {copy.brand.tagline}
           </p>
