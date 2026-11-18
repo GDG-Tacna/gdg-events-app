@@ -4,6 +4,93 @@
 
 La idea visual: **un arcade de los 90 reinterpretado como una PWA moderna de 2026**.
 
+> **Actualización vigente desde 2026-11-17.** El aspecto de la app se alineó con el sitio de DevFest Tacna y ganó tema claro. Lo que dice la sección «Actualización 2026-11-17» (más abajo) **manda sobre** las secciones de fondo, cards, color, tipografía, sombras, brillos y componentes que describen el look «arcade espacial» oscuro de octubre: esas se conservan como historia y para los nombres de tokens, que no cambiaron.
+
+## Actualización 2026-11-17: look del sitio DevFest Tacna y tema claro u oscuro
+
+Origen: dos cambios de estilo de Angelo Leva, fusionados en el PR #16 (`32fe773`, «match the look and feel of the DevFest Tacna site») y el PR #17 (`9f9e2df`, «add the light theme»). Referencia visual: devfest.gdgtacna.com. Es un cambio **solo visual**: los nombres de los tokens se mantienen, así que los componentes y las features no cambiaron de API.
+
+### Qué cambió
+
+| Aspecto | Antes (arcade espacial oscuro) | Ahora |
+|---|---|---|
+| Tema | Solo oscuro, sin selector | **Claro** como base (`:root`) y **oscuro** con la clase `.dark` en `<html>`. Sigue al sistema hasta que la persona elige con el botón de tema (`ThemeToggle`); la elección se guarda en `localStorage` con la clave `theme`, la misma del sitio |
+| Fondo | Degradado azul a violeta, dos nebulosas y estrellas pixel | **Plano**: `bg` liso (carbón en oscuro, gris claro en claro). `SpaceBackground` ya no dibuja nebulosas ni estrellas |
+| Cards y paneles | `surface` con borde `line` de 1 px, brillo superior y `shadow-card` | Paneles **planos** con borde de **2 px** `ink`; la card resaltada (`tone="cyan"`) cambia el borde a `cyan` en lugar de añadir brillo. Sin sombra |
+| Botón primario | Relleno cian | **Píldora `ink` sólida** (texto `on-ink`) con borde de 2 px; al pasar el cursor se vuelve amarillo Google (`gold`) con texto `on-accent` |
+| Botón secundario | Transparente con borde fino | Fondo `surface`, borde de 2 px `ink`, hover `pastel-blue`. El peligro (`danger`) tiene hover `pastel-red` |
+| Forma | Radios 10 / 14 / 20 px, botones con `radius-md` | Radios **12 / 16 / 24 px**; los botones son **píldora** (`radius-pill`), semibold |
+| Brillos | `glow-cyan`, `glow-magenta` y `glow-gold` con halo difuso | Siguen existiendo con el mismo nombre pero son un **anillo sólido de 2 px** (`#57caff`, `#ff7daf`, `#f9ab00`), sin halo |
+| Tipografía | Space Grotesk, Inter y Tiny5 | **Google Sans** (títulos y texto) y **Google Sans Code** (etiquetas), las mismas del sitio. Ya no se carga Tiny5 |
+| Títulos | Peso 600 y sin ajuste de espaciado | Peso 700 y espaciado negativo (`type-title-xl` y `type-pixel-title`: -0,02 a -0,03 em; `type-title`: -0,01 em) |
+
+### Paleta por tema
+
+Rellenos de acento (`bg-*`) iguales en los dos temas: `cyan` #57CAFF (azul medio tono), `violet` #4285F4 (azul Google), `violet-soft` #8AB4F8, `magenta` #FF7DAF, `lime` #5CDB6D, `gold` #F9AB00 (amarillo Google), `danger` #F28B82. `on-accent` es #1E1E1E en los dos.
+
+| Token | Claro | Oscuro | Uso |
+|---|---|---|---|
+| `bg-deep` | #E2E2E2 | #171717 | Fondo de campos y huecos |
+| `bg` | #F0F0F0 | #1E1E1E | Fondo de la app (`bg-violet` vale lo mismo: ya no hay degradado) |
+| `surface` | #FFFFFF | #2A2A2A | Cards y paneles |
+| `surface-raised` | #E2E2E2 | #383838 | Pista de barras, elementos elevados |
+| `line` | #1E1E1E (14 %) | #F0F0F0 (16 %) | Borde decorativo |
+| `line-strong` | #1E1E1E (40 %) | #F0F0F0 (42 %) | Borde de controles |
+| `ink` | #1E1E1E | #F0F0F0 | Borde de 2 px y relleno del botón primario (`primary` = `ink`) |
+| `on-ink` | #F0F0F0 | #1E1E1E | Texto sobre `ink` (`primary-foreground`) |
+| `text` | #1E1E1E | #F0F0F0 | Texto principal |
+| `text-muted` | #555555 | #C6C6C6 | Texto secundario |
+| `text-subtle` | #696969 | #A0A0A0 | Metadatos |
+
+**Pasteles de hover** (iguales en ambos temas, con texto carbón): `pastel-blue` #C3ECF6, `pastel-green` #CCF6C5, `pastel-yellow` #FFE7A5, `pastel-red` #F8D8D8. La pestaña activa de la barra inferior es una píldora `pastel-yellow`.
+
+### Regla de color: relleno o texto
+
+- **Relleno o borde:** los acentos brillantes (`bg-cyan`, `bg-gold`, `border-cyan`...), iguales en los dos temas.
+- **Texto de acento:** los tokens nuevos `*-ink`, que en el tema claro son más oscuros para leerse sobre el fondo claro. Ya no se usa `text-cyan`, `text-lime`, `text-gold`, `text-violet-soft` ni `text-danger` para escribir texto.
+
+| Token | Claro | Oscuro |
+|---|---|---|
+| `cyan-ink` | #1A56C4 | #57CAFF |
+| `violet-ink` | #1A56C4 | #4285F4 |
+| `violet-soft-ink` | #1A56C4 | #8AB4F8 |
+| `magenta-ink` | #B3261E | #FF7DAF |
+| `lime-ink` | #1B7430 | #5CDB6D |
+| `gold-ink` | #855C00 | #F9AB00 |
+| `danger-ink` | #B3261E | #F28B82 |
+
+### Componentes tocados
+
+- **Button, Card, TextField, RankChip, ProgressBar:** como arriba. El campo de texto lleva borde de 2 px `line-strong` y al enfocarse pasa a `ink`. La barra de progreso rellena de `violet` a `lime` a `gold` (es el único degradado que queda). `RankChip` muestra «NV n» en `gold` con borde `ink`.
+- **BottomNav:** borde superior de 2 px `ink`; pestaña activa `pastel-yellow` con texto carbón; el botón central de escanear es `gold` con borde `ink` y hover `pastel-yellow`.
+- **PlayerCard:** marco `ink` de 2 px, avatar sobre `pastel-blue` y la insignia de edición en `gold`.
+- **ThemeToggle** (nuevo, `shared/ui`): botón redondo de 48 px con borde `ink` y icono de sol o luna; hover `pastel-yellow`. Va en la cabecera de los visitantes (`AttendeeShell`), en la del staff (`StaffShell`), junto a «Salir» en el admin y arriba a la derecha en el inicio de sesión. No está en el escenario (proyector) ni en el onboarding.
+- **Estilos `type-pixel-*`:** conservan el nombre para no tocar las pantallas, pero ya no son pixel. `type-pixel-title` y `type-pixel-callout` son Google Sans 700 con espaciado negativo; `type-pixel-heading` es una etiqueta en Google Sans Code, mayúsculas, 12 px y espaciado de 0,12 em; `type-pixel-tag` es Google Sans Code 14 px semibold («+100 XP», «NV 3»). El **pixel art** (avatar, nave, planetas, medallas, moneda, estrella, marca de GDG Tacna) no cambió.
+- **PWA:** el color de la barra de estado (`themeColor`) sigue al tema: #F0F0F0 en claro y #1E1E1E en oscuro. El manifiesto conserva #1E1E1E para el fondo y el color de tema de la app instalada.
+
+### Contraste calculado (2026-11-18, WCAG 2.1)
+
+| Par | Claro | Oscuro |
+|---|---|---|
+| `text` sobre `bg` / `surface` | 14,6 / 16,7 | 14,6 / 12,6 |
+| `text-muted` sobre `bg` / `surface` | 6,5 / 7,5 | 9,8 / 8,4 |
+| `text-subtle` sobre `bg` / `surface` | 4,8 / 5,5 | 6,4 / 5,5 |
+| `cyan-ink` sobre `bg` | 5,8 | 9,0 |
+| `lime-ink` / `gold-ink` sobre `bg` | 5,1 / 5,2 | 9,4 / 8,6 |
+| `danger-ink` sobre `bg` | 5,7 | 7,0 |
+| `on-ink` sobre `ink` (botón primario) | 14,6 | 14,6 |
+| `on-accent` sobre `gold` (hover, relleno) | 8,6 | 8,6 |
+| Borde de control `line-strong` sobre `bg` | **2,4** | 3,7 |
+| Borde decorativo `line` sobre `bg` | 1,3 | 1,6 |
+
+### Puntos abiertos (no resueltos)
+
+1. **Anillo de foco en el tema claro:** `ring` sigue siendo `cyan` (#57CAFF), que sobre `bg` claro da **1,6:1** y sobre `surface` blanca 1,9:1, por debajo del 3:1 que pide WCAG para indicadores de foco. En oscuro da 9,0:1.
+2. **Borde de los campos de texto en claro:** `line-strong` da **2,4:1**, por debajo del 3:1 para componentes de interfaz. Los botones y cards no tienen el problema porque usan `ink`.
+3. **Pixel art sobre fondo claro:** los sprites (planetas, medallas, avatar) se dibujaron para fondos oscuros; no se revisaron sobre el tema claro.
+4. **Escenario (proyector):** no fuerza el tema oscuro; usa el que tenga el navegador que lo abre. Conviene fijarlo.
+5. **Secciones antiguas de este documento:** el diagrama de componentes y los tokens de más abajo describen el look anterior; la tabla de arriba manda donde choquen.
+
 ## La regla 70 / 30
 
 - **70% UI moderna.** Tipografía, botones, cards, navegación, pestañas, barras de progreso, textos y layout se ven como un producto actual: limpios, legibles y táctiles.
