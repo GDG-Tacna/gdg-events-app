@@ -90,7 +90,7 @@ describe("evaluate: keyword", () => {
 });
 
 describe("evaluate: speaker", () => {
-  const MEET = mission({ type: "speaker", speakerId: "ana-torres" }, 40);
+  const MEET = mission({ type: "speaker", speakerIds: ["ana-torres"] }, 40);
 
   it("completes with the code of that speaker only", () => {
     expect(evaluate(MEET, { kind: "speaker", speakerId: "ana-torres" }, null)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 40, creditsEarned: 0 });
@@ -105,26 +105,45 @@ describe("evaluate: speaker", () => {
   });
 });
 
-describe("evaluate: speaker with no speaker chosen", () => {
-  const ANY = mission({ type: "speaker", speakerId: null }, 40);
+describe("evaluate: speaker with several speakers chosen", () => {
+  const SOME = mission({ type: "speaker", speakerIds: ["ana-torres", "luis"] }, 40);
+
+  it("completes with the code of any one of them, and of nobody else", () => {
+    expect(evaluate(SOME, { kind: "speaker", speakerId: "ana-torres" }, null)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 40, creditsEarned: 0 });
+    expect(evaluate(SOME, { kind: "speaker", speakerId: "luis" }, null)).toMatchObject({ status: "completed" });
+    expect(evaluate(SOME, { kind: "speaker", speakerId: "zoe" }, null)).toEqual({ kind: "wrong-proof" });
+  });
+});
+
+describe("evaluate: speaker with every speaker accepted", () => {
+  const ANY = mission({ type: "speaker", speakerIds: null }, 40);
 
   it("completes with the code of any speaker, but not with another kind of proof", () => {
     expect(evaluate(ANY, { kind: "speaker", speakerId: "ana-torres" }, null)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 40, creditsEarned: 0 });
     expect(evaluate(ANY, { kind: "speaker", speakerId: "luis" }, null)).toMatchObject({ status: "completed" });
-    expect(evaluate(ANY, { kind: "team", role: "organizer" }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(ANY, { kind: "team", role: "organizer", uid: "uid-ana-123" }, null)).toEqual({ kind: "wrong-proof" });
     expect(evaluate(ANY, { kind: "checkpoint", checkpointId: "ana-torres" }, null)).toEqual({ kind: "wrong-proof" });
   });
 });
 
 describe("evaluate: team", () => {
-  const ORGANIZER = mission({ type: "team", role: "organizer" }, 30);
-  const VOLUNTEER = mission({ type: "team", role: "volunteer" }, 30);
+  const ORGANIZER = mission({ type: "team", role: "organizer", memberUids: null }, 30);
+  const VOLUNTEER = mission({ type: "team", role: "volunteer", memberUids: null }, 30);
+  const ANA = "uid-ana-123";
 
   it("completes with the code of someone with the role it asks for, and only that", () => {
-    expect(evaluate(ORGANIZER, { kind: "team", role: "organizer" }, null, 10)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 30, creditsEarned: 10 });
-    expect(evaluate(VOLUNTEER, { kind: "team", role: "volunteer" }, null)).toMatchObject({ status: "completed", xpEarned: 30 });
-    expect(evaluate(ORGANIZER, { kind: "team", role: "volunteer" }, null)).toEqual({ kind: "wrong-proof" });
-    expect(evaluate(VOLUNTEER, { kind: "team", role: "organizer" }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(ORGANIZER, { kind: "team", role: "organizer", uid: ANA }, null, 10)).toEqual({ kind: "next", status: "completed", attempts: 0, xpEarned: 30, creditsEarned: 10 });
+    expect(evaluate(VOLUNTEER, { kind: "team", role: "volunteer", uid: ANA }, null)).toMatchObject({ status: "completed", xpEarned: 30 });
+    expect(evaluate(ORGANIZER, { kind: "team", role: "volunteer", uid: ANA }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(VOLUNTEER, { kind: "team", role: "organizer", uid: ANA }, null)).toEqual({ kind: "wrong-proof" });
+  });
+
+  it("with members chosen, completes only with the code of one of them, and still only for its role", () => {
+    const CHOSEN = mission({ type: "team", role: "volunteer", memberUids: [ANA, "uid-bruno-1"] }, 30);
+    expect(evaluate(CHOSEN, { kind: "team", role: "volunteer", uid: ANA }, null)).toMatchObject({ status: "completed" });
+    expect(evaluate(CHOSEN, { kind: "team", role: "volunteer", uid: "uid-bruno-1" }, null)).toMatchObject({ status: "completed" });
+    expect(evaluate(CHOSEN, { kind: "team", role: "volunteer", uid: "uid-carla-1" }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(CHOSEN, { kind: "team", role: "organizer", uid: ANA }, null)).toEqual({ kind: "wrong-proof" });
   });
 
   it("refuses a speaker's code, a checkpoint and a typed answer", () => {
@@ -134,7 +153,7 @@ describe("evaluate: team", () => {
   });
 
   it("changes nothing once completed", () => {
-    expect(evaluate(ORGANIZER, { kind: "team", role: "organizer" }, done("completed", 0, 30))).toEqual({ kind: "closed" });
+    expect(evaluate(ORGANIZER, { kind: "team", role: "organizer", uid: ANA }, done("completed", 0, 30))).toEqual({ kind: "closed" });
   });
 });
 
@@ -159,7 +178,7 @@ describe("evaluate: squads", () => {
   });
 
   it("refuses other proofs, and changes nothing once completed", () => {
-    expect(evaluate(SQUADS, { kind: "team", role: "organizer" }, null)).toEqual({ kind: "wrong-proof" });
+    expect(evaluate(SQUADS, { kind: "team", role: "organizer", uid: "uid-ana-123" }, null)).toEqual({ kind: "wrong-proof" });
     expect(evaluate(SQUADS, squads([], []), done("completed", 0, 60))).toEqual({ kind: "closed" });
   });
 });

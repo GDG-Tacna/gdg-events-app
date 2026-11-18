@@ -9,6 +9,8 @@ const minigames = { currentMinigameSettings: vi.fn() };
 vi.mock("@/app-shell/composition/minigames.server", () => minigames);
 const speakers = vi.hoisted(() => ({ speakerStore: { list: vi.fn() } }));
 vi.mock("@/app-shell/composition/speakers.server", () => speakers);
+const team = vi.hoisted(() => ({ teamByMissionRole: vi.fn() }));
+vi.mock("@/app-shell/composition/mission-team.server", () => team);
 const features = vi.hoisted(() => ({ FEATURES: { minigames: true } }));
 vi.mock("@/shared/config/features", () => features);
 
@@ -45,9 +47,19 @@ describe("loadMissionFormOptions", () => {
         { id: "ana", name: "Ana", active: true },
       ],
     });
+    team.teamByMissionRole.mockResolvedValue({
+      ok: true,
+      value: {
+        organizer: [{ uid: "uid-olga-123", email: "olga@example.com", displayName: "Olga Rojas", role: "organizer" }],
+        volunteer: [
+          { uid: "uid-bruno-1", email: "bruno@example.com", displayName: null, role: "staff" },
+          { uid: "uid-ana-123", email: "zeta@example.com", displayName: "Ana Mamani", role: "staff" },
+        ],
+      },
+    });
   });
 
-  it("offers the active quadrants, the open talks and stands and the active speakers by name, as plain options", async () => {
+  it("offers the active quadrants, the open talks and stands, the active speakers and the team by name, as plain options", async () => {
     expect(await loadMissionFormOptions(ADMIN)).toEqual({
       quadrants: [{ id: "ai", name: "AI" }],
       checkpoints: { talk: [{ id: "talk-1", name: "Puesto talk-1" }], stand: [{ id: "stand-1", name: "Puesto stand-1" }] },
@@ -55,6 +67,14 @@ describe("loadMissionFormOptions", () => {
         { id: "ana", name: "Ana" },
         { id: "zoe", name: "Zoe" },
       ],
+      // A member with no name on their account is listed by email, and each list is in name order.
+      team: {
+        organizer: [{ id: "uid-olga-123", name: "Olga Rojas" }],
+        volunteer: [
+          { id: "uid-ana-123", name: "Ana Mamani" },
+          { id: "uid-bruno-1", name: "bruno@example.com" },
+        ],
+      },
       creditDefaults: { talk: 10, stand: 10, quiz: 5, keyword: 5 },
       minigames: [
         { id: "bug-kong", name: "Bug Kong", enabled: true, difficulty: "normal" },
@@ -89,5 +109,8 @@ describe("loadMissionFormOptions", () => {
 
     speakers.speakerStore.list.mockResolvedValueOnce({ ok: false, error: { code: "unknown" } });
     await expect(loadMissionFormOptions(ADMIN)).rejects.toThrow("Could not read the speakers");
+
+    team.teamByMissionRole.mockResolvedValueOnce({ ok: false, error: { code: "unknown" } });
+    await expect(loadMissionFormOptions(ADMIN)).rejects.toThrow("Could not read the team");
   });
 });

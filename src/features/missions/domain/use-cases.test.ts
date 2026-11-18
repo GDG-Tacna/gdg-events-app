@@ -325,10 +325,10 @@ describe("completeByCheckpoint", () => {
   });
 });
 describe("completeBySpeaker", () => {
-  const MEET_A = mission("meet-a", { type: "speaker", speakerId: "ana-torres" }, { order: 2, title: "Conoce a Ana" });
-  const MEET_B = mission("meet-b", { type: "speaker", speakerId: "ana-torres" }, { order: 1, title: "Pregúntale a Ana", xp: 60 });
-  const MEET_OFF = mission("meet-off", { type: "speaker", speakerId: "ana-torres" }, { active: false });
-  const OTHER = mission("meet-luis", { type: "speaker", speakerId: "luis" });
+  const MEET_A = mission("meet-a", { type: "speaker", speakerIds: ["ana-torres"] }, { order: 2, title: "Conoce a Ana" });
+  const MEET_B = mission("meet-b", { type: "speaker", speakerIds: ["ana-torres"] }, { order: 1, title: "Pregúntale a Ana", xp: 60 });
+  const MEET_OFF = mission("meet-off", { type: "speaker", speakerIds: ["ana-torres"] }, { active: false });
+  const OTHER = mission("meet-luis", { type: "speaker", speakerIds: ["luis"] });
   // A stand whose checkpoint id equals the speaker id is not completed by the speaker's code.
   const LOOKALIKE = mission("stand-ana", { type: "stand", checkpointId: "ana-torres" });
 
@@ -353,9 +353,32 @@ describe("completeBySpeaker", () => {
   });
 });
 
-describe("completeBySpeaker: missions that accept any speaker", () => {
-  const ANY = mission("meet-any", { type: "speaker", speakerId: null }, { order: 0, title: "Conoce a un speaker" });
-  const ANA = mission("meet-ana", { type: "speaker", speakerId: "ana-torres" }, { order: 1, title: "Conoce a Ana" });
+describe("completeBySpeaker: missions that name several speakers", () => {
+  const SOME = mission("meet-some", { type: "speaker", speakerIds: ["ana-torres", "luis"] }, { order: 1, title: "Conoce a Ana o a Luis" });
+
+  it("completes it with the code of any one of the chosen speakers, and with nobody else's", async () => {
+    const { deps, xp } = setup({ stored: [SOME] });
+
+    expect(await completeBySpeaker(deps, "u1", "zoe")).toEqual(ok([]));
+    expect(xp.grant).not.toHaveBeenCalled();
+    expect(await completeBySpeaker(deps, "u1", "luis")).toEqual(ok([{ id: "meet-some", title: "Conoce a Ana o a Luis", xpEarned: 40, creditsEarned: 0, justCompleted: true }]));
+    expect(await completeBySpeaker(deps, "u2", "ana-torres")).toEqual(ok([{ id: "meet-some", title: "Conoce a Ana o a Luis", xpEarned: 40, creditsEarned: 0, justCompleted: true }]));
+  });
+
+  it("completes it once, however many of the chosen speakers the cadet meets", async () => {
+    const { deps, xp } = setup({ stored: [SOME] });
+
+    await completeBySpeaker(deps, "u1", "ana-torres");
+    const again = await completeBySpeaker(deps, "u1", "luis");
+
+    expect(again).toEqual(ok([{ id: "meet-some", title: "Conoce a Ana o a Luis", xpEarned: 40, creditsEarned: 0, justCompleted: false }]));
+    expect(await xp.grant.mock.results[1].value).toEqual(ok({ granted: false, total: 40 }));
+  });
+});
+
+describe("completeBySpeaker: missions that accept every speaker", () => {
+  const ANY = mission("meet-any", { type: "speaker", speakerIds: null }, { order: 0, title: "Conoce a un speaker" });
+  const ANA = mission("meet-ana", { type: "speaker", speakerIds: ["ana-torres"] }, { order: 1, title: "Conoce a Ana" });
 
   it("completes the any-speaker mission with the code of whichever speaker was scanned, next to that speaker's own", async () => {
     const { deps, xp } = setup({ stored: [ANY, ANA] });
@@ -383,14 +406,18 @@ describe("completeBySpeaker: missions that accept any speaker", () => {
 });
 
 describe("completeByTeam", () => {
-  const ORGANIZER = mission("meet-organizer", { type: "team", role: "organizer" }, { order: 1, title: "Conoce a un organizador", xp: 30 });
-  const VOLUNTEER = mission("meet-volunteer", { type: "team", role: "volunteer" }, { order: 2, title: "Conoce a un voluntario", xp: 30 });
-  const VOLUNTEER_OFF = mission("meet-volunteer-off", { type: "team", role: "volunteer" }, { active: false });
+  const ORGANIZER = mission("meet-organizer", { type: "team", role: "organizer", memberUids: null }, { order: 1, title: "Conoce a un organizador", xp: 30 });
+  const VOLUNTEER = mission("meet-volunteer", { type: "team", role: "volunteer", memberUids: null }, { order: 2, title: "Conoce a un voluntario", xp: 30 });
+  const VOLUNTEER_OFF = mission("meet-volunteer-off", { type: "team", role: "volunteer", memberUids: null }, { active: false });
+  const VOLUNTEER_CHOSEN = mission("meet-ana-or-bruno", { type: "team", role: "volunteer", memberUids: ["uid-ana-123", "uid-bruno-1"] }, { order: 3, title: "Conoce a Ana o a Bruno", xp: 30 });
+  const ana = { role: "volunteer", memberUid: "uid-ana-123" } as const;
+  const asVolunteer = { role: "volunteer", memberUid: "uid-zoe-1234" } as const;
+  const asOrganizer = { role: "organizer", memberUid: "uid-zoe-1234" } as const;
 
   it("completes only the active missions of the scanned role, without spending the typed-answer limiter", async () => {
     const { deps, xp } = setup({ stored: [ORGANIZER, VOLUNTEER, VOLUNTEER_OFF] });
 
-    expect(await completeByTeam(deps, "u1", "volunteer")).toEqual(ok([{ id: "meet-volunteer", title: "Conoce a un voluntario", xpEarned: 30, creditsEarned: 0, justCompleted: true }]));
+    expect(await completeByTeam(deps, "u1", asVolunteer)).toEqual(ok([{ id: "meet-volunteer", title: "Conoce a un voluntario", xpEarned: 30, creditsEarned: 0, justCompleted: true }]));
     expect(xp.grant).toHaveBeenCalledTimes(1);
     expect(xp.grant).toHaveBeenCalledWith({ uid: "u1", source: "mission:meet-volunteer", xp: 30, credits: 0 });
     expect(deps.limiter.consume).not.toHaveBeenCalled();
@@ -400,15 +427,33 @@ describe("completeByTeam", () => {
   it("reports a mission done before as already completed, and nothing for a role without missions", async () => {
     const { deps } = setup({ stored: [ORGANIZER], completions: [row("meet-organizer", "completed", 0, 30)] });
 
-    expect(await completeByTeam(deps, "u1", "organizer")).toEqual(ok([{ id: "meet-organizer", title: "Conoce a un organizador", xpEarned: 30, creditsEarned: 0, justCompleted: false }]));
-    expect(await completeByTeam(deps, "u1", "volunteer")).toEqual(ok([]));
+    expect(await completeByTeam(deps, "u1", asOrganizer)).toEqual(ok([{ id: "meet-organizer", title: "Conoce a un organizador", xpEarned: 30, creditsEarned: 0, justCompleted: false }]));
+    expect(await completeByTeam(deps, "u1", asVolunteer)).toEqual(ok([]));
+  });
+
+  it("a mission that names members is completed only by one of them, next to the ones that accept every member", async () => {
+    const { deps, xp } = setup({ stored: [VOLUNTEER, VOLUNTEER_CHOSEN] });
+
+    // A volunteer who is not on the list completes the open mission only.
+    expect(await completeByTeam(deps, "u1", asVolunteer)).toEqual(ok([{ id: "meet-volunteer", title: "Conoce a un voluntario", xpEarned: 30, creditsEarned: 0, justCompleted: true }]));
+    expect(deps.completions.rows.has("u1_meet-ana-or-bruno")).toBe(false);
+    // One who is on it completes both.
+    expect(await completeByTeam(deps, "u2", ana)).toEqual(
+      ok([
+        { id: "meet-volunteer", title: "Conoce a un voluntario", xpEarned: 30, creditsEarned: 0, justCompleted: true },
+        { id: "meet-ana-or-bruno", title: "Conoce a Ana o a Bruno", xpEarned: 30, creditsEarned: 0, justCompleted: true },
+      ]),
+    );
+    expect(xp.grant).toHaveBeenCalledTimes(3);
+    // The role still has to match: an organizer with the same uid is not a volunteer.
+    expect(await completeByTeam(deps, "u3", { role: "organizer", memberUid: "uid-ana-123" })).toEqual(ok([]));
   });
 
   it("stops at an attendee without a profile in this edition", async () => {
     const { deps, xp } = setup({ stored: [ORGANIZER] });
     xp.grant.mockResolvedValueOnce(err({ code: "not-registered" }));
 
-    expect(await completeByTeam(deps, "u1", "organizer")).toEqual(err({ code: "not-registered" }));
+    expect(await completeByTeam(deps, "u1", asOrganizer)).toEqual(err({ code: "not-registered" }));
   });
 });
 

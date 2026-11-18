@@ -240,6 +240,8 @@ export const copy = {
       volunteer: "Esta misión se completa al conocer a un voluntario: pídele que te muestre su código «Mi código» y escanéalo.",
       squads: "Esta misión se completa al conectar con un cadete de cada escuadrón distinto al tuyo: escanea sus códigos desde la Red.",
     },
+    /** The people a speaker or team mission names; any one of them completes it. Placeholder: {names}. */
+    people: "Escanea el código de cualquiera de ellos: {names}.",
     /** A cumulative mission's progress. Placeholders: {done}, {total}. */
     squadsProgress: "{done} de {total} escuadrones",
     scan: "Escanear QR",
@@ -1664,6 +1666,12 @@ export const copy = {
       xp: "{xp} XP",
       /** Placeholder: {name}. */
       minigame: "Bonus: {name}",
+      /** Whom a speaker or team mission accepts, in the list. Placeholder: {n}. */
+      peopleSummary: {
+        speaker: { all: "Todos los speakers", one: "1 speaker", many: "{n} speakers" },
+        organizer: { all: "Todos los organizadores", one: "1 organizador", many: "{n} organizadores" },
+        volunteer: { all: "Todos los voluntarios", one: "1 voluntario", many: "{n} voluntarios" },
+      },
       otherQuadrant: "Zona inactiva",
       form: {
         createTitle: "Nueva misión",
@@ -1684,14 +1692,33 @@ export const copy = {
         xpHint: "Entre 1 y 500. Por defecto, {xp} para este tipo.",
         credits: "G-Credits",
         creditsHint: "Vacío usa el valor de Economía para este tipo ({n}). 0 para no dar créditos.",
-        checkpoint: { talk: "Charla", stand: "Stand", speaker: "Speaker" },
+        checkpoint: { talk: "Charla", stand: "Stand" },
         checkpointHint: {
           talk: "La charla cuyo QR en pantalla completa la misión.",
           stand: "El stand cuyo QR en pantalla completa la misión (también cuenta si el staff escanea el QR del cadete).",
-          speaker: "El speaker cuyo QR completa la misión. Lo muestra desde Speakers o desde su teléfono.",
         },
-        /** The «any speaker» choice of a speaker mission. */
-        anySpeaker: "Cualquier speaker",
+        /** Whom a speaker or team mission accepts: everyone, or any one of the people the admin chooses. */
+        people: {
+          all: "Todos",
+          pick: "Elegir",
+          countOne: "1 elegido",
+          /** Placeholder: {n}. */
+          count: "{n} elegidos",
+          /** Someone chosen earlier who is no longer offered. Placeholder: {name}. */
+          unavailable: "{name} (ya no disponible)",
+          speakers: {
+            legend: "Speakers que completan la misión",
+            allHint: "Vale el código de cualquier speaker activo.",
+            pickHint: "Vale el código de cualquiera de los elegidos. Lo muestran desde Speakers o desde su teléfono.",
+            none: "No hay speakers activos. Agrégalos primero en Speakers.",
+          },
+          team: {
+            legend: "Personas que completan la misión",
+            allHint: "Vale el código de cualquier persona del equipo con ese rol.",
+            pickHint: "Vale el código de cualquiera de los elegidos.",
+            none: "No hay nadie con ese rol en Equipo. Agrégalo primero allí.",
+          },
+        },
         teamRole: "A quién hay que conocer",
         teamRoleHint: "Quienes son del equipo muestran su código desde «Mi código». Los voluntarios son el staff de Equipo; los organizadores, sus organizadores y admins.",
         teamRoles: { organizer: "Un organizador", volunteer: "Un voluntario" },
@@ -1699,7 +1726,6 @@ export const copy = {
         noCheckpoints: {
           talk: "No hay charlas activas. Créalas primero en Puestos.",
           stand: "No hay stands activos. Créalos primero en Puestos.",
-          speaker: "No hay speakers activos. Agrégalos primero en Speakers.",
         },
         question: "Pregunta",
         options: "Opciones",
@@ -1733,8 +1759,9 @@ export const copy = {
         "invalid-xp": "El XP debe ser un número entero entre 1 y 500.",
         "invalid-type": "Elige un tipo de misión.",
         "invalid-checkpoint": "Elige el puesto que completa la misión.",
-        "invalid-speaker": "Elige el speaker que completa la misión.",
+        "invalid-speaker": "Elige al menos un speaker, o marca «Todos».",
         "invalid-team-role": "Elige a quién hay que conocer: un organizador o un voluntario.",
+        "invalid-team-members": "Elige al menos una persona, o marca «Todos».",
         "invalid-question": "La pregunta debe tener entre 5 y 160 caracteres.",
         "invalid-options": "Escribe de 2 a 4 opciones distintas, de hasta 80 caracteres.",
         "invalid-answer": "Marca cuál es la respuesta correcta.",
@@ -1744,7 +1771,8 @@ export const copy = {
         "unknown-quadrant": "Esa zona no está activa en esta edición.",
         "unknown-checkpoint": "Ese puesto no existe en esta edición.",
         "wrong-checkpoint-kind": "Ese puesto no es del tipo de esta misión. Para un stand, crea el puesto con el tipo Stand.",
-        "unknown-speaker": "Ese speaker no existe o está desactivado. Elige uno de la lista.",
+        "unknown-speaker": "Alguno de los speakers elegidos no existe o está desactivado. Desmárcalo e inténtalo de nuevo.",
+        "unknown-team-member": "Alguna de las personas elegidas ya no está en Equipo con ese rol. Desmárcala e inténtalo de nuevo.",
         "unknown-minigame": "Ese mini-juego no existe. Elige uno de la lista.",
         "invalid-minigame-difficulty": "Elige una dificultad de la lista.",
         "type-change": "El tipo de una misión no se puede cambiar. Crea una misión nueva.",

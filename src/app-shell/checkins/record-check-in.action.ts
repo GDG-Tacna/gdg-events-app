@@ -143,7 +143,8 @@ async function meetTeam(uid: string, payload: string): Promise<RecordCheckInActi
 
   let missions: ScanReward[] = [];
   if (await moduleOn("missions")) {
-    const completed = await completeByTeam(missionDeps, uid, verified.role);
+    // The code names who showed it (signed), so a mission that picks certain people can tell them apart.
+    const completed = await completeByTeam(missionDeps, uid, { role: verified.role, memberUid: verified.uid });
     if (!completed.ok && completed.error.code === "not-registered") return { ok: false, code: "not-registered" };
     if (completed.ok) missions = completed.value.map(({ id, title, xpEarned, creditsEarned, justCompleted }) => ({ id, title, xpEarned, creditsEarned, justCompleted }));
   }

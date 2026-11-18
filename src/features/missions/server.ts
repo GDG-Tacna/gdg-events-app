@@ -33,6 +33,7 @@ export {
   updateMission,
   type CheckpointDirectory,
   type SpeakerDirectory,
+  type TeamDirectory,
   type MissionAdminActor,
   type MissionAdminDeps,
   type MissionAdminError,

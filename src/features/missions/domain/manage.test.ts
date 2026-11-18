@@ -84,7 +84,13 @@ function setup(initial: Mission[] = [mission("bb", 1), mission("aa", 0), mission
     store,
     quadrants: { activeIds: vi.fn(async () => ok(new Set(["ai", "cloud"]) as ReadonlySet<string>)) },
     checkpoints: { kindOf: vi.fn(async (id: string): Promise<Result<string | null, { code: string }>> => ok(id.startsWith("talk-") ? "talk" : id.startsWith("stand-") ? "stand" : null)) },
-    speakers: { activeIds: vi.fn(async (): Promise<Result<ReadonlySet<string>, { code: string }>> => ok(new Set(["ana-torres"]))) },
+    speakers: { activeIds: vi.fn(async (): Promise<Result<ReadonlySet<string>, { code: string }>> => ok(new Set(["ana-torres", "luis"]))) },
+    team: {
+      membersOf: vi.fn(
+        async (role: "organizer" | "volunteer"): Promise<Result<ReadonlySet<string>, { code: string }>> =>
+          ok(new Set(role === "volunteer" ? ["uid-ana-123", "uid-bruno-1"] : ["uid-olga-123"])),
+      ),
+    },
     minigames: { ids: ["circuits", "bug-kong"] },
     references: { to: vi.fn(async (): Promise<Result<readonly string[], { code: string }>> => ok([])) },
     images: { ref: vi.fn((path: string, purpose: string) => (path.includes(`/${purpose}/`) ? { path, url: `https://cdn/${path}` } : null)), remove: vi.fn(async () => {}) },
@@ -213,25 +219,55 @@ describe("mission admin", () => {
       expect(await createMission(ctx.deps, ADMIN, { id: "stand-2", draft: { ...stand, config: { type: "stand", checkpointId: "ghost" } } })).toEqual(err({ code: "unknown-checkpoint" }));
     });
 
-    it("needs an active speaker of the edition for a «Conoce al speaker» mission", async () => {
-      const meet = { ...QUIZ_DRAFT, config: { type: "speaker", speakerId: "ana-torres" } };
+    it("needs active speakers of the edition for a «Conoce al speaker» mission that names some", async () => {
+      const meet = { ...QUIZ_DRAFT, config: { type: "speaker", speakerIds: ["ana-torres"] } };
 
-      expect(await createMission(ctx.deps, ADMIN, { id: "meet-ana", draft: meet })).toMatchObject({ ok: true, value: { config: { type: "speaker", speakerId: "ana-torres" } } });
-      expect(await createMission(ctx.deps, ADMIN, { id: "meet-zoe", draft: { ...meet, config: { type: "speaker", speakerId: "zoe" } } })).toEqual(err({ code: "unknown-speaker" }));
-      expect(await createMission(ctx.deps, ADMIN, { id: "meet-bad", draft: { ...meet, config: { type: "speaker", speakerId: "Ana" } } })).toEqual(err({ code: "invalid-speaker" }));
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-ana", draft: meet })).toMatchObject({ ok: true, value: { config: { type: "speaker", speakerIds: ["ana-torres"] } } });
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-both", draft: { ...meet, config: { type: "speaker", speakerIds: ["ana-torres", "luis"] } } })).toMatchObject({
+        ok: true,
+        value: { config: { type: "speaker", speakerIds: ["ana-torres", "luis"] } },
+      });
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-zoe", draft: { ...meet, config: { type: "speaker", speakerIds: ["zoe"] } } })).toEqual(err({ code: "unknown-speaker" }));
+      // One unknown speaker among the chosen refuses the whole mission.
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-mix", draft: { ...meet, config: { type: "speaker", speakerIds: ["ana-torres", "zoe"] } } })).toEqual(err({ code: "unknown-speaker" }));
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-bad", draft: { ...meet, config: { type: "speaker", speakerIds: ["Ana"] } } })).toEqual(err({ code: "invalid-speaker" }));
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-none", draft: { ...meet, config: { type: "speaker", speakerIds: [] } } })).toEqual(err({ code: "invalid-speaker" }));
 
       ctx.deps.speakers.activeIds.mockResolvedValueOnce(err({ code: "x" }));
       expect(await createMission(ctx.deps, ADMIN, { id: "meet-2", draft: meet })).toEqual(err({ code: "unknown" }));
     });
 
-    it("accepts a speaker mission with no speaker (any speaker) without looking speakers up, and a team or squads mission", async () => {
+    it("accepts a speaker mission that names nobody (every speaker) without looking speakers up, and a team or squads mission", async () => {
       const draft = (config: unknown) => ({ ...QUIZ_DRAFT, config });
 
-      expect(await createMission(ctx.deps, ADMIN, { id: "meet-any", draft: draft({ type: "speaker", speakerId: null }) })).toMatchObject({ ok: true, value: { config: { type: "speaker", speakerId: null } } });
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-any", draft: draft({ type: "speaker", speakerIds: null }) })).toMatchObject({ ok: true, value: { config: { type: "speaker", speakerIds: null } } });
       expect(ctx.deps.speakers.activeIds).not.toHaveBeenCalled();
-      expect(await createMission(ctx.deps, ADMIN, { id: "meet-org", draft: draft({ type: "team", role: "organizer" }) })).toMatchObject({ ok: true, value: { config: { type: "team", role: "organizer" } } });
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-org", draft: draft({ type: "team", role: "organizer", memberUids: null }) })).toMatchObject({
+        ok: true,
+        value: { config: { type: "team", role: "organizer", memberUids: null } },
+      });
+      expect(ctx.deps.team.membersOf).not.toHaveBeenCalled();
       expect(await createMission(ctx.deps, ADMIN, { id: "meet-squads", draft: draft({ type: "squads" }) })).toMatchObject({ ok: true, value: { config: { type: "squads" } } });
-      expect(await createMission(ctx.deps, ADMIN, { id: "meet-bad", draft: draft({ type: "team", role: "speaker" }) })).toEqual(err({ code: "invalid-team-role" }));
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-bad", draft: draft({ type: "team", role: "speaker", memberUids: null }) })).toEqual(err({ code: "invalid-team-role" }));
+    });
+
+    it("needs team members who hold the mission's role for a team mission that names some", async () => {
+      const draft = (config: unknown) => ({ ...QUIZ_DRAFT, config });
+
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-vol", draft: draft({ type: "team", role: "volunteer", memberUids: ["uid-ana-123", "uid-bruno-1"] }) })).toMatchObject({
+        ok: true,
+        value: { config: { type: "team", role: "volunteer", memberUids: ["uid-ana-123", "uid-bruno-1"] } },
+      });
+      expect(ctx.deps.team.membersOf).toHaveBeenCalledWith("volunteer");
+      // A volunteer is not an organizer, and nobody unknown is a member at all.
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-org", draft: draft({ type: "team", role: "organizer", memberUids: ["uid-ana-123"] }) })).toEqual(err({ code: "unknown-team-member" }));
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-ghost", draft: draft({ type: "team", role: "volunteer", memberUids: ["uid-ana-123", "uid-ghost-12"] }) })).toEqual(
+        err({ code: "unknown-team-member" }),
+      );
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-none", draft: draft({ type: "team", role: "volunteer", memberUids: [] }) })).toEqual(err({ code: "invalid-team-members" }));
+
+      ctx.deps.team.membersOf.mockResolvedValueOnce(err({ code: "x" }));
+      expect(await createMission(ctx.deps, ADMIN, { id: "meet-2", draft: draft({ type: "team", role: "volunteer", memberUids: ["uid-ana-123"] }) })).toEqual(err({ code: "unknown" }));
     });
 
     it("never takes an id that exists", async () => {

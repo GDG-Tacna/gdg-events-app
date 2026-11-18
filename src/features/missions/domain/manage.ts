@@ -1,7 +1,7 @@
 import { chooseImage, dropReplacedImage, type RecordImages } from "@/features/media/constants";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
-import { checkMission, isMinigameDifficulty, isMissionId, type Mission, type MissionDataErrorCode } from "./mission";
+import { checkMission, isMinigameDifficulty, isMissionId, type Mission, type MissionDataErrorCode, type TeamRole } from "./mission";
 
 export type MissionAdminErrorCode =
   | MissionDataErrorCode
@@ -13,8 +13,10 @@ export type MissionAdminErrorCode =
   | "unknown-checkpoint"
   /** A talk or stand mission points to a checkpoint of another kind (a meal for a stand, say). */
   | "wrong-checkpoint-kind"
-  /** A speaker mission points to someone who is not an active speaker of the edition. */
+  /** A speaker mission names someone who is not an active speaker of the edition. */
   | "unknown-speaker"
+  /** A team mission names someone who is not on the edition's team with that role. */
+  | "unknown-team-member"
   /** The mini-game is not one of the games built in code. */
   | "unknown-minigame"
   /** The mini-game difficulty is not easy, normal or hard. */
@@ -99,6 +101,14 @@ export interface SpeakerDirectory {
   activeIds(): Promise<Result<ReadonlySet<string>, { code: string }>>;
 }
 
+/**
+ * The uids of the people who show a team code of a role (the admin team answers it): staff are volunteers, organizers
+ * and admins are organizers.
+ */
+export interface TeamDirectory {
+  membersOf(role: TeamRole): Promise<Result<ReadonlySet<string>, { code: string }>>;
+}
+
 /** The mini-games built in code (the mini-games catalog answers it). Whether a game is enabled is checked when it is played. */
 export interface MinigameDirectory {
   ids: readonly string[];
@@ -121,6 +131,7 @@ export interface MissionAdminDeps {
   quadrants: QuadrantDirectory;
   checkpoints: CheckpointDirectory;
   speakers: SpeakerDirectory;
+  team: TeamDirectory;
   minigames: MinigameDirectory;
   references: MissionReferences;
   images: RecordImages;
@@ -162,11 +173,18 @@ async function checkDraft(deps: MissionAdminDeps, id: string, draft: MissionDraf
     if (kind.value === null) return err(missionAdminError("unknown-checkpoint"));
     if (kind.value !== mission.config.type) return err(missionAdminError("wrong-checkpoint-kind"));
   }
-  // A speaker mission without a speaker id accepts any speaker, so there is nothing to look up.
-  if (mission.config.type === "speaker" && mission.config.speakerId !== null) {
+  // A speaker or team mission that names nobody (`null`) accepts everyone, so there is nothing to look up.
+  if (mission.config.type === "speaker" && mission.config.speakerIds !== null) {
+    const { speakerIds } = mission.config;
     const speakers = await deps.speakers.activeIds();
     if (!speakers.ok) return err(missionAdminError("unknown"));
-    if (!speakers.value.has(mission.config.speakerId)) return err(missionAdminError("unknown-speaker"));
+    if (!speakerIds.every((speakerId) => speakers.value.has(speakerId))) return err(missionAdminError("unknown-speaker"));
+  }
+  if (mission.config.type === "team" && mission.config.memberUids !== null) {
+    const { memberUids, role } = mission.config;
+    const members = await deps.team.membersOf(role);
+    if (!members.ok) return err(missionAdminError("unknown"));
+    if (!memberUids.every((uid) => members.value.has(uid))) return err(missionAdminError("unknown-team-member"));
   }
 
   // Stored data drops a bad game quietly; what the admin sends is refused instead, so nothing is lost unseen.

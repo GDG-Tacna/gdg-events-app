@@ -11,6 +11,8 @@ const quadrantsServer = { getGalaxyMap: vi.fn() };
 vi.mock("@/features/quadrants/server", () => quadrantsServer);
 const minigamesServer = { getMinigameOffer: vi.fn() };
 vi.mock("@/features/minigames/server", () => minigamesServer);
+const peopleNames = vi.hoisted(() => ({ missionPeopleNames: vi.fn() }));
+vi.mock("@/app-shell/missions/people-names.server", () => peopleNames);
 
 const guards = { requireAttendee: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
@@ -61,6 +63,7 @@ describe("mission page", () => {
     features.FEATURES.minigames = true;
     features.FEATURES.checkins = true;
     minigamesServer.getMinigameOffer.mockResolvedValue({ ok: true, value: OFFER });
+    peopleNames.missionPeopleNames.mockResolvedValue(["Ana"]);
     minigames.enabledMinigames.mockResolvedValue(new Set(["circuits"]));
     quadrantsServer.getGalaxyMap.mockResolvedValue({ ok: true, value: GALAXY });
     guards.requireAttendee.mockResolvedValue({ uid: "u1", role: "attendee", displayName: null, photoUrl: null });
@@ -95,6 +98,7 @@ describe("mission page", () => {
       minigame: true,
       achievementsHref: "/achievements",
       bonusSlot: undefined,
+      people: ["Ana"],
     });
 
     // With achievements off, nothing links to a tab that does not exist.
@@ -120,6 +124,9 @@ describe("mission page", () => {
     expect(minigamesServer.getMinigameOffer).toHaveBeenCalledWith({ marker: "minigames" }, "u1", "ai-quiz");
     expect(slot.type).toBe(MinigameOfferCard);
     expect(slot.props).toEqual({ offer: OFFER, playHref: "/minigame/ai-quiz" });
+    // A completed mission no longer needs telling whom to look for.
+    expect(peopleNames.missionPeopleNames).not.toHaveBeenCalled();
+    expect(findElement(await open("ai-quiz"), MissionDetailView)?.props.people).toEqual([]);
   });
 
   it("leaves the bonus out before completing, with mini-games off, without one, or when it cannot be read", async () => {

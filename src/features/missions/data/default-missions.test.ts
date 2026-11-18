@@ -25,9 +25,9 @@ describe("default missions", () => {
     const meet = DEFAULT_MISSIONS.filter((m) => m.id.startsWith("meet-")).map((m) => [m.id, m.config]);
 
     expect(meet).toEqual([
-      ["meet-organizer", { type: "team", role: "organizer" }],
-      ["meet-speaker", { type: "speaker", speakerId: null }],
-      ["meet-volunteer", { type: "team", role: "volunteer" }],
+      ["meet-organizer", { type: "team", role: "organizer", memberUids: null }],
+      ["meet-speaker", { type: "speaker", speakerIds: null }],
+      ["meet-volunteer", { type: "team", role: "volunteer", memberUids: null }],
       ["meet-squads", { type: "squads" }],
     ]);
   });

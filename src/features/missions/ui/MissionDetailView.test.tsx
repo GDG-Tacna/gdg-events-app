@@ -175,22 +175,35 @@ describe("MissionDetailView", () => {
   });
 
   it("sends a «Conoce al speaker» mission to the scanner (the speaker shows the code)", () => {
-    renderView({ ...STAND, id: "meet-ana", type: "speaker", config: { type: "speaker" } });
+    renderView({ ...STAND, id: "meet-ana", type: "speaker", config: { type: "speaker", speakerIds: null } });
 
     expect(screen.getByText(copy.missions.howTo.speaker)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: copy.missions.scan })).toHaveAttribute("href", "/scan");
     expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
   });
 
+  it("names the people to look for when a speaker or team mission names some, and nothing when it accepts everyone", () => {
+    const { unmount } = renderView({ ...STAND, id: "meet-some", type: "speaker", config: { type: "speaker", speakerIds: ["ana-torres", "luis"] } }, undefined, { people: ["Ana Torres", "Luis Mamani"] });
+    expect(screen.getByText("Escanea el código de cualquiera de ellos: Ana Torres, Luis Mamani.")).toBeInTheDocument();
+    unmount();
+
+    const team = renderView({ ...STAND, id: "meet-vol", type: "team", config: { type: "team", role: "volunteer", memberUids: ["uid-ana-123"] } }, undefined, { people: ["Ana"] });
+    expect(screen.getByText("Escanea el código de cualquiera de ellos: Ana.")).toBeInTheDocument();
+    team.unmount();
+
+    renderView({ ...STAND, id: "meet-all", type: "speaker", config: { type: "speaker", speakerIds: null } });
+    expect(screen.queryByText(/cualquiera de ellos/)).not.toBeInTheDocument();
+  });
+
   it("sends a «Conoce a un organizador / voluntario» mission to the scanner, with the words of the role it asks for", () => {
-    const { unmount } = renderView({ ...STAND, id: "meet-org", type: "team", config: { type: "team", role: "organizer" } });
+    const { unmount } = renderView({ ...STAND, id: "meet-org", type: "team", config: { type: "team", role: "organizer", memberUids: null } });
 
     expect(screen.getByText(copy.missions.howTo.organizer)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: copy.missions.scan })).toHaveAttribute("href", "/scan");
     expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
     unmount();
 
-    renderView({ ...STAND, id: "meet-vol", type: "team", config: { type: "team", role: "volunteer" } });
+    renderView({ ...STAND, id: "meet-vol", type: "team", config: { type: "team", role: "volunteer", memberUids: null } });
     expect(screen.getByText(copy.missions.howTo.volunteer)).toBeInTheDocument();
     expect(screen.queryByText(copy.missions.howTo.organizer)).not.toBeInTheDocument();
   });
@@ -211,7 +224,7 @@ describe("MissionDetailView", () => {
   });
 
   it("offers no scan for a completed «Conoce a…» mission", () => {
-    renderView({ ...STAND, id: "meet-org", type: "team", config: { type: "team", role: "organizer" }, status: "completed", xpEarned: 30 });
+    renderView({ ...STAND, id: "meet-org", type: "team", config: { type: "team", role: "organizer", memberUids: null }, status: "completed", xpEarned: 30 });
 
     expect(screen.queryByText(copy.missions.howTo.organizer)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: copy.missions.scan })).not.toBeInTheDocument();

@@ -351,7 +351,8 @@ describe("recordCheckInAction with a team member's code", () => {
       achievements: [],
     });
     expect(teamServer.verifyTeamCode).toHaveBeenCalledWith(teamCodes.teamCodeDeps, CODE);
-    expect(missionsServer.completeByTeam).toHaveBeenCalledWith({ marker: "missions" }, "u1", "volunteer");
+    // The signed code says who showed it, so a mission that picks certain people can tell them apart.
+    expect(missionsServer.completeByTeam).toHaveBeenCalledWith({ marker: "missions" }, "u1", { role: "volunteer", memberUid: "uid-staff-123456" });
     expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
     expect(achievements.unlockAchievements).toHaveBeenCalledWith("u1");
   });
@@ -360,7 +361,7 @@ describe("recordCheckInAction with a team member's code", () => {
     teamServer.verifyTeamCode.mockReturnValue({ ok: true, uid: "uid-admin-123456", role: "organizer" });
 
     expect(await recordCheckInAction("devfest:tm:uid-admin-123456.organizer.1800000000.sig_xxxxxxxxxxxxxxxx")).toMatchObject({ ok: true, kind: "team", checkpointId: "organizer" });
-    expect(missionsServer.completeByTeam).toHaveBeenCalledWith({ marker: "missions" }, "u1", "organizer");
+    expect(missionsServer.completeByTeam).toHaveBeenCalledWith({ marker: "missions" }, "u1", { role: "organizer", memberUid: "uid-admin-123456" });
   });
 
   it("is only for cadets, and goes through the scan limiter", async () => {

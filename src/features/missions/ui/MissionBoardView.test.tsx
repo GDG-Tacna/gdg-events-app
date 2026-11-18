@@ -192,7 +192,7 @@ describe("MissionBoardView", () => {
   it("names the type of the new «Conoce a…» missions with their own icon and label", () => {
     const { container } = render(
       <MissionBoardView
-        board={board([mission("a", "cloud", { type: "team", config: { type: "team", role: "volunteer" } }), mission("b", "cloud", { type: "squads", config: { type: "squads" } })])}
+        board={board([mission("a", "cloud", { type: "team", config: { type: "team", role: "volunteer", memberUids: null } }), mission("b", "cloud", { type: "squads", config: { type: "squads" } })])}
         quadrants={QUADRANTS}
         missionHref={(id) => `/missions/${id}`}
       />,

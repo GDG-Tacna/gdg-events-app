@@ -219,28 +219,38 @@ export async function completeByCheckpoint(
 }
 
 /**
- * After a verified scan of a speaker's code: completes every active «Conoce al speaker» mission for that speaker, and
- * the ones that accept any speaker. Like `completeByCheckpoint`, a failure on one mission never hides the others, and
+ * After a verified scan of a speaker's code: completes every active «Conoce al speaker» mission that names that speaker
+ * (among others, or alone), and the ones that accept every speaker. Like `completeByCheckpoint`, a failure on one mission never hides the others, and
  * scanning again retries it.
  */
 export async function completeBySpeaker(deps: SubmitProofDeps, uid: string, speakerId: string): Promise<Result<readonly ScanMission[], MissionError>> {
   const missions = await offeredMissions(deps);
   if (!missions.ok) return missions;
   const tied = missions.value.filter(
-    (mission) => mission.active && mission.config.type === "speaker" && (mission.config.speakerId === null || mission.config.speakerId === speakerId),
+    (mission) => mission.active && mission.config.type === "speaker" && (mission.config.speakerIds === null || mission.config.speakerIds.includes(speakerId)),
   );
   return completeTied(deps, uid, tied, { kind: "speaker", speakerId });
 }
 
 /**
  * After a verified scan of a team member's code: completes every active «Conoce a un organizador / voluntario» mission
- * for that role. Same failure rules as the other scans.
+ * for that role that accepts this person (all members, or a list that names them). Same failure rules as the other scans.
  */
-export async function completeByTeam(deps: SubmitProofDeps, uid: string, role: TeamRole): Promise<Result<readonly ScanMission[], MissionError>> {
+export async function completeByTeam(
+  deps: SubmitProofDeps,
+  uid: string,
+  member: { role: TeamRole; memberUid: string },
+): Promise<Result<readonly ScanMission[], MissionError>> {
   const missions = await offeredMissions(deps);
   if (!missions.ok) return missions;
-  const tied = missions.value.filter((mission) => mission.active && mission.config.type === "team" && mission.config.role === role);
-  return completeTied(deps, uid, tied, { kind: "team", role });
+  const tied = missions.value.filter(
+    (mission) =>
+      mission.active &&
+      mission.config.type === "team" &&
+      mission.config.role === member.role &&
+      (mission.config.memberUids === null || mission.config.memberUids.includes(member.memberUid)),
+  );
+  return completeTied(deps, uid, tied, { kind: "team", role: member.role, uid: member.memberUid });
 }
 
 /**

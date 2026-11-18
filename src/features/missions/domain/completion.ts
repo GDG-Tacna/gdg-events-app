@@ -26,7 +26,8 @@ export const completionId = (uid: string, missionId: string) => `${uid}_${missio
 export type MissionProof =
   | { kind: "checkpoint"; checkpointId: string }
   | { kind: "speaker"; speakerId: string }
-  | { kind: "team"; role: TeamRole }
+  /** The role the scanned code carries and the uid of the team member who showed it. */
+  | { kind: "team"; role: TeamRole; uid: string }
   /** The squads the cadet has met so far and the ones they must meet (every other active squad). */
   | { kind: "squads"; met: readonly string[]; required: readonly string[] }
   | { kind: "choice"; option: number }
@@ -69,12 +70,15 @@ export function evaluate(mission: Mission, proof: MissionProof, previous: Missio
       return next("completed", attempts, "full");
 
     case "speaker":
-      // A mission without a speaker id accepts any speaker's code.
-      if (proof.kind !== "speaker" || (config.speakerId !== null && proof.speakerId !== config.speakerId)) return { kind: "wrong-proof" };
+      // Any one of the named speakers completes it; a mission naming none (`null`) accepts every speaker's code.
+      if (proof.kind !== "speaker" || !(config.speakerIds === null || config.speakerIds.includes(proof.speakerId))) return { kind: "wrong-proof" };
       return next("completed", attempts, "full");
 
     case "team":
-      if (proof.kind !== "team" || proof.role !== config.role) return { kind: "wrong-proof" };
+      // The code's role must match, and so must the person when the mission names some (`null` accepts every member).
+      if (proof.kind !== "team" || proof.role !== config.role || !(config.memberUids === null || config.memberUids.includes(proof.uid))) {
+        return { kind: "wrong-proof" };
+      }
       return next("completed", attempts, "full");
 
     case "squads": {
