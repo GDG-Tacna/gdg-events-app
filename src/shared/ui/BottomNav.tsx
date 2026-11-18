@@ -22,8 +22,11 @@ export interface BottomNavProps {
   end?: readonly BottomNavItem[];
 }
 
-const isActive = (pathname: string | null, href: string) =>
-  pathname === href || (pathname !== null && pathname.startsWith(`${href}/`));
+/** A tab is current by its path: the query it opens with (`?vista=agenda`) is not part of `usePathname`. */
+const isActive = (pathname: string | null, href: string) => {
+  const path = href.split("?")[0];
+  return pathname === path || (pathname !== null && pathname.startsWith(`${path}/`));
+};
 
 function Tab({ item, pathname }: { item: BottomNavItem; pathname: string | null }) {
   const active = isActive(pathname, item.href);

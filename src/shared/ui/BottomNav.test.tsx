@@ -77,6 +77,14 @@ describe("BottomNav", () => {
     expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
   });
 
+  it("marks a tab that opens with a query (the agenda) as current when its page is open", () => {
+    navigation.pathname = "/map";
+    renderNav({ ...PROPS, end: [{ href: "/map?vista=agenda", label: "Agenda", icon: "calendar" }] });
+
+    expect(screen.getByRole("link", { name: "Agenda" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
+  });
+
   it("keeps a tab current on the pages below it, but not on a page that only shares a prefix", () => {
     navigation.pathname = "/dashboard/details";
     const { unmount } = renderNav();
