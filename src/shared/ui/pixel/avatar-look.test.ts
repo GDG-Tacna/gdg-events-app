@@ -92,6 +92,13 @@ describe("avatar sprites from a look", () => {
     }
   });
 
+  it("draw each look once: the same look gives the same sprite, and any change gives another", () => {
+    expect(avatarSprite(base)).toBe(avatarSprite({ ...base }));
+    expect(avatarSprite("Nova_7")).toBe(avatarSprite("nova_7"));
+    expect(avatarSprite(base)).not.toBe(avatarSprite({ ...base, helmetOn: false }));
+    expect(avatarSprite(base)).not.toBe(avatarSprite({ ...base, suit: 2 }));
+  });
+
   it("keep the 32x32 grid and only known palette keys", () => {
     const sprite = avatarSprite(LOOK);
 

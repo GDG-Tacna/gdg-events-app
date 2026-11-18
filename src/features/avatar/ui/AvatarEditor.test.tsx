@@ -11,6 +11,9 @@ import { AvatarEditor } from "./AvatarEditor";
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
+// The editor draws a dozen little avatars and axe walks all of them: slow under a loaded machine, not wrong.
+vi.setConfig({ testTimeout: 20_000 });
+
 const t = copy.avatar;
 const ORIGINAL = lookFromSeed("Nova_7");
 

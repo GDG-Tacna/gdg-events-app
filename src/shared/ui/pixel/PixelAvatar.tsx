@@ -271,9 +271,27 @@ function drawRows(look: Pick<AvatarLook, "hairStyle" | "beard" | "glasses" | "he
   return rows.map((row) => row.join(""));
 }
 
+/**
+ * Sprites already drawn, by look. Drawing one walks a 32x32 grid many times, and the editor shows a dozen at once and
+ * draws them again on every choice, so each look is drawn once. A sprite is plain data nobody changes. The cache is
+ * bounded: when it is full it starts over.
+ */
+const SPRITES = new Map<string, PixelSpriteData>();
+const SPRITES_MAX = 400;
+
 /** The sprite of a look, or of the look an alias gives. */
 export function avatarSprite(seedOrLook: string | AvatarLook): PixelSpriteData {
   const look = typeof seedOrLook === "string" ? lookFromSeed(seedOrLook) : seedOrLook;
+  const key = [look.skin, look.hairStyle, look.hairColor, look.beard, look.glasses, look.helmet, look.helmetOn, look.suit].join("|");
+  const kept = SPRITES.get(key);
+  if (kept) return kept;
+  const sprite = drawSprite(look);
+  if (SPRITES.size >= SPRITES_MAX) SPRITES.clear();
+  SPRITES.set(key, sprite);
+  return sprite;
+}
+
+function drawSprite(look: AvatarLook): PixelSpriteData {
   const [h1, h2, h3, h4] = HELMET_COLORS[look.helmet];
   const skin = SKIN_TONES[look.skin];
   const hair = HAIR_COLORS[look.hairColor];
