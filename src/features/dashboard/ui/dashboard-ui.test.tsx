@@ -55,7 +55,7 @@ const renderView = (props: Partial<Parameters<typeof DashboardView>[0]> = {}) =>
 
 describe("PlayerCard", () => {
   it("links the avatar to the editor and draws the chosen look, or keeps a plain avatar without the editor", () => {
-    const look = { skin: 5, hairStyle: "buzz" as const, hairColor: 6, beard: "beard" as const, glasses: "shades" as const, helmet: 1, suit: 3 };
+    const look = { skin: 5, hairStyle: "buzz" as const, hairColor: 6, beard: "beard" as const, glasses: "shades" as const, helmet: 1, helmetOn: true, suit: 3 };
     const { unmount } = render(<PlayerCard overview={overview(120)} avatarLook={look} avatarHref="/avatar" />);
 
     expect(screen.getByRole("link", { name: copy.avatar.edit })).toHaveAttribute("href", "/avatar");

@@ -6,12 +6,15 @@ import { PixelSprite } from "./PixelSprite";
  * A young astronaut in 16-bit "HD" pixel art: a big round helmet shaded in four tones, a white visor rim, the face
  * seen through the open visor (hair, eyebrows, shiny eyes, blush and a smile, and optionally a beard and glasses) and
  * a suit with a chest panel, a zipper, a shoulder patch and seams. Dark outline with a faint luminous rim on the lit
- * side. 32x32.
+ * side. 32x32. With the helmet off (`helmetOn: false`) the whole head shows: a bigger face and the hairstyle in full,
+ * on the same suit.
  */
 const SIZE = 32;
 /** Helmet and visor ellipses: center and radii, in pixels. */
 const HELMET = { x: 16, y: 13, rx: 13.2, ry: 11.6 };
 const VISOR = { x: 16, y: 14.2, rx: 9.2, ry: 8.4 };
+/** The bare head (no helmet): center and radii. The eyes, nose, mouth and blush sit where they do behind the visor. */
+const HEAD = { x: 16, y: 13.8, rx: 9.4, ry: 9.8 };
 
 export interface AvatarTraits {
   hair: readonly [string, string, string];
@@ -51,12 +54,41 @@ function hairOf(style: AvatarLook["hairStyle"]): (dx: number, dy: number) => boo
 }
 
 /**
+ * Whether a cell of the bare head (offset from the head's center) is hair, for each hairstyle. Unlike the visor, the
+ * hair can rise above the head and fall past its sides, so each style has its own shape.
+ */
+function bareHairOf(style: AvatarLook["hairStyle"]): (dx: number, dy: number) => boolean {
+  const inside = (dx: number, dy: number, rx: number, ry: number) => (dx / rx) ** 2 + (dy / ry) ** 2 <= 1;
+  switch (style) {
+    case "curly":
+      // A big crown with curls: cells missing along its outer edge make the scallops.
+      return (dx, dy) => {
+        if (!inside(dx, dy, 11.6, 11.6) || !(dy <= -3.2 || (Math.abs(dx) > 7.6 && dy < 4.5))) return false;
+        return inside(dx, dy, 10.2, 10.4) || Math.floor(dx * 0.9 + dy * 1.7) % 3 !== 0;
+      };
+    case "buzz":
+      // Close-cropped: a thin cap on top of the head.
+      return (dx, dy) => dy <= -6 && inside(dx, dy, 9.8, 10.2);
+    default: {
+      const [length, side] = style.split("-");
+      return (dx, dy) => {
+        const fringeSide = side === "left" ? dx <= 1.5 : dx >= -1.5;
+        const crown = inside(dx, dy, 10.6, 10.8) && (dy <= -5 || (dy <= -2.4 && fringeSide && Math.abs(dx) < 8.8) || (Math.abs(dx) > 8.2 && dy < 0.7));
+        // Long hair keeps falling past the head's sides, down to the cheeks.
+        const falling = length === "long" && Math.abs(dx) > 7.4 && Math.abs(dx) <= 10.4 && dy >= 0 && dy < 7.5;
+        return crown || falling;
+      };
+    }
+  }
+}
+
+/**
  * Palette keys: 1-4 helmet highlight/light/base/shadow, h helmet shine, A/a side module, C/c collar, i cyan light,
  * W/w/x visor rim light/mid/shadow, s/S/z skin, k/K/j hair, E eye, e eye shine, n eye sparkle, m mouth, p blush,
  * r glass reflection, G/g glasses frame/lens, U/u/y suit light/mid/shadow, P/Q chest panel, Z zipper, T/t shoulder
  * patch, O outline, L luminous rim. "." is transparent.
  */
-function drawRows(look: Pick<AvatarLook, "hairStyle" | "beard" | "glasses">): string[] {
+function drawRows(look: Pick<AvatarLook, "hairStyle" | "beard" | "glasses" | "helmetOn">): string[] {
   const grid: string[][] = Array.from({ length: SIZE }, () => Array<string>(SIZE).fill("."));
   const set = (x: number, y: number, cell: string) => {
     if (x >= 0 && x < SIZE && y >= 0 && y < SIZE) grid[y][x] = cell;
@@ -76,46 +108,76 @@ function drawRows(look: Pick<AvatarLook, "hairStyle" | "beard" | "glasses">): st
     set(x, 23, "c");
   }
 
-  // The helmet shell, lit from the upper left in four tones.
-  for (let y = 0; y < SIZE; y += 1) {
-    for (let x = 0; x < SIZE; x += 1) {
-      const nx = (x + 0.5 - HELMET.x) / HELMET.rx;
-      const ny = (y + 0.5 - HELMET.y) / HELMET.ry;
-      if (Math.hypot(nx, ny) > 1) continue;
-      const light = -(nx * 0.62 + ny * 0.78);
-      set(x, y, light > 0.62 ? "1" : light > 0.2 ? "2" : light > -0.35 ? "3" : "4");
-    }
-  }
-  // Side modules (the ear pieces), each with a small cyan light.
-  for (const [x0, x1, outer] of [[2, 4, 2], [27, 29, 29]] as const) {
-    for (let y = 11; y <= 16; y += 1) for (let x = x0; x <= x1; x += 1) set(x, y, y === 11 ? "a" : x === outer ? "4" : "A");
-    set(x0 === 2 ? 3 : 28, 13, "i");
-    set(x0 === 2 ? 3 : 28, 14, "i");
-  }
-
-  // The visor rim and the face inside it.
-  const hairAt = hairOf(look.hairStyle);
+  const bare = look.helmetOn === false;
+  /** The cells of skin where facial hair can go. */
   const face: Array<[number, number]> = [];
-  for (let y = 0; y < SIZE; y += 1) {
-    for (let x = 0; x < SIZE; x += 1) {
-      const dx = x + 0.5 - VISOR.x;
-      const dy = y + 0.5 - VISOR.y;
-      const nx = dx / VISOR.rx;
-      const ny = dy / VISOR.ry;
-      const r = Math.hypot(nx, ny);
-      if (r > 1) continue;
-      if (r > 0.84) {
-        const light = -(nx * 0.62 + ny * 0.78);
-        set(x, y, light > 0.3 ? "W" : light > -0.3 ? "w" : "x");
-        continue;
+
+  if (bare) {
+    // The head without the helmet, resting on the collar: skin, ears, then the hair over it (and past it, for volume).
+    const hairAt = bareHairOf(look.hairStyle);
+    for (let y = 0; y < SIZE; y += 1) {
+      for (let x = 0; x < SIZE; x += 1) {
+        const dx = x + 0.5 - HEAD.x;
+        const dy = y + 0.5 - HEAD.y;
+        const nx = dx / HEAD.rx;
+        const ny = dy / HEAD.ry;
+        const onHead = Math.hypot(nx, ny) <= 1;
+        if (hairAt(dx, dy)) {
+          // The lowest cell of each lock is in shadow; the crown catches the light on the upper left.
+          set(x, y, !hairAt(dx, dy + 1) ? "j" : dx < -2.5 && dy < -5 ? "k" : "K");
+        } else if (onHead) {
+          const shade = nx * 0.6 + ny * 0.5;
+          set(x, y, shade > 0.42 ? "z" : shade < -0.35 ? "s" : "S");
+          face.push([x, y]);
+        }
       }
-      if (hairAt(dx, dy)) {
-        // The lowest row of each lock is in shadow; the crown catches the light on the upper left.
-        set(x, y, !hairAt(dx, dy + 1) ? "j" : dx < -2.5 && dy < -4 ? "k" : "K");
-      } else {
-        const shade = nx * 0.6 + ny * 0.5;
-        set(x, y, shade > 0.42 ? "z" : shade < -0.35 ? "s" : "S");
-        face.push([x, y]);
+    }
+    // Ears: one cell on each side of the head, the inner one a little darker.
+    for (const y of [15, 16, 17]) {
+      if (grid[y][6] === ".") set(6, y, "S");
+      if (grid[y][25] === ".") set(25, y, "z");
+    }
+  } else {
+    // The helmet shell, lit from the upper left in four tones.
+    for (let y = 0; y < SIZE; y += 1) {
+      for (let x = 0; x < SIZE; x += 1) {
+        const nx = (x + 0.5 - HELMET.x) / HELMET.rx;
+        const ny = (y + 0.5 - HELMET.y) / HELMET.ry;
+        if (Math.hypot(nx, ny) > 1) continue;
+        const light = -(nx * 0.62 + ny * 0.78);
+        set(x, y, light > 0.62 ? "1" : light > 0.2 ? "2" : light > -0.35 ? "3" : "4");
+      }
+    }
+    // Side modules (the ear pieces), each with a small cyan light.
+    for (const [x0, x1, outer] of [[2, 4, 2], [27, 29, 29]] as const) {
+      for (let y = 11; y <= 16; y += 1) for (let x = x0; x <= x1; x += 1) set(x, y, y === 11 ? "a" : x === outer ? "4" : "A");
+      set(x0 === 2 ? 3 : 28, 13, "i");
+      set(x0 === 2 ? 3 : 28, 14, "i");
+    }
+
+    // The visor rim and the face inside it.
+    const hairAt = hairOf(look.hairStyle);
+    for (let y = 0; y < SIZE; y += 1) {
+      for (let x = 0; x < SIZE; x += 1) {
+        const dx = x + 0.5 - VISOR.x;
+        const dy = y + 0.5 - VISOR.y;
+        const nx = dx / VISOR.rx;
+        const ny = dy / VISOR.ry;
+        const r = Math.hypot(nx, ny);
+        if (r > 1) continue;
+        if (r > 0.84) {
+          const light = -(nx * 0.62 + ny * 0.78);
+          set(x, y, light > 0.3 ? "W" : light > -0.3 ? "w" : "x");
+          continue;
+        }
+        if (hairAt(dx, dy)) {
+          // The lowest row of each lock is in shadow; the crown catches the light on the upper left.
+          set(x, y, !hairAt(dx, dy + 1) ? "j" : dx < -2.5 && dy < -4 ? "k" : "K");
+        } else {
+          const shade = nx * 0.6 + ny * 0.5;
+          set(x, y, shade > 0.42 ? "z" : shade < -0.35 ? "s" : "S");
+          face.push([x, y]);
+        }
       }
     }
   }
@@ -166,13 +228,15 @@ function drawRows(look: Pick<AvatarLook, "hairStyle" | "beard" | "glasses">): st
   }
 
   // Reflections on the visor glass and a shine on the shell (only recoloring the shell, never widening it).
-  for (const [x, y] of [[9, 9], [10, 8], [11, 8], [9, 10], [22, 20]] as const) set(x, y, "r");
-  const onShell = (x: number, y: number, cell: string) => {
-    if ("1234".includes(grid[y][x])) set(x, y, cell);
-  };
-  for (const [x, y] of [[7, 3], [6, 4], [8, 2], [9, 2]] as const) onShell(x, y, "1");
-  onShell(6, 5, "h");
-  onShell(7, 4, "h");
+  if (!bare) {
+    for (const [x, y] of [[9, 9], [10, 8], [11, 8], [9, 10], [22, 20]] as const) set(x, y, "r");
+    const onShell = (x: number, y: number, cell: string) => {
+      if ("1234".includes(grid[y][x])) set(x, y, cell);
+    };
+    for (const [x, y] of [[7, 3], [6, 4], [8, 2], [9, 2]] as const) onShell(x, y, "1");
+    onShell(6, 5, "h");
+    onShell(7, 4, "h");
+  }
 
   // Suit details: chest panel with lights, zipper, shoulder patch and seams.
   for (let y = 26; y <= 28; y += 1) for (let x = 13; x <= 19; x += 1) set(x, y, y === 26 ? "P" : "Q");
@@ -207,9 +271,27 @@ function drawRows(look: Pick<AvatarLook, "hairStyle" | "beard" | "glasses">): st
   return rows.map((row) => row.join(""));
 }
 
+/**
+ * Sprites already drawn, by look. Drawing one walks a 32x32 grid many times, and the editor shows a dozen at once and
+ * draws them again on every choice, so each look is drawn once. A sprite is plain data nobody changes. The cache is
+ * bounded: when it is full it starts over.
+ */
+const SPRITES = new Map<string, PixelSpriteData>();
+const SPRITES_MAX = 400;
+
 /** The sprite of a look, or of the look an alias gives. */
 export function avatarSprite(seedOrLook: string | AvatarLook): PixelSpriteData {
   const look = typeof seedOrLook === "string" ? lookFromSeed(seedOrLook) : seedOrLook;
+  const key = [look.skin, look.hairStyle, look.hairColor, look.beard, look.glasses, look.helmet, look.helmetOn, look.suit].join("|");
+  const kept = SPRITES.get(key);
+  if (kept) return kept;
+  const sprite = drawSprite(look);
+  if (SPRITES.size >= SPRITES_MAX) SPRITES.clear();
+  SPRITES.set(key, sprite);
+  return sprite;
+}
+
+function drawSprite(look: AvatarLook): PixelSpriteData {
   const [h1, h2, h3, h4] = HELMET_COLORS[look.helmet];
   const skin = SKIN_TONES[look.skin];
   const hair = HAIR_COLORS[look.hairColor];

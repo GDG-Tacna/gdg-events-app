@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BEARDS, GLASSES, HAIR_STYLES, lookFromSeed, parseLook, randomLook, sameLook, type AvatarLook } from "./avatar-look";
 import { avatarSprite, avatarTraits } from "./PixelAvatar";
 
-const LOOK: AvatarLook = { skin: 5, hairStyle: "curly", hairColor: 7, beard: "beard", glasses: "round", helmet: 2, suit: 3 };
+const LOOK: AvatarLook = { skin: 5, hairStyle: "curly", hairColor: 7, beard: "beard", glasses: "round", helmet: 2, helmetOn: true, suit: 3 };
 
 describe("avatar looks", () => {
   it("derive from the alias as always: only the original palettes, no beard, no glasses, the white suit", () => {
@@ -35,9 +35,22 @@ describe("avatar looks", () => {
 
   it("make random looks within the sets, and compare looks", () => {
     expect(parseLook(randomLook(() => 0))).not.toBeNull();
-    expect(parseLook(randomLook(() => 0.9999))).toEqual({ skin: 5, hairStyle: "buzz", hairColor: 7, beard: "mustache", glasses: "shades", helmet: 5, suit: 5 });
+    expect(parseLook(randomLook(() => 0.9999))).toEqual({ skin: 5, hairStyle: "buzz", hairColor: 7, beard: "mustache", glasses: "shades", helmet: 5, helmetOn: false, suit: 5 });
+    expect(randomLook(() => 0).helmetOn).toBe(true);
     expect(sameLook(LOOK, { ...LOOK })).toBe(true);
     expect(sameLook(LOOK, { ...LOOK, suit: 0 })).toBe(false);
+    expect(sameLook(LOOK, { ...LOOK, helmetOn: false })).toBe(false);
+  });
+
+  it("keep the helmet on for a look saved before it could come off, and refuse a helmet that is not on or off", () => {
+    const before: Partial<AvatarLook> = { ...LOOK };
+    delete before.helmetOn;
+
+    expect(parseLook(before)).toEqual({ ...LOOK, helmetOn: true });
+    expect(parseLook({ ...LOOK, helmetOn: false })).toEqual({ ...LOOK, helmetOn: false });
+    expect(parseLook({ ...LOOK, helmetOn: "no" })).toBeNull();
+    expect(parseLook({ ...LOOK, helmetOn: null })).toBeNull();
+    expect(lookFromSeed("Nova_7").helmetOn).toBe(true);
   });
 });
 
@@ -49,6 +62,41 @@ describe("avatar sprites from a look", () => {
     expect(new Set(HAIR_STYLES.map((hairStyle) => rowsOf({ ...base, hairStyle }))).size).toBe(HAIR_STYLES.length);
     expect(new Set(BEARDS.map((beard) => rowsOf({ ...base, beard }))).size).toBe(BEARDS.length);
     expect(new Set(GLASSES.map((glasses) => rowsOf({ ...base, glasses }))).size).toBe(GLASSES.length);
+  });
+
+  it("draw the whole head when the helmet is off: no shell and no visor, the face and the hair in full", () => {
+    const withHelmet = rowsOf({ ...base, helmetOn: true });
+    const bare = rowsOf({ ...base, helmetOn: false });
+
+    // The shell (1-4) and the visor rim (W, w, x) are only there with the helmet on.
+    expect(/[1-4WwxhA]/.test(bare)).toBe(false);
+    expect(/[1-4Ww]/.test(withHelmet)).toBe(true);
+    // The eyes and the hair are drawn in both.
+    expect(bare.includes("E")).toBe(true);
+    expect(bare.includes("K")).toBe(true);
+    // More hair shows without the helmet.
+    expect((bare.match(/[kKj]/g) ?? []).length).toBeGreaterThan((withHelmet.match(/[kKj]/g) ?? []).length);
+  });
+
+  it("draw a different bare head for every hairstyle, beard and pair of glasses, within the grid and the palette", () => {
+    const bare = { ...base, helmetOn: false };
+    expect(new Set(HAIR_STYLES.map((hairStyle) => rowsOf({ ...bare, hairStyle }))).size).toBe(HAIR_STYLES.length);
+    expect(new Set(BEARDS.map((beard) => rowsOf({ ...bare, beard }))).size).toBe(BEARDS.length);
+    expect(new Set(GLASSES.map((glasses) => rowsOf({ ...bare, glasses }))).size).toBe(GLASSES.length);
+
+    for (const hairStyle of HAIR_STYLES) {
+      const sprite = avatarSprite({ ...bare, hairStyle });
+      expect(sprite.rows).toHaveLength(32);
+      expect(sprite.rows.every((row) => row.length === 32)).toBe(true);
+      expect([...new Set(sprite.rows.join("").replaceAll(".", ""))].every((key) => key in sprite.palette)).toBe(true);
+    }
+  });
+
+  it("draw each look once: the same look gives the same sprite, and any change gives another", () => {
+    expect(avatarSprite(base)).toBe(avatarSprite({ ...base }));
+    expect(avatarSprite("Nova_7")).toBe(avatarSprite("nova_7"));
+    expect(avatarSprite(base)).not.toBe(avatarSprite({ ...base, helmetOn: false }));
+    expect(avatarSprite(base)).not.toBe(avatarSprite({ ...base, suit: 2 }));
   });
 
   it("keep the 32x32 grid and only known palette keys", () => {
