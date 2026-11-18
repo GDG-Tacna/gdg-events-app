@@ -47,7 +47,7 @@ const emptyForm: FormState = { mode: "create", id: "", idTouched: false, name: "
 export function SpeakerAvatar({ speaker, size = 48 }: { speaker: Pick<Speaker, "name" | "photo">; size?: number }) {
   if (speaker.photo) return <Thumbnail url={speaker.photo.url} size={size} className="rounded-full" />;
   return (
-    <span aria-hidden="true" style={{ width: size, height: size }} className="bg-bg-deep border-line-strong type-label text-cyan grid shrink-0 place-items-center rounded-full border">
+    <span aria-hidden="true" style={{ width: size, height: size }} className="bg-bg-deep border-line-strong type-label text-cyan-ink grid shrink-0 place-items-center rounded-full border">
       {speaker.name.trim().charAt(0).toUpperCase()}
     </span>
   );

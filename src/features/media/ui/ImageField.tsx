@@ -109,7 +109,7 @@ export function ImageField({ label, purpose, value, onChange, upload, disabled =
         {t.formats[ruleName]}
       </p>
       {error ? (
-        <p role="alert" className="type-body-sm text-danger">
+        <p role="alert" className="type-body-sm text-danger-ink">
           {error}
         </p>
       ) : null}

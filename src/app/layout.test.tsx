@@ -55,8 +55,11 @@ describe("root layout", () => {
     expect((tree as { props: { lang: string } }).props.lang).toBe("es");
   });
 
-  it("matches the manifest: same theme color for the status bar, and safe-area aware", () => {
-    expect(viewport.themeColor).toBe("#1e1e1e");
+  it("colors the status bar like the canvas of each theme (light like the site, dark like the manifest), and is safe-area aware", () => {
+    expect(viewport.themeColor).toEqual([
+      { media: "(prefers-color-scheme: light)", color: "#f0f0f0" },
+      { media: "(prefers-color-scheme: dark)", color: "#1e1e1e" },
+    ]);
     expect(viewport.viewportFit).toBe("cover");
     expect(metadata.title).toBeTruthy();
   });

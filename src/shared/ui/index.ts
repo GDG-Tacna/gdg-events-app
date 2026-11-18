@@ -55,3 +55,4 @@ export { EditionTag } from "./EditionTag";
 export { MedalArt, type MedalArtProps } from "./MedalArt";
 export { Thumbnail, type ThumbnailProps } from "./Thumbnail";
 export { SquadArt, type SquadArtProps } from "./SquadArt";
+export { ThemeToggle } from "./ThemeToggle";

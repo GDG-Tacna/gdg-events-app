@@ -27,9 +27,9 @@ describe("ScanReticle", () => {
   });
 
   it.each([
-    ["idle", "text-cyan"],
-    ["success", "text-lime"],
-    ["error", "text-danger"],
+    ["idle", "text-cyan-ink"],
+    ["success", "text-lime-ink"],
+    ["error", "text-danger-ink"],
   ] as const)("tints the ring for %s", (tone, className) => {
     render(<ScanReticle active={false} tone={tone} />);
 

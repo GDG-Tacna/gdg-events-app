@@ -18,13 +18,13 @@ export function share(part: number, whole: number): string | null {
 function StatTile({ icon, label, value, hint, href }: { icon: IconName; label: string; value: number; hint?: string | null; href?: string }) {
   const tile = (
     <div className="bg-surface border-border gap-space-3 p-space-4 flex items-center rounded-lg border">
-      <span aria-hidden="true" className="border-cyan/40 text-cyan bg-bg-deep grid size-11 shrink-0 place-items-center rounded-md border">
+      <span aria-hidden="true" className="border-cyan/40 text-cyan-ink bg-bg-deep grid size-11 shrink-0 place-items-center rounded-md border">
         <Icon name={icon} size={20} />
       </span>
       <span className="flex min-w-0 flex-col">
         <span className="type-title text-foreground tabular-nums">{formatNumber(value)}</span>
         <span className="type-caption text-text-subtle">{label}</span>
-        {hint ? <span className="type-caption text-lime">{hint}</span> : null}
+        {hint ? <span className="type-caption text-lime-ink">{hint}</span> : null}
       </span>
     </div>
   );
@@ -49,7 +49,7 @@ export function InsightsPanel({ overview, cadetsHref }: InsightsPanelProps) {
   return (
     <div className="gap-space-5 flex flex-col">
       <section aria-labelledby="insights-edition" className="gap-space-3 flex flex-col">
-        <h2 id="insights-edition" className="type-pixel-heading text-cyan">
+        <h2 id="insights-edition" className="type-pixel-heading text-cyan-ink">
           {interpolate(t.editionTitle, { id: current.eventId })}
         </h2>
         <ul aria-label={t.stats.label} className="gap-space-3 grid grid-cols-1 min-[560px]:grid-cols-2 min-[1024px]:grid-cols-3">
@@ -73,7 +73,7 @@ export function InsightsPanel({ overview, cadetsHref }: InsightsPanelProps) {
             {current.squads.map((squad) => (
               <li key={squad.squadId} className="border-border gap-space-3 py-space-2 flex items-center justify-between border-b last:border-b-0">
                 <span className="type-label text-foreground">{squad.name}</span>
-                <span className="type-title text-cyan tabular-nums">
+                <span className="type-title text-cyan-ink tabular-nums">
                   {formatNumber(squad.count)}
                   {share(squad.count, current.registered) ? <span className="type-caption text-text-subtle ml-space-2">{share(squad.count, current.registered)}</span> : null}
                 </span>
@@ -99,7 +99,7 @@ export function InsightsPanel({ overview, cadetsHref }: InsightsPanelProps) {
               {current.rations.map((meal) => (
                 <li key={meal.checkpointId} className="border-border gap-space-3 py-space-2 flex items-center justify-between border-b last:border-b-0">
                   <span className="type-label text-foreground">{meal.name}</span>
-                  <span className="type-title text-cyan tabular-nums">
+                  <span className="type-title text-cyan-ink tabular-nums">
                     {formatNumber(meal.count)}
                     {share(meal.count, current.attended) ? <span className="type-caption text-text-subtle ml-space-2">{share(meal.count, current.attended)}</span> : null}
                   </span>

@@ -217,7 +217,7 @@ export function BadgeForm({ mode, badge, save, upload, quadrants, missions, leve
             }}
           />
           {fieldError("image") ? (
-            <p role="alert" className="type-body-sm text-danger -mt-space-3">
+            <p role="alert" className="type-body-sm text-danger-ink -mt-space-3">
               {fieldError("image")}
             </p>
           ) : null}

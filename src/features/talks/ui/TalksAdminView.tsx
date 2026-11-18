@@ -117,7 +117,7 @@ export function TalksAdminView({ talks, rooms, setActive, remove, canDelete = tr
                 <Card className={cn("gap-space-3 flex flex-col", !talk.active && "opacity-75")}>
                   <div className="gap-space-3 flex flex-wrap items-start justify-between">
                     <div className="gap-space-1 flex min-w-0 flex-1 flex-col">
-                      <p className="type-caption text-cyan tabular-nums">{formatSlot(talk.startsAt, talk.endsAt) ?? t.noSchedule}</p>
+                      <p className="type-caption text-cyan-ink tabular-nums">{formatSlot(talk.startsAt, talk.endsAt) ?? t.noSchedule}</p>
                       <p className="type-label text-foreground">{talk.title}</p>
                       <p className="type-caption text-muted-foreground">
                         {talk.speaker ?? t.noSpeaker} · {roomName(talk.roomId)}

@@ -74,7 +74,7 @@ export function DashboardView({
 
         <section aria-labelledby="terminal-title" className="gap-space-4 flex flex-col">
           <div className="gap-space-3 flex items-center justify-between">
-            <h2 id="terminal-title" className="type-pixel-heading text-cyan gap-space-2 flex items-center">
+            <h2 id="terminal-title" className="type-pixel-heading text-cyan-ink gap-space-2 flex items-center">
               <span aria-hidden="true" className="bg-cyan inline-block size-2 rounded-[2px]" />
               {t.terminal.title}
             </h2>

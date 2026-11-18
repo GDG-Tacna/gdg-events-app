@@ -80,7 +80,7 @@ export function CadetsListView({ cadets, total, search, nextHref, hrefs }: Cadet
                   </p>
                 </div>
                 <div className="gap-space-2 flex shrink-0 flex-wrap items-center">
-                  {cadet.banned ? <span className={`${chip} border-danger text-danger`}>{t.banned}</span> : null}
+                  {cadet.banned ? <span className={`${chip} border-danger text-danger-ink`}>{t.banned}</span> : null}
                   <span className={chip}>{cadet.attended ? t.attended : t.notArrived}</span>
                 </div>
               </Card>

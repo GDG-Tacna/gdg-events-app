@@ -17,7 +17,7 @@ export function InlineAlert({ children, className }: InlineAlertProps) {
         className,
       )}
     >
-      <Icon name="alert" size={20} className="text-danger mt-0.5" />
+      <Icon name="alert" size={20} className="text-danger-ink mt-0.5" />
       <p className="type-body-sm text-foreground">{children}</p>
     </div>
   );

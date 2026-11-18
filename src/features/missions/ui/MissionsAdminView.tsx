@@ -132,7 +132,7 @@ export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, se
               <Card pad={false} className={cn("gap-space-3 p-space-3 flex flex-col", !mission.active && "opacity-75")}>
                 <div className="gap-space-3 flex items-start">
                   {handle}
-                  <span aria-hidden="true" className="bg-bg-deep border-line-strong text-cyan relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-md border">
+                  <span aria-hidden="true" className="bg-bg-deep border-line-strong text-cyan-ink relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-md border">
                     {mission.image ? <Image src={mission.image.url} alt="" fill unoptimized sizes="48px" className="object-cover" /> : <Icon name={TYPE_ICON[mission.config.type]} size={22} />}
                   </span>
                   <div className="gap-space-1 flex min-w-0 flex-1 flex-col">

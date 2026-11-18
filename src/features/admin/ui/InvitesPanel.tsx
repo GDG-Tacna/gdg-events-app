@@ -126,7 +126,7 @@ export function InvitesPanel({ invites, assignable, create, revoke, origin, now 
           <p className="type-body-sm text-foreground">
             {interpolate(t.created, { email: link.email })} {link.emailed ? t.emailed : null}
           </p>
-          <code className="type-caption text-cyan break-all select-all">{link.url}</code>
+          <code className="type-caption text-cyan-ink break-all select-all">{link.url}</code>
           <Button type="button" variant="secondary" size="sm" className="gap-space-2 self-start" onClick={() => void copyLink()}>
             <Icon name={copied ? "check" : "share"} size={16} />
             {copied ? t.copied : t.copy}

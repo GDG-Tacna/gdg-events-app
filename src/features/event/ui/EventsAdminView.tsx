@@ -49,7 +49,7 @@ export interface EventsAdminViewProps {
 
 const t = copy.admin.events;
 type Stage = keyof typeof t.stage;
-const STAGE_STYLE: Record<Stage, string> = { live: "border-accent text-accent", draft: "border-line-strong text-muted-foreground", finished: "border-line-strong text-text-subtle" };
+const STAGE_STYLE: Record<Stage, string> = { live: "border-accent text-lime-ink", draft: "border-line-strong text-muted-foreground", finished: "border-line-strong text-text-subtle" };
 
 const formatDate = (iso: string) => new Intl.DateTimeFormat("es-PE", { dateStyle: "medium", timeStyle: "short", timeZone: EDITION.timeZone }).format(new Date(iso));
 const nameOf = (edition: EditionRow) => edition.name ?? edition.id;
@@ -192,7 +192,7 @@ export function EventsAdminView({ editions, now, canManage, create, update, setS
             <li key={edition.id}>
               <Card className={cn("gap-space-3 flex flex-col", edition.isPublic && "border-accent/60")}>
                 <div className="gap-space-3 flex items-start">
-                  <span aria-hidden="true" className="bg-bg-deep border-line-strong text-cyan grid size-12 shrink-0 place-items-center rounded-md border">
+                  <span aria-hidden="true" className="bg-bg-deep border-line-strong text-cyan-ink grid size-12 shrink-0 place-items-center rounded-md border">
                     <Icon name="calendar" size={22} />
                   </span>
                   <div className="gap-space-1 flex min-w-0 flex-1 flex-col">

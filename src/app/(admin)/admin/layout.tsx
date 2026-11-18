@@ -8,6 +8,7 @@ import { moduleSwitches } from "@/app-shell/modules.server";
 import { sectionLevels } from "@/app-shell/permissions.server";
 import { AdminShell } from "@/features/admin";
 import { SignOutButton } from "@/features/auth";
+import { ThemeToggle } from "@/shared/ui";
 import { EditionSwitcher, WorkingEditionNotice } from "@/features/event";
 import { FEATURES } from "@/shared/config/features";
 import { copy } from "@/shared/copy/es";
@@ -30,9 +31,21 @@ export default async function AdminLayout({ children, modal }: LayoutProps<"/adm
       items={adminNavItems((module) => modules[module], levels)}
       readOnly={readOnlyAreas(levels)}
       account={session.displayName ?? copy.admin.accountLabel}
-      accountActions={<SignOutButton />}
+      accountActions={
+        <div className="gap-space-2 flex items-center">
+          <ThemeToggle />
+          <div className="flex-1">
+            <SignOutButton />
+          </div>
+        </div>
+      }
       accountPhotoUrl={session.photoUrl}
-      compactAccountActions={<SignOutButton variant="icon" />}
+      compactAccountActions={
+        <div className="gap-space-2 flex items-center">
+          <ThemeToggle />
+          <SignOutButton variant="icon" />
+        </div>
+      }
       edition={editions?.current ? <EditionSwitcher choices={editions.choices} current={editions.current} choose={chooseWorkingEditionAction} /> : null}
       notice={editions?.current ? <WorkingEditionNotice current={editions.current} live={live} choose={chooseWorkingEditionAction} /> : null}
     >

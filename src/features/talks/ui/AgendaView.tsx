@@ -66,14 +66,14 @@ export function AgendaView({ items, rooms }: AgendaViewProps) {
                     {/* A border, not the glow: several talks can be live at once, and the glow is for one element per screen. */}
                     <Card className={cn("gap-space-2 flex flex-col", item.status === "live" && "border-cyan/70", item.status === "past" && "opacity-70")}>
                       <div className="gap-space-2 flex flex-wrap items-center">
-                        <span className="type-caption text-cyan tabular-nums">{time ?? a.noSchedule}</span>
+                        <span className="type-caption text-cyan-ink tabular-nums">{time ?? a.noSchedule}</span>
                         {badge ? (
-                          <span className={cn("type-caption rounded-full border px-space-2 py-0.5", item.status === "live" ? "border-lime/70 text-lime" : "border-line-strong text-foreground")}>
+                          <span className={cn("type-caption rounded-full border px-space-2 py-0.5", item.status === "live" ? "border-lime/70 text-lime-ink" : "border-line-strong text-foreground")}>
                             {badge}
                           </span>
                         ) : null}
                         {item.attended ? (
-                          <span className="type-caption text-lime gap-space-1 ml-auto inline-flex items-center">
+                          <span className="type-caption text-lime-ink gap-space-1 ml-auto inline-flex items-center">
                             <Icon name="check" size={16} />
                             {a.attended}
                           </span>

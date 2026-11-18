@@ -104,7 +104,7 @@ export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, d
         </div>
         <div className="text-right">
           <p className="type-caption text-text-subtle">{copy.staff.counterLabel[kind]}</p>
-          <p className="type-title-xl text-accent tabular-nums" aria-live="polite">
+          <p className="type-title-xl text-lime-ink tabular-nums" aria-live="polite">
             {count ?? "–"}
           </p>
         </div>
@@ -121,7 +121,7 @@ export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, d
         )}
         {state.status === "sending" ? (
           <div className="bg-bg-deep/70 absolute inset-0 grid place-items-center">
-            <Icon name="loading" size={40} className="text-cyan" />
+            <Icon name="loading" size={40} className="text-cyan-ink" />
           </div>
         ) : null}
       </div>

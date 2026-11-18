@@ -17,7 +17,7 @@ const t = copy.stage;
 /** Each squad's pixel logo, with its uploaded logo's address when it has one. */
 export type SquadSprites = Readonly<Record<string, PixelSpriteData & { logoUrl?: string | null }>>;
 
-const PLACE_TONE = ["text-gold", "text-foreground", "text-violet-soft"];
+const PLACE_TONE = ["text-gold-ink", "text-foreground", "text-violet-soft-ink"];
 
 /** Rows already on the board that moved up since the last one, so they can flash once. */
 function useClimbers(keys: readonly string[]): ReadonlySet<string> {
@@ -64,7 +64,7 @@ export function CadetBoard({ cadets }: { cadets: readonly BoardCadet[] }) {
             <span className="font-display truncate text-[clamp(1.25rem,4vh,3.5rem)] leading-[1.2] font-semibold">{cadet.alias}</span>
             <span className="text-text-subtle truncate text-[clamp(0.85rem,2.2vh,1.75rem)] leading-[1.2]">{cadet.squad ?? t.noSquad}</span>
           </span>
-          <span className="font-display text-accent text-[clamp(1.25rem,3.2vh,2.75rem)] font-semibold tabular-nums">{interpolate(t.xp, { n: formatNumber(cadet.xp) })}</span>
+          <span className="font-display text-lime-ink text-[clamp(1.25rem,3.2vh,2.75rem)] font-semibold tabular-nums">{interpolate(t.xp, { n: formatNumber(cadet.xp) })}</span>
         </motion.li>
       ))}
     </ol>
@@ -84,7 +84,7 @@ export function SquadBoard({ squads, sprites }: { squads: readonly SquadStanding
               <span className={cn("type-pixel-tag text-[clamp(1.25rem,3.4vh,3rem)]", PLACE_TONE[squad.position - 1] ?? "text-text-subtle")}>{squad.position}</span>
               {sprite ? <SquadArt sprite={sprite} logoUrl={sprite.logoUrl} scale={4} /> : null}
               <span className="font-display min-w-0 flex-1 truncate text-[clamp(1.25rem,3.6vh,3.25rem)] leading-[1.2] font-semibold">{squad.name}</span>
-              <span className="font-display text-accent text-[clamp(1.25rem,3.4vh,3rem)] font-semibold tabular-nums">{interpolate(t.xp, { n: formatNumber(squad.xp) })}</span>
+              <span className="font-display text-lime-ink text-[clamp(1.25rem,3.4vh,3rem)] font-semibold tabular-nums">{interpolate(t.xp, { n: formatNumber(squad.xp) })}</span>
             </div>
             <div className="bg-bg-deep h-[1.6vh] min-h-2 overflow-hidden rounded-full" aria-hidden="true">
               <motion.div
@@ -155,7 +155,7 @@ export function RaffleScreen({ raffle }: { raffle: StageRaffle }) {
           className="border-gold/60 bg-bg-deep h-[24vh] w-auto max-w-[40vw] rounded-lg border object-contain"
         />
       ) : null}
-      <h2 className="font-display text-gold text-[clamp(2rem,7vh,6rem)] font-bold">{raffle.prizeName}</h2>
+      <h2 className="font-display text-gold-ink text-[clamp(2rem,7vh,6rem)] font-bold">{raffle.prizeName}</h2>
       <div
         aria-live="off"
         className={cn("bg-surface flex min-w-[min(80vw,1100px)] flex-col items-center gap-[1.5vh] rounded-lg border px-[4vw] py-[5vh]", landed ? "border-gold/80 shadow-[var(--shadow-glow-gold)]" : "border-border")}
@@ -166,7 +166,7 @@ export function RaffleScreen({ raffle }: { raffle: StageRaffle }) {
         </p>
         {landed ? (
           <p className="text-muted-foreground text-[clamp(1rem,2.8vh,2.5rem)]">
-            {raffle.winner.squad ?? t.noSquad} · <span className="text-accent">{interpolate(t.raffle.tickets, { n: formatNumber(raffle.tickets), total: formatNumber(raffle.totalTickets) })}</span>
+            {raffle.winner.squad ?? t.noSquad} · <span className="text-lime-ink">{interpolate(t.raffle.tickets, { n: formatNumber(raffle.tickets), total: formatNumber(raffle.totalTickets) })}</span>
           </p>
         ) : null}
       </div>
@@ -186,7 +186,7 @@ export function RevealScreen({ champions, sprites }: { champions: StageChampions
   const sprite = squad ? sprites[squad.id] : undefined;
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-[5vh] text-center">
-      <motion.h2 {...enter(0)} className="font-display text-gold flex items-center gap-[2vw] text-[clamp(2rem,7vh,6rem)] font-bold">
+      <motion.h2 {...enter(0)} className="font-display text-gold-ink flex items-center gap-[2vw] text-[clamp(2rem,7vh,6rem)] font-bold">
         <PixelStar scale={6} />
         {t.reveal.title}
         <PixelStar scale={6} />
@@ -197,7 +197,7 @@ export function RevealScreen({ champions, sprites }: { champions: StageChampions
           <p className="font-display max-w-full truncate text-[clamp(2rem,7vh,6rem)] leading-[1.2] font-bold">{cadet ? cadet.alias : t.reveal.none}</p>
           {cadet ? (
             <p className="text-muted-foreground text-[clamp(1rem,2.6vh,2.25rem)]">
-              {cadet.squad ?? t.noSquad} · <span className="text-accent">{interpolate(t.xp, { n: formatNumber(cadet.xp) })}</span>
+              {cadet.squad ?? t.noSquad} · <span className="text-lime-ink">{interpolate(t.xp, { n: formatNumber(cadet.xp) })}</span>
             </p>
           ) : null}
         </motion.section>
@@ -205,7 +205,7 @@ export function RevealScreen({ champions, sprites }: { champions: StageChampions
           <p className="text-text-subtle text-[clamp(1rem,2.4vh,2rem)] tracking-wide uppercase">{t.reveal.squad}</p>
           {sprite ? <SquadArt sprite={sprite} logoUrl={sprite.logoUrl} scale={6} /> : null}
           <p className="font-display max-w-full truncate text-[clamp(1.75rem,4.6vh,4.25rem)] leading-[1.2] font-bold">{squad ? squad.name : t.reveal.none}</p>
-          {squad ? <p className="text-accent text-[clamp(1rem,2.6vh,2.25rem)]">{interpolate(t.xp, { n: formatNumber(squad.xp) })}</p> : null}
+          {squad ? <p className="text-lime-ink text-[clamp(1rem,2.6vh,2.25rem)]">{interpolate(t.xp, { n: formatNumber(squad.xp) })}</p> : null}
         </motion.section>
       </div>
     </div>

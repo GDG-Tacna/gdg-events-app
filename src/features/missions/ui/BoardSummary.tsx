@@ -22,12 +22,12 @@ export function BoardSummary({ done, total, xp, credits, barValue = done }: Boar
       <div className="gap-space-3 flex flex-wrap items-center justify-between">
         <p className="type-label text-foreground">{summary}</p>
         <p className="gap-space-3 flex items-center">
-          <span className="type-pixel-tag text-accent">
+          <span className="type-pixel-tag text-lime-ink">
             <span className="sr-only">{copy.missions.earned}: </span>
             {interpolate(copy.missions.xp, { xp: formatNumber(xp) })}
           </span>
           {credits > 0 ? (
-            <span className="type-pixel-tag text-gold">
+            <span className="type-pixel-tag text-gold-ink">
               <span className="sr-only">{copy.missions.earnedCredits}: </span>
               {interpolate(copy.missions.credits, { n: formatNumber(credits) })}
             </span>

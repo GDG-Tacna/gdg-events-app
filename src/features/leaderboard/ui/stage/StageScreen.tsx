@@ -83,7 +83,7 @@ export function StageScreen({ eventId, feed, squads, sprites, initialStage, init
   if (status === "signed-out" || status === "denied") {
     return (
       <div role="alert" className="flex min-h-dvh flex-col items-center justify-center gap-4 px-8 text-center">
-        <Icon name="lock" size={48} className="text-gold" />
+        <Icon name="lock" size={48} className="text-gold-ink" />
         <p className="font-display text-3xl font-bold">{t.errors[status].title}</p>
         <p className="text-muted-foreground max-w-[60ch] text-xl">{t.errors[status].body}</p>
       </div>
@@ -109,7 +109,7 @@ export function StageScreen({ eventId, feed, squads, sprites, initialStage, init
           </div>
           <div className="flex items-center gap-3">
             {stage.frozen && stage.display === "ranking" ? (
-              <span className="type-pixel-tag border-gold text-gold rounded-full border px-4 py-1 text-[clamp(0.9rem,2vh,1.6rem)]">{t.frozen}</span>
+              <span className="type-pixel-tag border-gold text-gold-ink rounded-full border px-4 py-1 text-[clamp(0.9rem,2vh,1.6rem)]">{t.frozen}</span>
             ) : null}
             <StatusPill status={status} />
             {!fullscreen ? (

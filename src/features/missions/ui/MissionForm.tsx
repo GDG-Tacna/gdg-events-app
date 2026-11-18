@@ -282,7 +282,7 @@ export function MissionForm({ mode, mission, initial, save, upload, quadrants, c
             />
             <p className="type-caption text-text-subtle">{copy.admin.missions.form.imageHint}</p>
             {fieldError("image") ? (
-              <p role="alert" className="type-body-sm text-danger">
+              <p role="alert" className="type-body-sm text-danger-ink">
                 {fieldError("image")}
               </p>
             ) : null}
@@ -596,7 +596,7 @@ function QuizFields({
           </Button>
         ) : null}
         {errors.options ? (
-          <p role="alert" className="type-body-sm text-danger">
+          <p role="alert" className="type-body-sm text-danger-ink">
             {errors.options}
           </p>
         ) : null}

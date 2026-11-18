@@ -15,7 +15,7 @@ export function SpeakerCallout({ name, href }: SpeakerCalloutProps) {
   return (
     <Card aria-label={t.label} role="region" className="gap-space-3 border-violet flex flex-col">
       <div className="gap-space-3 flex items-start">
-        <span aria-hidden="true" className="bg-bg-deep border-border text-violet-soft grid size-12 shrink-0 place-items-center rounded-md border">
+        <span aria-hidden="true" className="bg-bg-deep border-border text-violet-soft-ink grid size-12 shrink-0 place-items-center rounded-md border">
           <Icon name="qr" size={24} />
         </span>
         <div className="gap-space-1 flex min-w-0 flex-col">

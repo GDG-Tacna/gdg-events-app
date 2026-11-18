@@ -73,7 +73,7 @@ export function ContactScanner({ camera: Camera, connect, onConnected, onShowCon
         )}
         {state.status === "sending" ? (
           <div className="bg-bg-deep/70 absolute inset-0 grid place-items-center">
-            <Icon name="loading" size={40} className="text-cyan" />
+            <Icon name="loading" size={40} className="text-cyan-ink" />
           </div>
         ) : null}
       </div>
@@ -84,7 +84,7 @@ export function ContactScanner({ camera: Camera, connect, onConnected, onShowCon
         {message ? (
           <Card className="gap-space-4 flex flex-col">
             <div className="gap-space-3 flex items-start">
-              <Icon name={result?.ok ? "check" : "alert"} size={28} className={result?.ok ? "text-lime" : "text-danger"} />
+              <Icon name={result?.ok ? "check" : "alert"} size={28} className={result?.ok ? "text-lime-ink" : "text-danger-ink"} />
               <div className="gap-space-1 flex min-w-0 flex-col">
                 <h2 ref={resultRef} tabIndex={-1} className="type-title text-foreground focus-visible:outline-none">
                   {message.title}
@@ -97,9 +97,9 @@ export function ContactScanner({ camera: Camera, connect, onConnected, onShowCon
               <>
                 <CadetCardView card={result.card} className="bg-surface-raised border-border p-space-4 rounded-md border" />
                 {result.xpEarned + result.creditsEarned > 0 ? (
-                  <p className="type-pixel-tag text-accent gap-space-3 flex flex-wrap">
+                  <p className="type-pixel-tag text-lime-ink gap-space-3 flex flex-wrap">
                     {result.xpEarned > 0 ? <span>{interpolate(copy.network.xp, { n: formatNumber(result.xpEarned) })}</span> : null}
-                    {result.creditsEarned > 0 ? <span className="text-gold">{interpolate(copy.network.credits, { n: formatNumber(result.creditsEarned) })}</span> : null}
+                    {result.creditsEarned > 0 ? <span className="text-gold-ink">{interpolate(copy.network.credits, { n: formatNumber(result.creditsEarned) })}</span> : null}
                   </p>
                 ) : null}
                 {result.capReached ? <p className="type-body-sm text-muted-foreground">{t.capReached}</p> : null}

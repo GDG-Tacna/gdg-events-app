@@ -30,7 +30,7 @@ export function MissionTags({ type, quadrant, minigame }: MissionTagsProps) {
         </li>
       ) : null}
       {minigame ? (
-        <li className={`${chip} border-gold/60 text-gold`}>
+        <li className={`${chip} border-gold/60 text-gold-ink`}>
           <span className="type-pixel-tag text-[12px] leading-4">{copy.missions.tags.minigameBonus}</span>
           {copy.missions.tags.minigame}
         </li>

@@ -48,7 +48,7 @@ export function SelectField({ label, options, hint, error, className, ...props }
         </p>
       ) : null}
       {error ? (
-        <p id={errorId} role="alert" className="type-body-sm text-danger">
+        <p id={errorId} role="alert" className="type-body-sm text-danger-ink">
           {error}
         </p>
       ) : null}

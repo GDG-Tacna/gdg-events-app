@@ -84,7 +84,7 @@ function TransmissionCard({ transmission }: { transmission: Transmission }) {
   }
   return (
     <Card className="gap-space-2 flex flex-col">
-      <p className="type-caption text-accent gap-space-1 inline-flex items-center">
+      <p className="type-caption text-lime-ink gap-space-1 inline-flex items-center">
         <Icon name="transmission" size={16} />
         {copy.odyssey.open}
       </p>

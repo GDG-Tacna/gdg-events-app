@@ -32,7 +32,7 @@ export default async function AdminHomePage() {
         {insights.ok ? <InsightsPanel overview={insights.value} cadetsHref={levels.cadets !== "none" ? ROUTES.adminCadets : undefined} /> : <InlineAlert>{copy.admin.home.error}</InlineAlert>}
 
         <section aria-labelledby="admin-shortcuts" className="gap-space-3 flex flex-col">
-          <h2 id="admin-shortcuts" className="type-pixel-heading text-cyan">
+          <h2 id="admin-shortcuts" className="type-pixel-heading text-cyan-ink">
             {copy.admin.home.shortcutsTitle}
           </h2>
           {groupedCards(adminAreaCards((module) => modules[module], levels)).map((group) => (
@@ -46,7 +46,7 @@ export default async function AdminHomePage() {
                       title={area.description}
                       className="bg-surface border-border hover:border-cyan focus-visible:ring-ring gap-space-2 p-space-4 flex h-full flex-col items-center rounded-lg border text-center transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
                     >
-                      <span aria-hidden="true" className="border-cyan/40 text-cyan bg-bg-deep grid size-12 place-items-center rounded-md border">
+                      <span aria-hidden="true" className="border-cyan/40 text-cyan-ink bg-bg-deep grid size-12 place-items-center rounded-md border">
                         <Icon name={area.icon} size={22} />
                       </span>
                       <span className="type-label text-foreground">{area.title}</span>

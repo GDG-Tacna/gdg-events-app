@@ -30,7 +30,7 @@ function StatTile({ icon, value, label, hint }: { icon: ReactNode; value: number
       <span className="flex min-w-0 flex-col">
         <span className="type-title text-foreground tabular-nums leading-tight">{formatNumber(value)}</span>
         <span className="type-caption text-text-subtle tracking-wider uppercase">{label}</span>
-        {hint ? <span className="type-caption text-gold">{hint}</span> : null}
+        {hint ? <span className="type-caption text-gold-ink">{hint}</span> : null}
       </span>
     </div>
   );
@@ -77,7 +77,7 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
                 href={networkHref}
                 aria-label={copy.dashboard.account.network}
                 title={copy.dashboard.account.network}
-                className="border-line-strong text-cyan hover:bg-secondary focus-visible:ring-ring inline-grid size-12 shrink-0 place-items-center rounded-md border focus-visible:ring-[3px] focus-visible:outline-none"
+                className="border-line-strong text-cyan-ink hover:bg-secondary focus-visible:ring-ring inline-grid size-12 shrink-0 place-items-center rounded-md border focus-visible:ring-[3px] focus-visible:outline-none"
               >
                 <Icon name="users" size={24} />
               </Link>
@@ -87,7 +87,7 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
                 href={qrHref}
                 aria-label={copy.pass.open}
                 title={copy.pass.open}
-                className="border-line-strong text-cyan hover:bg-secondary focus-visible:ring-ring inline-grid size-12 shrink-0 place-items-center rounded-md border focus-visible:ring-[3px] focus-visible:outline-none"
+                className="border-line-strong text-cyan-ink hover:bg-secondary focus-visible:ring-ring inline-grid size-12 shrink-0 place-items-center rounded-md border focus-visible:ring-[3px] focus-visible:outline-none"
               >
                 <Icon name="qr" size={24} />
               </Link>
@@ -104,7 +104,7 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
       <div className="gap-space-2 flex flex-col">
         <div className="gap-space-2 flex items-baseline justify-between">
           <span className="type-caption text-text-subtle">{copy.dashboard.rankProgress}</span>
-          <span className="type-caption text-cyan tabular-nums">{values ? interpolate(copy.dashboard.progressCaption, values) : copy.dashboard.maxRank}</span>
+          <span className="type-caption text-cyan-ink tabular-nums">{values ? interpolate(copy.dashboard.progressCaption, values) : copy.dashboard.maxRank}</span>
         </div>
         <ProgressBar
           value={overview.progressPercent}

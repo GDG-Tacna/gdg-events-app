@@ -21,7 +21,7 @@ export function Stat({ icon, value, label, hint, className }: StatProps) {
         <span className="type-stat text-foreground tabular-nums">{formatNumber(value)}</span>
       </div>
       <p className="type-caption text-text-subtle">{label}</p>
-      {hint ? <p className="type-caption text-gold">{hint}</p> : null}
+      {hint ? <p className="type-caption text-gold-ink">{hint}</p> : null}
     </div>
   );
 }
