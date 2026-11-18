@@ -214,6 +214,8 @@ export const copy = {
       talk: "QR de charla",
       stand: "Visita a stand",
       speaker: "Conoce al speaker",
+      team: "Conoce al equipo",
+      squads: "Conoce a cada escuadrón",
       quiz: "Pregunta",
       keyword: "Palabra clave",
     },
@@ -236,7 +238,14 @@ export const copy = {
       talk: "Esta misión se completa escaneando el QR que aparece en pantalla durante la charla.",
       stand: "Esta misión se completa al visitar el stand: escanea el QR que muestra la pantalla del stand.",
       speaker: "Esta misión se completa al conocer al speaker: escanea el QR que te muestra en su teléfono o en pantalla.",
+      organizer: "Esta misión se completa al conocer a un organizador: pídele que te muestre su código «Mi código» y escanéalo.",
+      volunteer: "Esta misión se completa al conocer a un voluntario: pídele que te muestre su código «Mi código» y escanéalo.",
+      squads: "Esta misión se completa al conectar con un cadete de cada escuadrón distinto al tuyo: escanea sus códigos desde la Red.",
     },
+    /** The people a speaker or team mission names; any one of them completes it. Placeholder: {names}. */
+    people: "Escanea el código de cualquiera de ellos: {names}.",
+    /** A cumulative mission's progress. Placeholders: {done}, {total}. */
+    squadsProgress: "{done} de {total} escuadrones",
     scan: "Escanear QR",
     showQr: "Mostrar mi QR",
     /** The tags on a mission card and its screen. */
@@ -351,6 +360,7 @@ export const copy = {
       catering: { title: "¡Suministros registrados!", body: "Tu paso por este puesto quedó registrado." },
       stand: { title: "¡Stand visitado!", body: "Tu visita a este stand quedó registrada." },
       speaker: { title: "¡Speaker encontrado!", body: "Escaneaste el código de este speaker." },
+      team: { title: "¡Equipo encontrado!", body: "Escaneaste el código de un miembro del equipo." },
       contact: { title: "¡Nuevo contacto!", body: "Ya están conectados. Su tarjeta está en tus contactos." },
     },
     alreadyContact: { title: "Ya eran contactos", body: "Este cadete ya estaba en tu red: no suma dos veces." },
@@ -1658,6 +1668,12 @@ export const copy = {
       xp: "{xp} XP",
       /** Placeholder: {name}. */
       minigame: "Bonus: {name}",
+      /** Whom a speaker or team mission accepts, in the list. Placeholder: {n}. */
+      peopleSummary: {
+        speaker: { all: "Todos los speakers", one: "1 speaker", many: "{n} speakers" },
+        organizer: { all: "Todos los organizadores", one: "1 organizador", many: "{n} organizadores" },
+        volunteer: { all: "Todos los voluntarios", one: "1 voluntario", many: "{n} voluntarios" },
+      },
       otherQuadrant: "Zona inactiva",
       form: {
         createTitle: "Nueva misión",
@@ -1678,16 +1694,40 @@ export const copy = {
         xpHint: "Entre 1 y 500. Por defecto, {xp} para este tipo.",
         credits: "G-Credits",
         creditsHint: "Vacío usa el valor de Economía para este tipo ({n}). 0 para no dar créditos.",
-        checkpoint: { talk: "Charla", stand: "Stand", speaker: "Speaker" },
+        checkpoint: { talk: "Charla", stand: "Stand" },
         checkpointHint: {
           talk: "La charla cuyo QR en pantalla completa la misión.",
           stand: "El stand cuyo QR en pantalla completa la misión (también cuenta si el staff escanea el QR del cadete).",
-          speaker: "El speaker cuyo QR completa la misión. Lo muestra desde Speakers o desde su teléfono.",
         },
+        /** Whom a speaker or team mission accepts: everyone, or any one of the people the admin chooses. */
+        people: {
+          all: "Todos",
+          pick: "Elegir",
+          countOne: "1 elegido",
+          /** Placeholder: {n}. */
+          count: "{n} elegidos",
+          /** Someone chosen earlier who is no longer offered. Placeholder: {name}. */
+          unavailable: "{name} (ya no disponible)",
+          speakers: {
+            legend: "Speakers que completan la misión",
+            allHint: "Vale el código de cualquier speaker activo.",
+            pickHint: "Vale el código de cualquiera de los elegidos. Lo muestran desde Speakers o desde su teléfono.",
+            none: "No hay speakers activos. Agrégalos primero en Speakers.",
+          },
+          team: {
+            legend: "Personas que completan la misión",
+            allHint: "Vale el código de cualquier persona del equipo con ese rol.",
+            pickHint: "Vale el código de cualquiera de los elegidos.",
+            none: "No hay nadie con ese rol en Equipo. Agrégalo primero allí.",
+          },
+        },
+        teamRole: "A quién hay que conocer",
+        teamRoleHint: "Quienes son del equipo muestran su código desde «Mi código». Los voluntarios son el staff de Equipo; los organizadores, sus organizadores y admins.",
+        teamRoles: { organizer: "Un organizador", volunteer: "Un voluntario" },
+        squadsHint: "Se completa al conectar, desde la Red, con un cadete de cada escuadrón activo distinto al del cadete. Necesita el módulo Red encendido.",
         noCheckpoints: {
           talk: "No hay charlas activas. Créalas primero en Puestos.",
           stand: "No hay stands activos. Créalos primero en Puestos.",
-          speaker: "No hay speakers activos. Agrégalos primero en Speakers.",
         },
         question: "Pregunta",
         options: "Opciones",
@@ -1721,7 +1761,9 @@ export const copy = {
         "invalid-xp": "El XP debe ser un número entero entre 1 y 500.",
         "invalid-type": "Elige un tipo de misión.",
         "invalid-checkpoint": "Elige el puesto que completa la misión.",
-        "invalid-speaker": "Elige el speaker que completa la misión.",
+        "invalid-speaker": "Elige al menos un speaker, o marca «Todos».",
+        "invalid-team-role": "Elige a quién hay que conocer: un organizador o un voluntario.",
+        "invalid-team-members": "Elige al menos una persona, o marca «Todos».",
         "invalid-question": "La pregunta debe tener entre 5 y 160 caracteres.",
         "invalid-options": "Escribe de 2 a 4 opciones distintas, de hasta 80 caracteres.",
         "invalid-answer": "Marca cuál es la respuesta correcta.",
@@ -1731,7 +1773,8 @@ export const copy = {
         "unknown-quadrant": "Esa zona no está activa en esta edición.",
         "unknown-checkpoint": "Ese puesto no existe en esta edición.",
         "wrong-checkpoint-kind": "Ese puesto no es del tipo de esta misión. Para un stand, crea el puesto con el tipo Stand.",
-        "unknown-speaker": "Ese speaker no existe o está desactivado. Elige uno de la lista.",
+        "unknown-speaker": "Alguno de los speakers elegidos no existe o está desactivado. Desmárcalo e inténtalo de nuevo.",
+        "unknown-team-member": "Alguna de las personas elegidas ya no está en Equipo con ese rol. Desmárcala e inténtalo de nuevo.",
         "unknown-minigame": "Ese mini-juego no existe. Elige uno de la lista.",
         "invalid-minigame-difficulty": "Elige una dificultad de la lista.",
         "type-change": "El tipo de una misión no se puede cambiar. Crea una misión nueva.",
@@ -2579,6 +2622,27 @@ export const copy = {
       disabled: "Los speakers no están disponibles por ahora.",
       unknown: "No pudimos abrir tu QR. Inténtalo de nuevo.",
       signIn: "No pudimos entrar con Google. Inténtalo de nuevo.",
+    },
+  },
+  /** «Mi código»: the code staff and organizers show so cadets can meet them. */
+  teamCode: {
+    title: "Mi código",
+    back: "Volver",
+    intro: "Muéstralo a los cadetes que quieran conocerte: al escanearlo completan su misión. Cambia cada dos minutos.",
+    roles: { organizer: "Organizador", volunteer: "Voluntario" },
+    /** The entry point on the staff and admin homes. */
+    open: "Mostrar mi código",
+    qr: {
+      scanHint: "Los cadetes escanean este código con la app para completar «Conoce a un organizador» o «Conoce a un voluntario».",
+      errors: {
+        "checkpoint-not-found": "Ese código no existe.",
+        "checkpoint-inactive": "Ese código ya no está disponible.",
+        "not-shown-on-screen": "Ese código no se muestra en pantalla.",
+        unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
+        forbidden: "Solo el staff y los organizadores tienen un código.",
+        disabled: "Los códigos del equipo no están disponibles por ahora.",
+        unknown: "No pudimos generar el código. Revisa la clave de firma del servidor e inténtalo de nuevo.",
+      },
     },
   },
   speakerHome: {

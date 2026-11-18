@@ -15,10 +15,21 @@ describe("default missions", () => {
     expect(new Set(DEFAULT_MISSIONS.map((m) => m.order)).size).toBe(DEFAULT_MISSIONS.length);
   });
 
-  it("cover every type but speaker (it needs the edition's speakers) and every bundled quadrant, with the default XP of their type", () => {
-    expect(new Set(DEFAULT_MISSIONS.map((m) => m.config.type))).toEqual(new Set(MISSION_TYPES.filter((type) => type !== "speaker")));
+  it("cover every type and every bundled quadrant, with the default XP of their type", () => {
+    expect(new Set(DEFAULT_MISSIONS.map((m) => m.config.type))).toEqual(new Set(MISSION_TYPES));
     expect(new Set(DEFAULT_MISSIONS.map((m) => m.quadrantId))).toEqual(new Set(DEFAULT_QUADRANTS.map((q) => q.id)));
     expect(DEFAULT_MISSIONS.every((m) => m.xp === DEFAULT_XP[m.config.type] && m.active && m.minigame === null)).toBe(true);
+  });
+
+  it("include the four «Conoce a…» missions, which need nothing from the edition's data", () => {
+    const meet = DEFAULT_MISSIONS.filter((m) => m.id.startsWith("meet-")).map((m) => [m.id, m.config]);
+
+    expect(meet).toEqual([
+      ["meet-organizer", { type: "team", role: "organizer", memberUids: null }],
+      ["meet-speaker", { type: "speaker", speakerIds: null }],
+      ["meet-volunteer", { type: "team", role: "volunteer", memberUids: null }],
+      ["meet-squads", { type: "squads" }],
+    ]);
   });
 
   it("send stand missions to a stand that exists on the bundled plan", () => {

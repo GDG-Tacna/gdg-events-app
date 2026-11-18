@@ -14,11 +14,15 @@ import {
   MISSION_TYPES,
   QUIZ_OPTIONS_MAX,
   QUIZ_OPTIONS_MIN,
+  TEAM_ROLES,
+  isTeamRole,
   type Mission,
   type MissionConfig,
   type MissionType,
+  type TeamRole,
 } from "../domain/mission";
 import type { AdminOption, MinigameOption, SaveMissionAction } from "./admin-actions";
+import { PeoplePicker } from "./PeoplePicker";
 
 export interface MissionFormProps {
   mode: "create" | "edit";
@@ -33,8 +37,10 @@ export interface MissionFormProps {
   quadrants: readonly AdminOption[];
   /** Active checkpoints a talk or a stand mission can point to. */
   checkpoints: { talk: readonly AdminOption[]; stand: readonly AdminOption[] };
-  /** Active speakers a «Conoce al speaker» mission can point to (none when absent). */
+  /** Active speakers a «Conoce al speaker» mission can name (none when absent). */
   speakers?: readonly AdminOption[];
+  /** The team members who show a code of each role, for «Conoce a un organizador / voluntario» (none when absent). */
+  team?: Partial<Record<TeamRole, readonly AdminOption[]>>;
   listHref: string;
   /** The edition's G-Credits per mission type (Economía), shown as the default; absent when credits are off. */
   creditDefaults?: Partial<Record<MissionType, number>>;
@@ -63,6 +69,9 @@ type Field =
   | "xp"
   | "credits"
   | "checkpoint"
+  | "speakers"
+  | "teamRole"
+  | "members"
   | "question"
   | "options"
   | "answer"
@@ -83,8 +92,11 @@ const FIELD_OF: Partial<Record<MissionAdminErrorCode, Field>> = {
   "invalid-checkpoint": "checkpoint",
   "unknown-checkpoint": "checkpoint",
   "wrong-checkpoint-kind": "checkpoint",
-  "invalid-speaker": "checkpoint",
-  "unknown-speaker": "checkpoint",
+  "invalid-speaker": "speakers",
+  "unknown-speaker": "speakers",
+  "invalid-team-role": "teamRole",
+  "invalid-team-members": "members",
+  "unknown-team-member": "members",
   "invalid-question": "question",
   "invalid-options": "options",
   "invalid-answer": "answer",
@@ -104,7 +116,7 @@ const configOf = <T extends MissionType>(mission: Mission | undefined, type: T) 
  * The same rules as the server are checked before sending, field by field; whether the quadrant and the
  * checkpoint exist is checked by the server. Goes back to the list once saved.
  */
-export function MissionForm({ mode, mission, initial, save, upload, quadrants, checkpoints, speakers = [], listHref, creditDefaults, minigames }: MissionFormProps) {
+export function MissionForm({ mode, mission, initial, save, upload, quadrants, checkpoints, speakers = [], team: teamOptions = {}, listHref, creditDefaults, minigames }: MissionFormProps) {
   const router = useRouter();
   // What prefills the fields: the mission being edited, or a suggestion to start a new one from.
   const seed = mission ?? initial;
@@ -121,8 +133,13 @@ export function MissionForm({ mode, mission, initial, save, upload, quadrants, c
   const keyword = configOf(seed, "keyword");
   const scan = seed && (seed.config.type === "talk" || seed.config.type === "stand") ? seed.config : null;
   const met = configOf(seed, "speaker");
-  // What a scan mission points to: a checkpoint for talks and stands, a speaker for «Conoce al speaker».
-  const [checkpointId, setCheckpointId] = useState(scan?.checkpointId ?? met?.speakerId ?? "");
+  const team = configOf(seed, "team");
+  // What a talk or stand mission points to.
+  const [checkpointId, setCheckpointId] = useState(scan?.checkpointId ?? "");
+  // Whom a speaker or team mission accepts: `null` is everyone, a list is any one of them (empty until the admin chooses).
+  const [speakerPick, setSpeakerPick] = useState<readonly string[] | null>(met ? met.speakerIds : null);
+  const [teamRole, setTeamRole] = useState<TeamRole>(team?.role ?? "volunteer");
+  const [teamPick, setTeamPick] = useState<readonly string[] | null>(team ? team.memberUids : null);
   const [question, setQuestion] = useState(quiz?.question ?? "");
   const [options, setOptions] = useState<string[]>(quiz ? [...quiz.options] : ["", ""]);
   const [answer, setAnswer] = useState(quiz?.answer ?? 0);
@@ -140,8 +157,8 @@ export function MissionForm({ mode, mission, initial, save, upload, quadrants, c
   const [error, setError] = useState<MissionAdminErrorCode | null>(null);
 
   const id = mode === "edit" && mission ? mission.id : (idDraft ?? suggestId(title));
-  const scanOptions = type === "talk" || type === "stand" ? checkpoints[type] : type === "speaker" ? speakers : [];
-  const scanned = type === "talk" || type === "stand" || type === "speaker";
+  const scanOptions = type === "talk" || type === "stand" ? checkpoints[type] : [];
+  const scanned = type === "talk" || type === "stand";
   const field = error ? FIELD_OF[error] : undefined;
   const fieldError = (name: Field) => (field === name && error ? copy.admin.missions.errors[error] : null);
 
@@ -158,7 +175,11 @@ export function MissionForm({ mode, mission, initial, save, upload, quadrants, c
       case "stand":
         return { type, checkpointId: checkpointId || (scanOptions[0]?.id ?? "") };
       case "speaker":
-        return { type, speakerId: checkpointId || (scanOptions[0]?.id ?? "") };
+        return { type, speakerIds: speakerPick };
+      case "team":
+        return { type, role: teamRole, memberUids: teamPick };
+      case "squads":
+        return { type };
       case "quiz":
         return { type, question, options, answer };
       case "keyword":
@@ -333,6 +354,48 @@ export function MissionForm({ mode, mission, initial, save, upload, quadrants, c
               <InlineAlert>{copy.admin.missions.form.noCheckpoints[type]}</InlineAlert>
             )
           ) : null}
+
+          {type === "speaker" ? (
+            <PeoplePicker
+              legend={copy.admin.missions.form.people.speakers.legend}
+              texts={copy.admin.missions.form.people.speakers}
+              people={speakers}
+              value={speakerPick}
+              onChange={setSpeakerPick}
+              disabled={pending}
+              error={fieldError("speakers")}
+            />
+          ) : null}
+
+          {type === "team" ? (
+            <>
+              <SelectField
+                label={copy.admin.missions.form.teamRole}
+                hint={copy.admin.missions.form.teamRoleHint}
+                options={TEAM_ROLES.map((role) => ({ value: role, label: copy.admin.missions.form.teamRoles[role] }))}
+                value={teamRole}
+                disabled={pending}
+                error={fieldError("teamRole")}
+                onChange={(event) => {
+                  if (!isTeamRole(event.target.value)) return;
+                  setTeamRole(event.target.value);
+                  // The people of one role are not the people of the other: keep choosing, but from scratch.
+                  setTeamPick((current) => (current === null ? null : []));
+                }}
+              />
+              <PeoplePicker
+                legend={copy.admin.missions.form.people.team.legend}
+                texts={copy.admin.missions.form.people.team}
+                people={teamOptions[teamRole] ?? []}
+                value={teamPick}
+                onChange={setTeamPick}
+                disabled={pending}
+                error={fieldError("members")}
+              />
+            </>
+          ) : null}
+
+          {type === "squads" ? <InlineAlert>{copy.admin.missions.form.squadsHint}</InlineAlert> : null}
 
           {type === "quiz" ? (
             <QuizFields

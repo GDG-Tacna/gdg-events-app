@@ -9,6 +9,7 @@ import { FirestoreCommunicationStore } from "@/features/odyssey/server";
 import { getGalaxyMap } from "@/features/quadrants/server";
 import { err, ok } from "@/shared/lib/result";
 import { recordImages } from "./media.server";
+import { teamByMissionRole } from "./mission-team.server";
 import { speakerStore } from "./speakers.server";
 
 /**
@@ -35,6 +36,12 @@ export const missionAdminDeps: MissionAdminDeps = {
     activeIds: async () => {
       const listed = await speakerStore.list();
       return listed.ok ? ok(new Set(listed.value.filter((speaker) => speaker.active).map((speaker) => speaker.id))) : err({ code: "unknown" });
+    },
+  },
+  team: {
+    membersOf: async (role) => {
+      const team = await teamByMissionRole();
+      return team.ok ? ok(new Set(team.value[role].map((member) => member.uid))) : err({ code: "unknown" });
     },
   },
   minigames: { ids: MINIGAME_IDS },

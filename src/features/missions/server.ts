@@ -6,6 +6,8 @@ export {
   missionError,
   completeByCheckpoint,
   completeBySpeaker,
+  completeByTeam,
+  completeBySquads,
   submitMissionProof,
   type ScanMission,
   type BoardMission,
@@ -17,8 +19,9 @@ export {
   type SubmitProofDeps,
 } from "./domain/use-cases";
 export { evaluate, type MissionCompletion, type MissionProof } from "./domain/completion";
-export { DEFAULT_XP, MISSION_TYPES, parseMission, type Mission, type MissionConfig, type MissionType } from "./domain/mission";
-export type { AttemptLimiter, CompletionStore, CreditRules, MissionSource, XpGranter } from "./domain/ports";
+export { DEFAULT_XP, MISSION_TYPES, TEAM_ROLES, parseMission, type Mission, type MissionConfig, type MissionType, type TeamRole } from "./domain/mission";
+export { squadProgressOf } from "./domain/squad-progress";
+export type { AttemptLimiter, CompletionStore, CreditRules, MissionSource, SquadProgress, SquadProgressSource, XpGranter } from "./domain/ports";
 export {
   createMission,
   deleteMission,
@@ -30,6 +33,7 @@ export {
   updateMission,
   type CheckpointDirectory,
   type SpeakerDirectory,
+  type TeamDirectory,
   type MissionAdminActor,
   type MissionAdminDeps,
   type MissionAdminError,

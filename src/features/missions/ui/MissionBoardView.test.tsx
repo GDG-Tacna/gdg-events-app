@@ -179,4 +179,28 @@ describe("MissionBoardView", () => {
     expect(tile("Misión b").querySelector("svg.lucide-circle-check")).toBeInTheDocument();
     expect(container.querySelectorAll("img[alt='']")).toHaveLength(2);
   });
+
+  it("shows how many squads an open «Conoce a cada escuadrón» mission has met instead of «Pendiente»", () => {
+    const squads = mission("meet-squads", "cloud", { type: "squads", config: { type: "squads" }, progress: { done: 1, total: 2 } });
+    render(<MissionBoardView board={board([squads, mission("other", "cloud")])} quadrants={QUADRANTS} missionHref={(id) => `/missions/${id}`} />);
+
+    expect(within(card("Misión meet-squads")).getByText("1 de 2 escuadrones")).toBeInTheDocument();
+    expect(within(card("Misión meet-squads")).queryByText(copy.missions.status.open)).not.toBeInTheDocument();
+    expect(within(card("Misión other")).getByText(copy.missions.status.open)).toBeInTheDocument();
+  });
+
+  it("names the type of the new «Conoce a…» missions with their own icon and label", () => {
+    const { container } = render(
+      <MissionBoardView
+        board={board([mission("a", "cloud", { type: "team", config: { type: "team", role: "volunteer", memberUids: null } }), mission("b", "cloud", { type: "squads", config: { type: "squads" } })])}
+        quadrants={QUADRANTS}
+        missionHref={(id) => `/missions/${id}`}
+      />,
+    );
+
+    expect(within(card("Misión a")).getByText(copy.missions.types.team)).toBeInTheDocument();
+    expect(within(card("Misión b")).getByText(copy.missions.types.squads)).toBeInTheDocument();
+    expect(container.querySelector("li > div > span[aria-hidden='true'] svg.lucide-users-round")).toBeInTheDocument();
+    expect(container.querySelector("li > div > span[aria-hidden='true'] svg.lucide-flag")).toBeInTheDocument();
+  });
 });

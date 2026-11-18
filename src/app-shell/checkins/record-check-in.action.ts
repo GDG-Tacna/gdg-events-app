@@ -4,6 +4,7 @@ import { z } from "zod";
 import { unlockAchievements } from "@/app-shell/composition/achievements.server";
 import { checkInDeps } from "@/app-shell/composition/checkins.server";
 import { speakerCodeDeps } from "@/app-shell/composition/speakers.server";
+import { teamCodeDeps } from "@/app-shell/composition/team-code.server";
 import { currentEconomy, rewardLedger } from "@/app-shell/composition/economy.server";
 import { missionDeps } from "@/app-shell/composition/missions.server";
 import { getSession } from "@/app-shell/guards";
@@ -11,11 +12,13 @@ import { connectContactAction } from "@/app-shell/network/network.actions";
 import type { CheckInErrorCode, RecordCheckInActionResult, ScanReward } from "@/features/checkins";
 import { recordCheckIn } from "@/features/checkins/server";
 import { rewardTalk } from "@/features/economy/server";
-import { completeByCheckpoint, completeBySpeaker } from "@/features/missions/server";
+import { completeByCheckpoint, completeBySpeaker, completeByTeam } from "@/features/missions/server";
 import { isContactCode } from "@/features/network";
 import { isPassCode } from "@/features/pass";
 import { isSpeakerCode } from "@/features/speakers";
 import { verifySpeakerCode } from "@/features/speakers/server";
+import { isTeamCode } from "@/features/team-code";
+import { verifyTeamCode } from "@/features/team-code/server";
 import { FEATURES } from "@/shared/config/features";
 import { moduleOn } from "@/app-shell/modules.server";
 
@@ -48,6 +51,7 @@ export async function recordCheckInAction(payload: string): Promise<RecordCheckI
   // A cadet's personal pass is for staff to scan: say so instead of calling it «not a DevFest code».
   if (isPassCode(parsed.data)) return { ok: false, code: "pass-code" };
   if (isSpeakerCode(parsed.data)) return meetSpeaker(session.uid, parsed.data);
+  if (isTeamCode(parsed.data)) return meetTeam(session.uid, parsed.data);
 
   const result = await recordCheckIn(checkInDeps, { uid: session.uid, payload: parsed.data });
   if (!result.ok) return { ok: false, code: result.error.code };
@@ -88,7 +92,7 @@ const CONTACT_ERRORS: Record<string, CheckInErrorCode> = {
 async function connectContact(payload: string): Promise<RecordCheckInActionResult> {
   const connected = await connectContactAction(payload);
   if (!connected.ok) return { ok: false, code: CONTACT_ERRORS[connected.code] ?? "unknown" };
-  const { card, created, xpEarned, creditsEarned, capReached, achievements } = connected;
+  const { card, created, xpEarned, creditsEarned, capReached, achievements, missions = [] } = connected;
   // `checkpointId` names no puesto here: a contact is between cadets.
   return {
     ok: true,
@@ -97,6 +101,7 @@ async function connectContact(payload: string): Promise<RecordCheckInActionResul
     recorded: created,
     firstEntrance: false,
     contact: { card, created, xpEarned, creditsEarned, capReached },
+    missions,
     achievements,
   };
 }
@@ -124,4 +129,25 @@ async function meetSpeaker(uid: string, payload: string): Promise<RecordCheckInA
   }
   const achievements = await unlockAchievements(uid);
   return { ok: true, checkpointId: verified.speakerId, kind: "speaker", recorded: true, firstEntrance: false, missions, talkCredits: 0, achievements };
+}
+
+/**
+ * A team member's code («Conoce a un organizador / voluntario»): like a speaker's, not a check-in, so nothing is recorded
+ * but the missions it completes. It goes through the same per-cadet limiter, then the signature and expiry (the role
+ * it carries is signed). Scanning it again is safe: a completed mission is never paid twice.
+ */
+async function meetTeam(uid: string, payload: string): Promise<RecordCheckInActionResult> {
+  if (!(await checkInDeps.limiter.consume(uid))) return { ok: false, code: "rate-limited" };
+  const verified = verifyTeamCode(teamCodeDeps, payload);
+  if (!verified.ok) return { ok: false, code: verified.code };
+
+  let missions: ScanReward[] = [];
+  if (await moduleOn("missions")) {
+    // The code names who showed it (signed), so a mission that picks certain people can tell them apart.
+    const completed = await completeByTeam(missionDeps, uid, { role: verified.role, memberUid: verified.uid });
+    if (!completed.ok && completed.error.code === "not-registered") return { ok: false, code: "not-registered" };
+    if (completed.ok) missions = completed.value.map(({ id, title, xpEarned, creditsEarned, justCompleted }) => ({ id, title, xpEarned, creditsEarned, justCompleted }));
+  }
+  const achievements = await unlockAchievements(uid);
+  return { ok: true, checkpointId: verified.role, kind: "team", recorded: true, firstEntrance: false, missions, talkCredits: 0, achievements };
 }

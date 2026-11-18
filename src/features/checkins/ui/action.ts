@@ -13,8 +13,8 @@ export interface ScanReward {
 }
 
 /** What the server action answers to the scanner screen. Plain data: it crosses the client boundary. */
-/** What a scan was: a checkpoint of some kind, a speaker's own code («Conoce al speaker») or another cadet's contact code. */
-export type ScanKind = CheckpointKind | "speaker" | "contact";
+/** What a scan was: a checkpoint of some kind, a speaker's or a team member's own code («Conoce al speaker / equipo») or another cadet's contact code. */
+export type ScanKind = CheckpointKind | "speaker" | "team" | "contact";
 
 /** The other cadet a contact code was scanned from: their card and what the contact paid. Filled in by the app shell. */
 export interface ScanContact {

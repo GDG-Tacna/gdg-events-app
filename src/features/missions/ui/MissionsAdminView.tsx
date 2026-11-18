@@ -33,11 +33,23 @@ const TYPE_ICON: Record<MissionType, IconName> = {
   talk: "qr",
   stand: "map-pin",
   speaker: "person",
+  team: "users",
+  squads: "flag",
   quiz: "question",
   keyword: "key",
 };
 /** A non-breaking space keeps the dot on the line of the item before it. */
 const SEPARATOR = " · ";
+
+/** Whom a speaker or team mission accepts, in words («Todos los speakers», «3 voluntarios»); nothing for the other types. */
+function peopleSummary(config: Mission["config"]): string | null {
+  if (config.type !== "speaker" && config.type !== "team") return null;
+  const words = copy.admin.missions.peopleSummary[config.type === "speaker" ? "speaker" : config.role];
+  const picked = config.type === "speaker" ? config.speakerIds : config.memberUids;
+  if (picked === null) return words.all;
+  return picked.length === 1 ? words.one : interpolate(words.many, { n: String(picked.length) });
+}
+
 const chip ="type-caption border-line-strong text-foreground px-space-3 rounded-full border py-1";
 
 /**
@@ -132,6 +144,12 @@ export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, se
                       <span>{quadrantName(mission.quadrantId)}</span>
                       <span aria-hidden="true">{SEPARATOR}</span>
                       <span className="whitespace-nowrap">{interpolate(copy.admin.missions.xp, { xp: formatNumber(mission.xp) })}</span>
+                      {peopleSummary(mission.config) ? (
+                        <>
+                          <span aria-hidden="true">{SEPARATOR}</span>
+                          <span>{peopleSummary(mission.config)}</span>
+                        </>
+                      ) : null}
                       {mission.minigame && mission.minigame in copy.minigames.names ? (
                         <>
                           <span aria-hidden="true">{SEPARATOR}</span>

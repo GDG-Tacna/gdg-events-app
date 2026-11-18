@@ -1,10 +1,15 @@
 import type { ImageRef } from "@/features/media/constants";
 /** Mission types: a closed set, because each one's proof is checked by code on the server. */
-export const MISSION_TYPES = ["talk", "stand", "speaker", "quiz", "keyword"] as const;
+export const MISSION_TYPES = ["talk", "stand", "speaker", "team", "squads", "quiz", "keyword"] as const;
 export type MissionType = (typeof MISSION_TYPES)[number];
 
+/** Who a «Conoce al equipo» mission asks the cadet to meet: an organizer, or a volunteer (staff). */
+export const TEAM_ROLES = ["organizer", "volunteer"] as const;
+export type TeamRole = (typeof TEAM_ROLES)[number];
+export const isTeamRole = (value: unknown): value is TeamRole => typeof value === "string" && (TEAM_ROLES as readonly string[]).includes(value);
+
 /** XP a new mission of each type starts with; the admin can change it per mission. */
-export const DEFAULT_XP: Record<MissionType, number> = { talk: 50, stand: 30, speaker: 40, quiz: 40, keyword: 40 };
+export const DEFAULT_XP: Record<MissionType, number> = { talk: 50, stand: 30, speaker: 40, team: 30, squads: 60, quiz: 40, keyword: 40 };
 
 export const MISSION_XP_MAX = 500;
 export const MISSION_CREDITS_MAX = 1000;
@@ -12,6 +17,8 @@ export const QUIZ_ATTEMPTS = 2;
 export const QUIZ_OPTIONS_MIN = 2;
 export const QUIZ_OPTIONS_MAX = 4;
 export const KEYWORDS_MAX = 5;
+/** Most people a speaker or team mission can name (it accepts any one of them). */
+export const PICK_MAX = 50;
 
 /** The difficulties a mission may set for its mini-game (the same set as the mini-games catalog). */
 export const MINIGAME_DIFFICULTIES = ["easy", "normal", "hard"] as const;
@@ -25,8 +32,21 @@ export type MissionConfig =
   | { type: "talk"; checkpointId: string }
   /** Completed by scanning the printed QR of this stand. */
   | { type: "stand"; checkpointId: string }
-  /** Completed by scanning the code of this speaker (shown by an admin or by the speaker on their phone). */
-  | { type: "speaker"; speakerId: string }
+  /**
+   * Completed by scanning the code of any one of these speakers (shown by an admin or by the speaker on their phone);
+   * `null` accepts every speaker.
+   */
+  | { type: "speaker"; speakerIds: readonly string[] | null }
+  /**
+   * Completed by scanning the code of a team member with this role (shown from their staff or admin session): any
+   * one of `memberUids`, or any member with the role when it is `null`.
+   */
+  | { type: "team"; role: TeamRole; memberUids: readonly string[] | null }
+  /**
+   * Cumulative: completed once the cadet has made a contact with someone from every other active squad. The target is
+   * derived from the squads catalog and the cadet's own squad, so nothing is stored here.
+   */
+  | { type: "squads" }
   /** Two attempts; a right second answer earns half the XP. `answer` is the index of the right option. */
   | { type: "quiz"; question: string; options: readonly string[]; answer: number }
   /** A word given at a stand or by a speaker. Stored normalized (`normalizeKeyword`). */
@@ -52,11 +72,16 @@ export interface Mission {
   image?: ImageRef | null;
 }
 
-/** What an attendee may know about a mission: the question and its options, never the answer or the keywords. */
+/**
+ * What an attendee may know about a mission: the question and its options, never the answer or the keywords. The people
+ * a speaker or team mission names are not secret (the cadet is told whom to look for); the detail page turns the ids into names.
+ */
 export type PublicMissionConfig =
   | { type: "talk" }
   | { type: "stand" }
-  | { type: "speaker" }
+  | { type: "speaker"; speakerIds: readonly string[] | null }
+  | { type: "team"; role: TeamRole; memberUids: readonly string[] | null }
+  | { type: "squads" }
   | { type: "quiz"; question: string; options: readonly string[] }
   | { type: "keyword"; prompt: string };
 
@@ -64,8 +89,12 @@ export function publicConfig(config: MissionConfig): PublicMissionConfig {
   switch (config.type) {
     case "talk":
     case "stand":
-    case "speaker":
+    case "squads":
       return { type: config.type };
+    case "speaker":
+      return { type: "speaker", speakerIds: config.speakerIds };
+    case "team":
+      return { type: "team", role: config.role, memberUids: config.memberUids };
     case "quiz":
       return { type: "quiz", question: config.question, options: config.options };
     case "keyword":
@@ -88,6 +117,20 @@ export const isMissionId = (value: unknown): value is string => typeof value ===
 const REFERENCE_ID = /^[a-z0-9][a-z0-9-]{1,47}$/;
 const isReferenceId = (value: unknown): value is string => typeof value === "string" && REFERENCE_ID.test(value);
 
+/** A team member's account uid (the same shape the team code carries). */
+const MEMBER_UID = /^[A-Za-z0-9_-]{6,128}$/;
+const isMemberUid = (value: unknown): value is string => typeof value === "string" && MEMBER_UID.test(value);
+
+/**
+ * Reads a choice of people: `null` is «everyone», otherwise 1 to `PICK_MAX` valid ids (repeats dropped). `undefined`
+ * when the value is neither, so a missing or malformed list is never read as «everyone».
+ */
+function readPick(value: unknown, isValid: (item: unknown) => item is string): readonly string[] | null | undefined {
+  if (value === null) return null;
+  if (!Array.isArray(value) || value.length === 0 || value.length > PICK_MAX || !value.every(isValid)) return undefined;
+  return [...new Set<string>(value)];
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const text = (value: unknown, min: number, max: number): string | null => {
   if (typeof value !== "string") return null;
@@ -105,6 +148,8 @@ export type MissionDataErrorCode =
   | "invalid-type"
   | "invalid-checkpoint"
   | "invalid-speaker"
+  | "invalid-team-role"
+  | "invalid-team-members"
   | "invalid-question"
   | "invalid-options"
   | "invalid-answer"
@@ -121,8 +166,20 @@ function checkConfig(input: unknown): Checked<MissionConfig> {
     case "talk":
     case "stand":
       return isReferenceId(input.checkpointId) ? { ok: true, value: { type: input.type, checkpointId: input.checkpointId } } : fail("invalid-checkpoint");
-    case "speaker":
-      return isReferenceId(input.speakerId) ? { ok: true, value: { type: "speaker", speakerId: input.speakerId } } : fail("invalid-speaker");
+    case "speaker": {
+      // Missions saved before the choice of several hold one `speakerId` (a string, or null for «any»); it reads as a list of one.
+      const stored = input.speakerIds !== undefined ? input.speakerIds : typeof input.speakerId === "string" ? [input.speakerId] : input.speakerId;
+      const speakerIds = readPick(stored, isReferenceId);
+      return speakerIds === undefined ? fail("invalid-speaker") : { ok: true, value: { type: "speaker", speakerIds } };
+    }
+    case "team": {
+      if (!isTeamRole(input.role)) return fail("invalid-team-role");
+      // A mission saved before the choice of several has no list: it accepts every member with the role.
+      const memberUids = readPick(input.memberUids === undefined ? null : input.memberUids, isMemberUid);
+      return memberUids === undefined ? fail("invalid-team-members") : { ok: true, value: { type: "team", role: input.role, memberUids } };
+    }
+    case "squads":
+      return { ok: true, value: { type: "squads" } };
     case "quiz": {
       const question = text(input.question, 5, 160);
       if (!question) return fail("invalid-question");

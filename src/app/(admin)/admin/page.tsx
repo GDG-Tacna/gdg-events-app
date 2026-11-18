@@ -9,7 +9,7 @@ import { InsightsPanel } from "@/features/insights";
 import { getInsights } from "@/features/insights/server";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
-import { Icon, InlineAlert, ScreenEnter } from "@/shared/ui";
+import { ButtonLink, Icon, InlineAlert, ScreenEnter } from "@/shared/ui";
 
 export const metadata: Metadata = { title: copy.admin.nav.home };
 
@@ -24,6 +24,9 @@ export default async function AdminHomePage() {
         <header className="gap-space-1 flex flex-col">
           <h1 className="type-title-xl text-foreground">{copy.admin.home.title}</h1>
           <p className="type-body text-muted-foreground">{copy.admin.home.intro}</p>
+          <ButtonLink href={ROUTES.teamCode} variant="secondary" className="mt-space-3 self-start">
+            {copy.teamCode.open}
+          </ButtonLink>
         </header>
 
         {insights.ok ? <InsightsPanel overview={insights.value} cadetsHref={levels.cadets !== "none" ? ROUTES.adminCadets : undefined} /> : <InlineAlert>{copy.admin.home.error}</InlineAlert>}

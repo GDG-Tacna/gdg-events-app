@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { unlockAchievements } from "@/app-shell/composition/achievements.server";
+import { missionDeps } from "@/app-shell/composition/missions.server";
 import { networkDeps } from "@/app-shell/composition/network.server";
 import { getSession } from "@/app-shell/guards";
+import { completeBySquads } from "@/features/missions/server";
 import type { ConnectContactActionResult, IssueContactCodeActionResult, SaveContactLinksActionResult } from "@/features/network";
-import { connectCadets, issueContactCode, saveContactLinks, type NetworkActor } from "@/features/network/server";
+import { connectCadets, issueContactCode, saveContactLinks, verifyContactCode, type NetworkActor } from "@/features/network/server";
 import { ROUTES } from "@/shared/config/routes";
 import { moduleOn } from "@/app-shell/modules.server";
 
@@ -45,10 +47,25 @@ export async function connectContactAction(payload: string): Promise<ConnectCont
 
   const connected = await connectCadets(networkDeps, actor, parsed.data);
   if (!connected.ok) return { ok: false, code: connected.error.code };
+  // A contact may complete «Conoce a alguien de cada escuadrón» for either cadet (it is mutual); a failure never undoes the contact.
+  const missions = await completeSquadMissions(actor.uid, parsed.data);
   // A new contact may unlock "contactos hechos" badges; the other cadet gets theirs on their next scan or visit to Logros.
   const achievements = await unlockAchievements(actor.uid);
   revalidatePath(ROUTES.network);
-  return { ok: true, ...connected.value, achievements };
+  return { ok: true, ...connected.value, missions, achievements };
+}
+
+/**
+ * After a contact: completes the squads mission for the scanning cadet (answered, so the scanner can celebrate it) and for
+ * the cadet whose code was scanned (their board shows it next time). The other cadet's uid comes from the code, which
+ * `connectCadets` just verified.
+ */
+async function completeSquadMissions(uid: string, payload: string) {
+  if (!(await moduleOn("missions"))) return [];
+  const scanned = verifyContactCode(networkDeps, payload);
+  if (scanned.ok) await completeBySquads(missionDeps, scanned.value);
+  const completed = await completeBySquads(missionDeps, uid);
+  return completed.ok ? completed.value.map(({ id, title, xpEarned, creditsEarned, justCompleted }) => ({ id, title, xpEarned, creditsEarned, justCompleted })) : [];
 }
 
 /** Saves the links the cadet shows on their card. */

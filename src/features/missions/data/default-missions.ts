@@ -8,6 +8,9 @@ import { DEFAULT_XP } from "../domain/mission";
  *
  * Stand missions point to the checkpoint `stand-{area}` of a stand on the bundled plan, and the talk to
  * `talk-keynote`: both are created in Puestos. Keywords are placeholders the organizers replace.
+ *
+ * The «Conoce a…» missions (organizer, any speaker, volunteer, someone of every other squad) need no setup: the team
+ * and the speakers show their codes, and the squads one counts the cadet's contacts.
  */
 const base = (id: string, quadrantId: string, order: number) => ({ id, quadrantId, order, active: true, minigame: null, minigameDifficulty: null, credits: null });
 
@@ -18,6 +21,34 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
     description: "Escanea el QR que aparece en pantalla durante la charla inaugural.",
     xp: DEFAULT_XP.talk,
     config: { type: "talk", checkpointId: "talk-keynote" },
+  },
+  {
+    ...base("meet-organizer", "community", 1),
+    title: "Conoce a un organizador",
+    description: "Pídele a un organizador del DevFest que te muestre su código y escanéalo.",
+    xp: DEFAULT_XP.team,
+    config: { type: "team", role: "organizer", memberUids: null },
+  },
+  {
+    ...base("meet-speaker", "community", 2),
+    title: "Conoce a un speaker",
+    description: "Pídele a cualquier speaker del evento que te muestre su código y escanéalo.",
+    xp: DEFAULT_XP.speaker,
+    config: { type: "speaker", speakerIds: null },
+  },
+  {
+    ...base("meet-volunteer", "community", 3),
+    title: "Conoce a un voluntario",
+    description: "Pídele a un voluntario del DevFest que te muestre su código y escanéalo.",
+    xp: DEFAULT_XP.team,
+    config: { type: "team", role: "volunteer", memberUids: null },
+  },
+  {
+    ...base("meet-squads", "community", 4),
+    title: "Conoce a alguien de cada escuadrón",
+    description: "Escanea el código de contacto de un cadete de cada escuadrón distinto al tuyo.",
+    xp: DEFAULT_XP.squads,
+    config: { type: "squads" },
   },
 
   {

@@ -2,8 +2,10 @@ import "server-only";
 import { checkpointAdminDeps } from "@/app-shell/composition/checkpoint-admin.server";
 import { currentEconomy } from "@/app-shell/composition/economy.server";
 import { currentMinigameSettings } from "@/app-shell/composition/minigames.server";
+import { teamByMissionRole } from "@/app-shell/composition/mission-team.server";
 import { speakerStore } from "@/app-shell/composition/speakers.server";
 import { galaxyDeps } from "@/app-shell/composition/quadrants.server";
+import type { TeamMember } from "@/features/admin/server";
 import { listCheckpoints } from "@/features/checkpoints/server";
 import { MINIGAME_IDS } from "@/features/minigames/server";
 import type { AdminOption, MinigameOption } from "@/features/missions";
@@ -17,11 +19,17 @@ export interface MissionFormOptions {
   checkpoints: { talk: AdminOption[]; stand: AdminOption[] };
   /** The edition's active speakers, for «Conoce al speaker» missions. */
   speakers: AdminOption[];
+  /** The team members who show a code of each role, for «Conoce a un organizador / voluntario» missions. */
+  team: Record<"organizer" | "volunteer", AdminOption[]>;
   /** G-Credits per mission type in this edition, or absent when credits are switched off. */
-  creditDefaults?: Record<"talk" | "stand" | "speaker" | "quiz" | "keyword", number>;
+  creditDefaults?: Record<"talk" | "stand" | "speaker" | "team" | "squads" | "quiz" | "keyword", number>;
   /** Every mini-game built, with whether the edition offers it and its difficulty; absent when mini-games are off. */
   minigames?: MinigameOption[];
 }
+
+/** A person of the team as the picker lists them (only admins open this form): their name, or their email when they have none. */
+const teamOptions = (members: readonly TeamMember[]): AdminOption[] =>
+  members.map(({ uid, displayName, email }) => ({ id: uid, name: displayName ?? email })).sort((a, b) => a.name.localeCompare(b.name));
 
 /**
  * What the mission form offers: the edition's active quadrants, its open talk and stand checkpoints, its active
@@ -29,16 +37,18 @@ export interface MissionFormOptions {
  * on a failed read so the route's error boundary shows a retry instead of an empty, misleading form.
  */
 export async function loadMissionFormOptions(actor: { uid: string; role: "attendee" | "staff" | "admin" | null }): Promise<MissionFormOptions> {
-  const [galaxy, checkpoints, speakers, economy, minigames] = await Promise.all([
+  const [galaxy, checkpoints, speakers, team, economy, minigames] = await Promise.all([
     getGalaxyMap(galaxyDeps),
     listCheckpoints(checkpointAdminDeps, actor),
     speakerStore.list(),
+    teamByMissionRole(),
     currentEconomy(),
     (await moduleOn("minigames")) ? currentMinigameSettings() : null,
   ]);
   if (!galaxy.ok) throw new Error("Could not read the quadrants");
   if (!checkpoints.ok) throw new Error("Could not read the checkpoints");
   if (!speakers.ok) throw new Error("Could not read the speakers");
+  if (!team.ok) throw new Error("Could not read the team");
 
   const open = checkpoints.value.filter((checkpoint) => checkpoint.active);
   const of = (kind: string) => open.filter((checkpoint) => checkpoint.kind === kind).map(({ id, name }) => ({ id, name }));
@@ -46,6 +56,7 @@ export async function loadMissionFormOptions(actor: { uid: string; role: "attend
     quadrants: galaxy.value.quadrants.map(({ id, name }) => ({ id, name })),
     checkpoints: { talk: of("talk"), stand: of("stand") },
     speakers: [...speakers.value].filter((speaker) => speaker.active).sort(compareSpeakers).map(({ id, name }) => ({ id, name })),
+    team: { organizer: teamOptions(team.value.organizer), volunteer: teamOptions(team.value.volunteer) },
     ...(economy.creditsEnabled ? { creditDefaults: { ...economy.missionCredits } } : {}),
     ...(minigames
       ? { minigames: MINIGAME_IDS.map((id) => ({ id, name: copy.minigames.names[id], enabled: minigames.games[id].enabled, difficulty: minigames.games[id].difficulty })) }

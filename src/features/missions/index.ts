@@ -13,4 +13,4 @@ export type { SuggestMissionsAction, SuggestMissionsActionResult } from "./ui/su
 export type { SuggestErrorCode, SuggestedMission } from "./domain/suggest";
 export { SUGGESTABLE_TYPES, SUGGEST_COUNT_MAX, SUGGEST_TOPIC_MAX, SUGGEST_TOPIC_MIN } from "./domain/suggest";
 export type { CompletionStatus } from "./domain/completion";
-export { MISSION_TYPES, QUIZ_ATTEMPTS, type MissionType, type PublicMissionConfig } from "./domain/mission";
+export { MISSION_TYPES, QUIZ_ATTEMPTS, TEAM_ROLES, type MissionType, type PublicMissionConfig, type TeamRole } from "./domain/mission";
