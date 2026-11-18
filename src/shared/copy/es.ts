@@ -2573,8 +2573,20 @@ export const copy = {
     cardVoted: "Ya votaste",
     cardSee: "Ver encuesta",
     none: "No hay ninguna encuesta abierta ahora. Cuando el escenario lance una, aparecerá aquí.",
-    back: "Ir al inicio",
+    back: "Volver al inicio",
     legend: "Elige una opción",
+    results: {
+      title: "Así va la votación",
+      live: "Se actualiza solo mientras esté abierta.",
+      closed: "La encuesta se cerró. Estos son los resultados finales.",
+      listLabel: "Votos por opción",
+      yourVoteTag: "Tu voto",
+      /** Placeholder: {n}. */
+      total: "{n} votos",
+      oneVote: "1 voto",
+      /** Placeholders: {count}, {percent}. */
+      count: "{count} · {percent}%",
+    },
     vote: "Votar",
     change: "Cambiar mi voto",
     sending: "Enviando…",

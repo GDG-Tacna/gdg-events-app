@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { err, ok } from "@/shared/lib/result";
 import { closePoll, createPoll, deletePoll, listPolls, openPoll, pollResults, updatePoll, type PollAdminDeps, type PollContent } from "./manage";
 import { checkPollDraft, comparePolls, percentOf, rewardOf, type Poll, type PollDraft } from "./poll";
-import { castVote, getCadetPoll, type VoteDeps } from "./vote";
+import { castVote, getCadetPoll, getOpenPollTally, type VoteDeps } from "./vote";
 
 vi.mock("@/shared/lib/log", () => ({ logServerError: vi.fn() }));
 
@@ -182,6 +182,7 @@ function voteSetup(open: Poll | null, cast: unknown = ok({ first: true, poll: op
       openPoll: vi.fn(async () => ok(open)),
       myVote: vi.fn(async () => ok(null as string | null)),
       cast: vi.fn(async () => cast as never),
+      tally: vi.fn(async () => ok({ counts: { o1: 2, o2: 1 }, total: 3 })),
     },
     ledger: { grant: vi.fn(async () => ok({ granted: true })) },
     creditsOn: vi.fn(async () => true),
@@ -200,6 +201,27 @@ describe("voting", () => {
 
     expect(await getCadetPoll(deps, "u1")).toEqual(ok({ poll: OPEN, myVote: "o2", reward: { xp: 20, credits: 0 } }));
     expect(await getCadetPoll(voteSetup(null), "u1")).toEqual(ok(null));
+  });
+
+  it("answers the standings of the open poll only", async () => {
+    const deps = voteSetup(OPEN);
+    expect(await getOpenPollTally(deps, "poll-1")).toEqual(ok({ counts: { o1: 2, o2: 1 }, total: 3 }));
+    expect(deps.votes.tally).toHaveBeenCalledWith("poll-1");
+
+    // Another poll's id, no open poll at all, and a malformed id never reach the count.
+    const other = voteSetup(OPEN);
+    expect(await getOpenPollTally(other, "poll-2")).toEqual(err({ code: "closed" }));
+    const none = voteSetup(null);
+    expect(await getOpenPollTally(none, "poll-1")).toEqual(err({ code: "closed" }));
+    expect(await getOpenPollTally(other, "Bad Id")).toEqual(err({ code: "not-found" }));
+    expect(other.votes.tally).not.toHaveBeenCalled();
+    expect(none.votes.tally).not.toHaveBeenCalled();
+  });
+
+  it("fails as unknown when the count cannot be read", async () => {
+    const deps = voteSetup(OPEN);
+    deps.votes.tally.mockResolvedValue(err({ code: "unknown" }) as never);
+    expect(await getOpenPollTally(deps, "poll-1")).toEqual(err({ code: "unknown" }));
   });
 
   it("pays the prize through the ledger once per poll, from the poll the vote's transaction read", async () => {

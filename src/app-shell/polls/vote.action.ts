@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { voteDeps } from "@/app-shell/composition/polls.server";
+import { pollStore, voteDeps } from "@/app-shell/composition/polls.server";
 import { getSession } from "@/app-shell/guards";
 import { moduleOn } from "@/app-shell/modules.server";
 import type { VoteActionResult } from "@/features/polls";
@@ -27,5 +27,7 @@ export async function votePollAction(input: { pollId: string; optionId: string }
   if (!voted.ok) return { ok: false, code: voted.error.code };
   // The prize changes the cadet's XP or G-Credits on the dashboard.
   if (voted.value.xp + voted.value.credits > 0) revalidatePath(ROUTES.dashboard);
-  return { ok: true, ...voted.value };
+  // A fresh count, not the shared one, so the cadet sees their own vote in the results right away.
+  const tally = await pollStore.tally(parsed.data.pollId);
+  return { ok: true, ...voted.value, ...(tally.ok ? { tally: tally.value } : {}) };
 }

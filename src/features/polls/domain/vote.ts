@@ -1,6 +1,6 @@
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
-import { isOptionId, isPollId, rewardOf, type Poll } from "./poll";
+import { isOptionId, isPollId, rewardOf, type Poll, type PollTally } from "./poll";
 
 export type VoteErrorCode =
   | "not-found"
@@ -26,6 +26,8 @@ export interface VoteStore {
    * refuses a second. Answers the poll as the transaction read it and whether this was the cadet's first vote.
    */
   cast(pollId: string, uid: string, optionId: string, at: Date): Promise<Result<{ first: boolean; poll: Poll } | "closed" | "invalid-option" | "already-voted" | null, { code: string }>>;
+  /** How many voted each option of a poll, and in total. */
+  tally(pollId: string): Promise<Result<PollTally, { code: string }>>;
 }
 
 export interface VoteDeps {
@@ -54,6 +56,20 @@ export async function getCadetPoll(deps: Pick<VoteDeps, "votes" | "creditsOn">, 
   const mine = await deps.votes.myVote(open.value.id, uid);
   if (!mine.ok) return err({ code: "unknown" });
   return ok({ poll: open.value, myVote: mine.value, reward: rewardOf(open.value, await deps.creditsOn()) });
+}
+
+/**
+ * How the open poll's votes stand, for a cadet who voted. Only the open poll's tally is ever answered: a draft, a
+ * closed poll or another id is `closed`, so a cadet cannot read the votes of a poll that is not being voted.
+ */
+export async function getOpenPollTally(deps: Pick<VoteDeps, "votes">, pollId: string): Promise<Result<PollTally, { code: VoteErrorCode }>> {
+  if (!isPollId(pollId)) return err({ code: "not-found" });
+  const open = await deps.votes.openPoll();
+  if (!open.ok) return err({ code: "unknown" });
+  if (!open.value || open.value.id !== pollId) return err({ code: "closed" });
+  const tally = await deps.votes.tally(pollId);
+  if (!tally.ok) return err({ code: "unknown" });
+  return ok(tally.value);
 }
 
 /**

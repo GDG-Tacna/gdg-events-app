@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-const composition = vi.hoisted(() => ({ pollAdminDeps: { marker: "polls" }, voteDeps: { marker: "votes" }, keptOpenPoll: { clear: vi.fn() } }));
+const composition = vi.hoisted(() => ({
+  pollAdminDeps: { marker: "polls" },
+  voteDeps: { marker: "votes" },
+  keptOpenPoll: { clear: vi.fn() },
+  keptOpenTally: { clear: vi.fn() },
+  pollStore: { tally: vi.fn() },
+}));
 vi.mock("@/app-shell/composition/polls.server", () => composition);
 
 const guards = { getSession: vi.fn() };
@@ -16,6 +22,7 @@ const server = vi.hoisted(() => ({
   deletePoll: vi.fn(),
   pollResults: vi.fn(),
   castVote: vi.fn(),
+  getOpenPollTally: vi.fn(),
 }));
 vi.mock("@/features/polls/server", () => server);
 
@@ -24,6 +31,7 @@ vi.mock("@/shared/config/features", () => features);
 
 const { changePollAction, pollResultsAction, savePollAction } = await import("./manage.actions");
 const { votePollAction } = await import("./vote.action");
+const { pollTallyAction } = await import("./cadet-tally.action");
 
 const session = (role: "attendee" | "staff" | "admin" | null) => ({ uid: "u1", role, displayName: null, photoUrl: null });
 const ADMIN = { uid: "u1", role: "admin" };
@@ -47,7 +55,7 @@ describe("poll admin actions", () => {
     expect(server.updatePoll).toHaveBeenCalledWith({ marker: "polls" }, ADMIN, { id: "poll-1", draft: DRAFT });
   });
 
-  it("open, close and delete, forgetting the kept open poll after each change", async () => {
+  it("open, close and delete, forgetting the kept open poll and its tally after each change", async () => {
     server.openPoll.mockResolvedValue({ ok: true, value: {} });
     server.closePoll.mockResolvedValue({ ok: true, value: {} });
     server.deletePoll.mockResolvedValue({ ok: false, error: { code: "wrong-status" } });
@@ -56,6 +64,7 @@ describe("poll admin actions", () => {
     expect(await changePollAction({ id: "poll-1", action: "close" })).toEqual({ ok: true });
     expect(await changePollAction({ id: "poll-1", action: "delete" })).toEqual({ ok: false, code: "wrong-status" });
     expect(composition.keptOpenPoll.clear).toHaveBeenCalledTimes(2);
+    expect(composition.keptOpenTally.clear).toHaveBeenCalledTimes(2);
     expect(await changePollAction({ id: "poll-1", action: "explode" } as never)).toEqual({ ok: false, code: "not-found" });
   });
 
@@ -86,11 +95,20 @@ describe("vote action", () => {
     guards.getSession.mockResolvedValue(session("attendee"));
   });
 
-  it("votes as the session's cadet and answers what it earned", async () => {
+  it("votes as the session's cadet and answers what it earned with a fresh count", async () => {
     server.castVote.mockResolvedValue({ ok: true, value: { xp: 20, credits: 0 } });
+    composition.pollStore.tally.mockResolvedValue({ ok: true, value: { counts: { o1: 1 }, total: 1 } });
 
-    expect(await votePollAction({ pollId: "poll-1", optionId: "o1" })).toEqual({ ok: true, xp: 20, credits: 0 });
+    expect(await votePollAction({ pollId: "poll-1", optionId: "o1" })).toEqual({ ok: true, xp: 20, credits: 0, tally: { counts: { o1: 1 }, total: 1 } });
     expect(server.castVote).toHaveBeenCalledWith({ marker: "votes" }, "u1", { pollId: "poll-1", optionId: "o1" });
+    expect(composition.pollStore.tally).toHaveBeenCalledWith("poll-1");
+  });
+
+  it("still answers the vote when the count cannot be read", async () => {
+    server.castVote.mockResolvedValue({ ok: true, value: { xp: 0, credits: 0 } });
+    composition.pollStore.tally.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+
+    expect(await votePollAction({ pollId: "poll-1", optionId: "o1" })).toEqual({ ok: true, xp: 0, credits: 0 });
   });
 
   it("is for cadets only, with polls on and a sane input", async () => {
@@ -103,5 +121,36 @@ describe("vote action", () => {
     features.FEATURES.polls = false;
     expect(await votePollAction({ pollId: "poll-1", optionId: "o1" })).toEqual({ ok: false, code: "disabled" });
     expect(server.castVote).not.toHaveBeenCalled();
+  });
+});
+
+describe("cadet tally action", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    features.FEATURES.polls = true;
+    guards.getSession.mockResolvedValue(session("attendee"));
+  });
+
+  it("answers how the open poll's votes stand, or why not", async () => {
+    server.getOpenPollTally.mockResolvedValue({ ok: true, value: { counts: { o1: 2 }, total: 2 } });
+    expect(await pollTallyAction({ pollId: "poll-1" })).toEqual({ ok: true, tally: { counts: { o1: 2 }, total: 2 } });
+    expect(server.getOpenPollTally).toHaveBeenCalledWith({ marker: "votes" }, "poll-1");
+
+    server.getOpenPollTally.mockResolvedValue({ ok: false, error: { code: "closed" } });
+    expect(await pollTallyAction({ pollId: "poll-1" })).toEqual({ ok: false, code: "closed" });
+  });
+
+  it("is for cadets only, with polls on and a sane input", async () => {
+    guards.getSession.mockResolvedValue(session("staff"));
+    expect(await pollTallyAction({ pollId: "poll-1" })).toEqual({ ok: false, code: "forbidden" });
+    guards.getSession.mockResolvedValue(session(null));
+    expect(await pollTallyAction({ pollId: "poll-1" })).toEqual({ ok: false, code: "not-registered" });
+    guards.getSession.mockResolvedValue(null);
+    expect(await pollTallyAction({ pollId: "poll-1" })).toEqual({ ok: false, code: "unauthenticated" });
+    guards.getSession.mockResolvedValue(session("attendee"));
+    expect(await pollTallyAction({ pollId: "" })).toEqual({ ok: false, code: "not-found" });
+    features.FEATURES.polls = false;
+    expect(await pollTallyAction({ pollId: "poll-1" })).toEqual({ ok: false, code: "disabled" });
+    expect(server.getOpenPollTally).not.toHaveBeenCalled();
   });
 });
