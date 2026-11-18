@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { copy } from "@/shared/copy/es";
 
 /** Colors of the Design System (`bg` and `bg-deep`): the splash and the status bar match the app. */
-const BACKGROUND = "#0a0f24";
+const BACKGROUND = "#1e1e1e";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {

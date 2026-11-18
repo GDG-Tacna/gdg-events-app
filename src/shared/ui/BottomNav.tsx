@@ -37,7 +37,8 @@ function Tab({ item, pathname }: { item: BottomNavItem; pathname: string | null 
         aria-current={active ? "page" : undefined}
         className={cn(
           "gap-space-1 type-caption focus-visible:ring-ring flex min-h-12 flex-col items-center justify-center rounded-md px-2 py-1 transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
-          active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+          // The current tab is a pastel yellow pill with coal text, like the site's menu hover.
+          active ? "bg-pastel-yellow text-on-accent" : "text-muted-foreground hover:text-foreground",
         )}
       >
         <Icon name={item.icon} size={24} />
@@ -69,9 +70,9 @@ export function BottomNav({ label, start, action, end = [] }: BottomNavProps) {
     <nav
       aria-label={label}
       className={cn(
-        "bg-surface border-border fixed inset-x-0 bottom-0 z-40 border-t",
+        "bg-surface border-ink fixed inset-x-0 bottom-0 z-40 border-t-2",
         "supports-[backdrop-filter]:bg-surface/90 supports-[backdrop-filter]:backdrop-blur",
-        "min-[760px]:inset-y-0 min-[760px]:right-auto min-[760px]:w-24 min-[760px]:border-t-0 min-[760px]:border-r",
+        "min-[760px]:inset-y-0 min-[760px]:right-auto min-[760px]:w-24 min-[760px]:border-t-0 min-[760px]:border-r-2",
       )}
     >
       <ul
@@ -94,9 +95,9 @@ export function BottomNav({ label, start, action, end = [] }: BottomNavProps) {
             aria-current={actionActive ? "page" : undefined}
             aria-label={action.label}
             className={cn(
-              "bg-primary text-primary-foreground border-surface focus-visible:ring-ring shadow-card grid size-16 -translate-y-4 place-items-center rounded-full border-4 transition-transform focus-visible:ring-[3px] focus-visible:outline-none active:scale-95",
+              "bg-gold text-on-accent border-ink hover:bg-pastel-yellow focus-visible:ring-ring grid size-16 -translate-y-4 place-items-center rounded-full border-2 transition-[transform,background-color] focus-visible:ring-[3px] focus-visible:outline-none active:scale-95",
               "min-[760px]:mx-auto min-[760px]:translate-y-0",
-              actionActive && "ring-primary/60 ring-2",
+              actionActive && "ring-gold/60 ring-offset-surface ring-2 ring-offset-2",
             )}
           >
             <Icon name={action.icon} size={30} />

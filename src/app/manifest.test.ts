@@ -22,8 +22,8 @@ describe("web app manifest", () => {
   });
 
   it("uses the dark Design System background for the splash and the status bar", () => {
-    expect(m.background_color).toBe("#0a0f24");
-    expect(m.theme_color).toBe("#0a0f24");
+    expect(m.background_color).toBe("#1e1e1e");
+    expect(m.theme_color).toBe("#1e1e1e");
   });
 
   it("declares the icons browsers require for installing: 192 and 512 as 'any', and a maskable 512", () => {

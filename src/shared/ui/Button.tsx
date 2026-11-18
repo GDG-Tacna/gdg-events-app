@@ -7,10 +7,11 @@ type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-  primary: "bg-primary text-primary-foreground hover:bg-primary/90",
-  secondary: "bg-transparent text-foreground border border-input hover:bg-secondary",
+  // Solid ink pill that turns Google yellow on hover, like the DevFest Tacna site.
+  primary: "bg-primary text-primary-foreground border-2 border-ink hover:bg-gold hover:text-on-accent",
+  secondary: "bg-surface text-foreground border-2 border-ink hover:bg-pastel-blue hover:text-on-accent",
   ghost: "bg-transparent text-muted-foreground hover:bg-secondary hover:text-foreground",
-  danger: "bg-danger text-on-accent hover:bg-danger/90",
+  danger: "bg-danger text-on-accent border-2 border-danger hover:bg-pastel-red hover:border-pastel-red",
 };
 
 const SIZE_CLASSES: Record<Size, string> = {
@@ -26,7 +27,7 @@ export function buttonClasses({
   block = false,
 }: { variant?: Variant; size?: Size; block?: boolean } = {}): string {
   return cn(
-    "type-label rounded-md transition-[background-color,transform] duration-100 active:scale-[0.97]",
+    "type-label rounded-pill font-semibold transition-[background-color,color,border-color,transform] duration-200 active:scale-[0.97]",
     "focus-visible:ring-ring focus-visible:ring-[3px]",
     VARIANT_CLASSES[variant],
     SIZE_CLASSES[size],
