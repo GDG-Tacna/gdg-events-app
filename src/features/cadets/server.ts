@@ -31,4 +31,5 @@ export {
   type IndexedCadet,
 } from "./domain/manage";
 export { FirebaseAccountDirectory } from "./data/server/firebase-account-directory";
+export { CachedCadetStore, type CachedCadetStoreOptions } from "./data/server/cached-cadet-store";
 export { FirestoreCadetStore, toCadet } from "./data/server/firestore-cadet-store";

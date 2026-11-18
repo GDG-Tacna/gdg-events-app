@@ -1,7 +1,7 @@
 import "server-only";
 import { FirestoreAuditLog } from "@/features/admin/server";
 import { createAlias } from "@/features/attendee";
-import { FirebaseAccountDirectory, FirestoreCadetStore, type CadetsDeps } from "@/features/cadets/server";
+import { CachedCadetStore, FirebaseAccountDirectory, FirestoreCadetStore, type CadetsDeps } from "@/features/cadets/server";
 import { err, ok } from "@/shared/lib/result";
 import { squadStore } from "./squads.server";
 
@@ -11,7 +11,8 @@ import { squadStore } from "./squads.server";
  * neither; changes go to the admin audit trail.
  */
 export const cadetsDeps: CadetsDeps = {
-  store: new FirestoreCadetStore(),
+  // The search reads every cadet: kept for a minute, and dropped whenever a change goes through this store.
+  store: new CachedCadetStore(new FirestoreCadetStore()),
   accounts: new FirebaseAccountDirectory(),
   aliases: { check: createAlias },
   squads: {
