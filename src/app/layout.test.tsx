@@ -60,4 +60,9 @@ describe("root layout", () => {
     expect(viewport.viewportFit).toBe("cover");
     expect(metadata.title).toBeTruthy();
   });
+
+  it("names the installed app «GDG Tacna» on Android and on iPhones", () => {
+    expect(metadata.applicationName).toBe("GDG Tacna");
+    expect((metadata.appleWebApp as { title: string }).title).toBe("GDG Tacna");
+  });
 });

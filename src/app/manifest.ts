@@ -7,7 +7,7 @@ const BACKGROUND = "#0a0f24";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: copy.brand.name,
+    name: copy.brand.installName,
     short_name: copy.brand.shortName,
     description: copy.brand.description,
     lang: "es",

@@ -14,7 +14,8 @@ import { moduleOn } from "./modules.server";
  * A tab shows only while its module is on for the edition.
  *
  * Every tab starts with the same header: the event's brand and the way out, so the cadet can sign out from any view.
- * The header keeps the phone's top inset, so the pages below it only add their own spacing.
+ * It stays on top while the page scrolls, like a phone app's bar, over a solid fill (the blur is only an extra). It
+ * keeps the phone's top inset, so the pages below it only add their own spacing.
  */
 export async function AttendeeShell({ children }: { children: ReactNode }) {
   const start: BottomNavItem[] = [
@@ -33,10 +34,12 @@ export async function AttendeeShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="pb-[calc(5.5rem+env(safe-area-inset-bottom))] min-[760px]:pb-0 min-[760px]:pl-24">
-      <header className="px-space-4 pt-safe-space-4 mx-auto flex w-full max-w-[520px] items-start justify-between gap-space-3 min-[760px]:max-w-[880px]">
-        <BrandMark />
-        <div className="gap-space-2 flex shrink-0 items-center">
-          <SignOutButton variant="icon" />
+      <header className="bg-surface border-border pt-safe sticky top-0 z-30 border-b supports-[backdrop-filter]:bg-surface/90 supports-[backdrop-filter]:backdrop-blur">
+        <div className="px-space-4 py-space-2 gap-space-3 mx-auto flex w-full max-w-[520px] items-center justify-between min-[760px]:max-w-[880px]">
+          <BrandMark compact />
+          <div className="gap-space-2 flex shrink-0 items-center">
+            <SignOutButton variant="icon" />
+          </div>
         </div>
       </header>
       {children}
