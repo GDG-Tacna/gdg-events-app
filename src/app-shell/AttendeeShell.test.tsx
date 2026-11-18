@@ -61,7 +61,7 @@ describe("AttendeeShell", () => {
     const { container } = renderShell(await AttendeeShell({ children: <p>x</p> }));
 
     const frame = container.firstElementChild as HTMLElement;
-    expect(frame.className).toContain("pb-[calc(5.5rem+env(safe-area-inset-bottom))]");
+    expect(frame.className).toContain("pb-[calc(6rem+env(safe-area-inset-bottom))]");
     expect(frame.className).toContain("min-[760px]:pl-24");
   });
 
