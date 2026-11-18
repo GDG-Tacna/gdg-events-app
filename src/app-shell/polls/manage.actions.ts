@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { keptOpenPoll, pollAdminDeps } from "@/app-shell/composition/polls.server";
+import { keptOpenPoll, keptOpenTally, pollAdminDeps } from "@/app-shell/composition/polls.server";
 import { getSession } from "@/app-shell/guards";
 import { moduleOn } from "@/app-shell/modules.server";
 import { mayEdit } from "@/app-shell/permissions.server";
@@ -40,6 +40,7 @@ const refused = (value: PollAdminActor | Refusal): value is Refusal => "ok" in v
 /** What a change shows: the admin list, and the cadets' dashboard and poll screen (the open poll changed). */
 function refresh() {
   keptOpenPoll.clear();
+  keptOpenTally.clear();
   revalidatePath(ROUTES.adminPolls);
   revalidatePath(ROUTES.dashboard);
   revalidatePath(ROUTES.poll);
