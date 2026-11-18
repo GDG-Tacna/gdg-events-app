@@ -32,6 +32,11 @@ describe("AdminShell", () => {
 
     expect(screen.getByRole("heading", { name: "Contenido" })).toBeInTheDocument();
     expect(screen.getByText(copy.admin.brand)).toBeInTheDocument();
+    // The admin belongs to the platform, not to one edition: nothing of the cadets' event brand (DevFest, Space Arcade, its tagline).
+    expect(screen.queryByText(copy.brand.wordmark)).not.toBeInTheDocument();
+    expect(screen.queryByText(copy.brand.name)).not.toBeInTheDocument();
+    expect(screen.queryByText(copy.brand.arcade)).not.toBeInTheDocument();
+    expect(screen.queryByText(copy.brand.tagline)).not.toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: copy.admin.navLabel });
     expect(within(nav).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/admin", "/admin/team"]);
     expect(screen.getByText("Ana Pérez")).toBeInTheDocument();
