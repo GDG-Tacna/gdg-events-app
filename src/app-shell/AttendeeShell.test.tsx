@@ -28,6 +28,9 @@ describe("AttendeeShell", () => {
     expect(within(header).getByText(copy.brand.name)).toBeInTheDocument();
     expect(within(header).getByRole("button", { name: copy.auth.signOut })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: copy.auth.signOut })).toHaveLength(1);
+    // It stays on top while the page scrolls, like a phone app's bar.
+    expect(header.className).toContain("sticky");
+    expect(header.className).toContain("top-0");
     // Above the page, so it is the first thing on every tab.
     expect(header.compareDocumentPosition(screen.getByRole("heading", { name: "Contenido" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
