@@ -29,6 +29,9 @@ const tiny5 = Tiny5({
 export const metadata: Metadata = {
   title: copy.brand.name,
   description: copy.brand.description,
+  applicationName: copy.brand.installName,
+  // iPhones name the home screen icon after this, not after the manifest.
+  appleWebApp: { title: copy.brand.installName },
 };
 
 export const viewport: Viewport = {

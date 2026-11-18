@@ -5,9 +5,10 @@ import manifest from "./manifest";
 const m = manifest();
 
 describe("web app manifest", () => {
-  it("names the app with the Design System brand and a short name that fits under the icon", () => {
-    expect(m.name).toBe(copy.brand.name);
-    expect(m.short_name).toBe(copy.brand.shortName);
+  it("names the installed app after the community, not one edition, with a short name that fits under the icon", () => {
+    expect(m.name).toBe("GDG Tacna");
+    expect(m.short_name).toBe("GDG Tacna");
+    expect(m.name).not.toMatch(/space arcade|devfest/i);
     expect((m.short_name ?? "").length).toBeLessThanOrEqual(12);
     expect(m.description).toBe(copy.brand.description);
   });

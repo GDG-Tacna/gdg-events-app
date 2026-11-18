@@ -93,4 +93,13 @@ describe("BrandMark", () => {
     expect(screen.getByText(copy.brand.tagline)).toBeInTheDocument();
     expect(document.querySelector("svg[viewBox='0 0 28 16']")).toBeInTheDocument();
   });
+
+  it("has a compact form without the tagline, still naming the product once", () => {
+    render(<BrandMark compact />);
+
+    expect(screen.getByText(copy.brand.name)).toHaveClass("sr-only");
+    expect(screen.getByText(copy.brand.arcade)).toBeInTheDocument();
+    expect(screen.queryByText(copy.brand.tagline)).not.toBeInTheDocument();
+    expect(document.querySelector("svg[viewBox='0 0 28 16']")).toBeInTheDocument();
+  });
 });

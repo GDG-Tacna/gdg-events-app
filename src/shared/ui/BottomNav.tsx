@@ -73,7 +73,8 @@ export function BottomNav({ label, start, action, end = [] }: BottomNavProps) {
     >
       <ul
         className={cn(
-          "px-space-2 pb-safe flex items-end justify-around pt-1",
+          // At least half a rem below the tabs even where the phone reports no inset (Android's gesture bar, a desktop window).
+          "px-space-2 flex items-end justify-around pt-2 pb-[max(env(safe-area-inset-bottom),0.5rem)]",
           "min-[760px]:h-full min-[760px]:flex-col min-[760px]:items-stretch min-[760px]:justify-center min-[760px]:gap-6 min-[760px]:pt-0",
         )}
       >

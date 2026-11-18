@@ -52,7 +52,9 @@ export const copy = {
     wordmark: "DevFest",
     arcade: "Space Arcade",
     /** Name under the home screen icon: it must stay short (about 12 characters). */
-    shortName: "Space Arcade",
+    shortName: "GDG Tacna",
+    /** The installed app's own name (home screen, app switcher): the community's, not one edition's. */
+    installName: "GDG Tacna",
     tagline: "Odisea de Código",
     description:
       "La PWA de gamificación de DevFest Tacna 2026: explora planetas, completa misiones y sube de rango.",
