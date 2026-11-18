@@ -18,6 +18,14 @@ describe("UnlockedBadges", () => {
     expect((await axe(container)).violations).toEqual([]);
   });
 
+  it("shows the same content when it arrives animated (the drop and the spin are only how it gets there)", () => {
+    render(<UnlockedBadges animated delay={1.2} badges={[{ id: "a", name: "Primer salto", tone: "lime" }]} href="/achievements" />);
+
+    const list = within(screen.getByRole("list", { name: t.label }));
+    expect(list.getByText("Primer salto")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: t.see })).toHaveAttribute("href", "/achievements");
+  });
+
   it("draws nothing without badges, and no link without a destination", () => {
     const { container } = render(<UnlockedBadges badges={[]} href="/achievements" />);
     expect(container).toBeEmptyDOMElement();

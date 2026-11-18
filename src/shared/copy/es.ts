@@ -373,6 +373,10 @@ export const copy = {
     viewMission: "Ver misión",
     viewMissions: "Ver misiones",
     talkCredits: "+{n} G-Credits por asistir a esta charla",
+    /** The XP the scan gave, counting up. Placeholder: {n}. */
+    xpGained: "+{n} XP",
+    xpBar: "Progreso de XP",
+    rankUp: "¡Subiste de rango!",
     errors: {
       "invalid-code": {
         title: "Código no válido",

@@ -28,12 +28,18 @@ vi.mock("@/app-shell/guards", () => guards);
 const checkinsServer = { recordCheckIn: vi.fn() };
 vi.mock("@/features/checkins/server", () => checkinsServer);
 
+const attendee = vi.hoisted(() => ({ attendeeDeps: { attendees: { findByUid: vi.fn() } } }));
+vi.mock("@/app-shell/composition/attendee.server", () => attendee);
+const dashboard = vi.hoisted(() => ({ dashboardDeps: { ranks: vi.fn() } }));
+vi.mock("@/app-shell/composition/dashboard.server", () => dashboard);
+
 const network = vi.hoisted(() => ({ connectContactAction: vi.fn() }));
 vi.mock("@/app-shell/network/network.actions", () => network);
 
 const features = vi.hoisted(() => ({ FEATURES: { checkins: true, missions: true, network: true } }));
 vi.mock("@/shared/config/features", () => features);
 
+const { RANKS } = await import("@/features/attendee");
 const { recordCheckInAction } = await import("./record-check-in.action");
 
 const session = (role: "attendee" | "staff" | "admin" | null) => ({ uid: "u1", role, displayName: null, photoUrl: null });
@@ -47,6 +53,9 @@ describe("recordCheckInAction", () => {
     economyServer.rewardTalk.mockResolvedValue({ ok: true, value: { credits: 10 } });
     achievements.unlockAchievements.mockResolvedValue([]);
     guards.getSession.mockResolvedValue(session("attendee"));
+    // The cadet's profile after the scan: 120 XP, the second rank of the bundled ladder.
+    attendee.attendeeDeps.attendees.findByUid.mockResolvedValue({ ok: true, value: { uid: "u1", xp: 120 } });
+    dashboard.dashboardDeps.ranks.mockResolvedValue(RANKS);
   });
 
   it("does nothing when check-ins are switched off", async () => {
@@ -104,6 +113,7 @@ describe("recordCheckInAction", () => {
       contact: { card, created: true, xpEarned: 20, creditsEarned: 5, capReached: false },
       missions: [],
       achievements: [{ id: "a", name: "Red", tone: "cyan" }],
+      progress: expect.objectContaining({ xpGained: 20 }),
     });
     expect(network.connectContactAction).toHaveBeenCalledWith("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA");
     expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
@@ -195,7 +205,59 @@ describe("recordCheckInAction", () => {
       missions: [{ id: "m-1", title: "Visita el stand", xpEarned: 30, creditsEarned: 10, justCompleted: true }],
       talkCredits: kind === "talk" ? 10 : 0,
       achievements: [],
+      // 30 XP now: the bar moved, within the first rank (120 XP in the profile read here, so it crossed into the second).
+      progress: expect.objectContaining({ xpGained: 30 }),
     });
+  });
+
+  it("says how the XP bar moved when the scan gave XP, and whether it crossed into a new rank", async () => {
+    checkinsServer.recordCheckIn.mockResolvedValue({ ok: true, value: { checkpointId: "cp-1", kind: "stand", recorded: true, firstEntrance: false } });
+    missionsServer.completeByCheckpoint.mockResolvedValue({
+      ok: true,
+      value: [
+        { id: "m-1", title: "Visita el stand", xpEarned: 30, creditsEarned: 0, justCompleted: true },
+        // A mission already completed gave nothing now.
+        { id: "m-2", title: "Otra", xpEarned: 50, creditsEarned: 0, justCompleted: false },
+      ],
+    });
+
+    const result = await recordCheckInAction("devfest:eq:cp-1");
+
+    // 120 XP now, 90 before: from the end of the first rank to the start of the second.
+    expect(result).toMatchObject({
+      ok: true,
+      progress: { xpGained: 30, from: { percent: 90, level: 1, name: "Recluta" }, to: { percent: 5, level: 2, name: "Piloto" }, rankUp: true },
+    });
+    expect(attendee.attendeeDeps.attendees.findByUid).toHaveBeenCalledWith("u1");
+  });
+
+  it("reads nothing about the rank when the scan gave no XP, and leaves the bar out when it cannot be read", async () => {
+    checkinsServer.recordCheckIn.mockResolvedValue({ ok: true, value: { checkpointId: "talk-1", kind: "talk", recorded: true, firstEntrance: false } });
+    missionsServer.completeByCheckpoint.mockResolvedValue({ ok: true, value: [] });
+    const plain = await recordCheckInAction("devfest:eq:talk-1");
+    expect(plain).not.toHaveProperty("progress");
+    expect(attendee.attendeeDeps.attendees.findByUid).not.toHaveBeenCalled();
+
+    missionsServer.completeByCheckpoint.mockResolvedValue({ ok: true, value: [{ id: "m-1", title: "Asiste", xpEarned: 35, creditsEarned: 0, justCompleted: true }] });
+    attendee.attendeeDeps.attendees.findByUid.mockRejectedValueOnce(new Error("down"));
+    expect(await recordCheckInAction("devfest:eq:talk-1")).toMatchObject({ ok: true, kind: "talk" });
+    attendee.attendeeDeps.attendees.findByUid.mockResolvedValueOnce({ ok: false, error: { code: "unknown" } });
+    expect(await recordCheckInAction("devfest:eq:talk-1")).not.toHaveProperty("progress");
+  });
+
+  it("also says how the bar moved after a contact that paid XP", async () => {
+    network.connectContactAction.mockResolvedValue({
+      ok: true,
+      card: { alias: "Bruno", squad: null, links: { linkedin: null, github: null, web: null } },
+      created: true,
+      xpEarned: 20,
+      creditsEarned: 5,
+      capReached: false,
+      achievements: [],
+      missions: [],
+    });
+
+    expect(await recordCheckInAction("devfest:ct:uid-bruno.1.AAAAAAAAAAAAAAAAAAAA")).toMatchObject({ ok: true, kind: "contact", progress: { xpGained: 20 } });
   });
 
   it("returns the badges the scan unlocked, looked for with the session's uid", async () => {

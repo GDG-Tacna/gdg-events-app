@@ -8,8 +8,12 @@ import { teamCodeDeps } from "@/app-shell/composition/team-code.server";
 import { currentEconomy, rewardLedger } from "@/app-shell/composition/economy.server";
 import { missionDeps } from "@/app-shell/composition/missions.server";
 import { getSession } from "@/app-shell/guards";
+import { attendeeDeps } from "@/app-shell/composition/attendee.server";
+import { dashboardDeps } from "@/app-shell/composition/dashboard.server";
 import { connectContactAction } from "@/app-shell/network/network.actions";
-import type { CheckInErrorCode, RecordCheckInActionResult, ScanReward } from "@/features/checkins";
+import { rankProgress } from "@/features/attendee";
+import type { CheckInErrorCode, RecordCheckInActionResult, ScanProgress, ScanReward } from "@/features/checkins";
+import { rankName } from "@/shared/copy/rank-name";
 import { recordCheckIn } from "@/features/checkins/server";
 import { rewardTalk } from "@/features/economy/server";
 import { completeByCheckpoint, completeBySpeaker, completeByTeam } from "@/features/missions/server";
@@ -47,7 +51,7 @@ export async function recordCheckInAction(payload: string): Promise<RecordCheckI
   const parsed = payloadSchema.safeParse(payload);
   if (!parsed.success) return { ok: false, code: "invalid-code" };
   // Another cadet's contact code: the same scanner makes the contact (what the Red's own scanner does).
-  if ((await moduleOn("network")) && isContactCode(parsed.data)) return connectContact(parsed.data);
+  if ((await moduleOn("network")) && isContactCode(parsed.data)) return connectContact(parsed.data, session.uid);
   // A cadet's personal pass is for staff to scan: say so instead of calling it «not a DevFest code».
   if (isPassCode(parsed.data)) return { ok: false, code: "pass-code" };
   if (isSpeakerCode(parsed.data)) return meetSpeaker(session.uid, parsed.data);
@@ -70,7 +74,29 @@ export async function recordCheckInAction(payload: string): Promise<RecordCheckI
   }
   // Whatever this scan earned (a talk, a stand, its missions) may unlock badges; never fails the check-in.
   const achievements = await unlockAchievements(session.uid);
-  return { ok: true, ...result.value, missions, talkCredits, achievements };
+  const progress = await scanProgress(session.uid, xpOf(missions));
+  return { ok: true, ...result.value, missions, talkCredits, achievements, ...(progress ? { progress } : {}) };
+}
+
+/** The XP the missions of a scan gave just now (a mission already completed gave none). */
+const xpOf = (missions: readonly ScanReward[]) => missions.reduce((sum, mission) => sum + (mission.justCompleted ? mission.xpEarned : 0), 0);
+
+/**
+ * How this scan moved the cadet's XP bar, for the result screen: only when it gave XP, and never at the cost of the
+ * scan (a failed read just leaves the bar out). One read of the cadet's profile and the edition's ladder.
+ */
+async function scanProgress(uid: string, xpGained: number): Promise<ScanProgress | undefined> {
+  if (xpGained <= 0) return undefined;
+  try {
+    const [found, ladder] = await Promise.all([attendeeDeps.attendees.findByUid(uid), dashboardDeps.ranks()]);
+    if (!found.ok || found.value === null) return undefined;
+    const after = rankProgress(found.value.xp, ladder);
+    const before = rankProgress(Math.max(0, found.value.xp - xpGained), ladder);
+    const view = (progress: typeof after) => ({ percent: progress.percent, level: progress.rank.level, name: rankName(progress.rank.id, progress.rank.level, progress.rank.name) });
+    return { xpGained, from: view(before), to: view(after), rankUp: after.rank.level > before.rank.level };
+  } catch {
+    return undefined;
+  }
 }
 
 /** The scanner's words for what the Red can refuse; the link errors cannot come from a scan. */
@@ -89,10 +115,11 @@ const CONTACT_ERRORS: Record<string, CheckInErrorCode> = {
  * Another cadet's contact code: makes the two contacts through the Red's action (which checks the session, the code and
  * pays both) and answers in the scanner's shape. It is not a check-in, so it never counts for the key metric.
  */
-async function connectContact(payload: string): Promise<RecordCheckInActionResult> {
+async function connectContact(payload: string, uid: string): Promise<RecordCheckInActionResult> {
   const connected = await connectContactAction(payload);
   if (!connected.ok) return { ok: false, code: CONTACT_ERRORS[connected.code] ?? "unknown" };
   const { card, created, xpEarned, creditsEarned, capReached, achievements, missions = [] } = connected;
+  const progress = await scanProgress(uid, xpEarned + xpOf(missions));
   // `checkpointId` names no puesto here: a contact is between cadets.
   return {
     ok: true,
@@ -103,6 +130,7 @@ async function connectContact(payload: string): Promise<RecordCheckInActionResul
     contact: { card, created, xpEarned, creditsEarned, capReached },
     missions,
     achievements,
+    ...(progress ? { progress } : {}),
   };
 }
 
