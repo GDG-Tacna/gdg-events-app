@@ -77,6 +77,31 @@ describe("BottomNav", () => {
     expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
   });
 
+  it("shows the current tab with a yellow icon and label (the readable yellow) and a mark over the bar's line, and no other tab", () => {
+    navigation.pathname = "/dashboard";
+    renderNav({ ...PROPS, end: [{ href: "/map", label: "Mapa", icon: "map" }] });
+
+    const current = screen.getByRole("link", { name: "Inicio" });
+    expect(current.className).toContain("text-gold-ink");
+    expect(current.className).not.toContain("bg-pastel-yellow");
+    expect(current.parentElement?.querySelector("span.bg-gold")).not.toBeNull();
+
+    const other = screen.getByRole("link", { name: "Mapa" });
+    expect(other.className).not.toContain("text-gold-ink");
+    expect(other.parentElement?.querySelector("span.bg-gold")).toBeNull();
+  });
+
+  it("hangs the main action from the bar's line instead of lifting it inside the bar", () => {
+    renderNav();
+
+    const action = screen.getByRole("link", { name: "Escanear QR" });
+    expect(action.className).toContain("absolute");
+    expect(action.className).toContain("-translate-y-1/2");
+    // A ring of the bar's color cuts the line behind it.
+    expect(action.className).toContain("ring-surface");
+    expect(action.className).not.toContain("-translate-y-4");
+  });
+
   it("marks a tab that opens with a query (the agenda) as current when its page is open", () => {
     navigation.pathname = "/map";
     renderNav({ ...PROPS, end: [{ href: "/map?vista=agenda", label: "Agenda", icon: "calendar" }] });
