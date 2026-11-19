@@ -24,15 +24,19 @@ export interface FilePickerDialogProps {
   onConnect: () => void;
   /** Adds a file by its path; answers an error text to show, or `null` when it was added. */
   onAdd: (path: string) => Promise<string | null>;
+  /** Adds a Google Slides presentation by its link (and an optional name); same answer. */
+  onAddGoogleSlides: (link: string, name: string) => Promise<string | null>;
 }
 
 /**
  * «Añadir archivo»: pick a file from the connected folder (or type its path) and it is added, at the end of the open
  * point of the agenda. Only the path is kept; the file stays where it is.
  */
-export function FilePickerDialog({ open, onOpenChange, itemTitle, files, folderReady, onConnect, onAdd }: FilePickerDialogProps) {
+export function FilePickerDialog({ open, onOpenChange, itemTitle, files, folderReady, onConnect, onAdd, onAddGoogleSlides }: FilePickerDialogProps) {
   const [query, setQuery] = useState("");
   const [typed, setTyped] = useState("");
+  const [link, setLink] = useState("");
+  const [deckName, setDeckName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -51,6 +55,19 @@ export function FilePickerDialog({ open, onOpenChange, itemTitle, files, folderR
     onOpenChange(false);
   }
 
+  async function addDeck(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending || !link.trim()) return;
+    setPending(true);
+    setError(null);
+    const failed = await onAddGoogleSlides(link.trim(), deckName.trim());
+    setPending(false);
+    if (failed) return setError(failed);
+    setLink("");
+    setDeckName("");
+    onOpenChange(false);
+  }
+
   function submitTyped(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (typed.trim()) void add(typed.trim().replaceAll("\\", "/"));
@@ -58,13 +75,14 @@ export function FilePickerDialog({ open, onOpenChange, itemTitle, files, folderR
 
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} title={t.title} description={interpolate(t.description, { title: itemTitle })}>
+      <div className="gap-space-5 flex flex-col">
+      {error ? (
+        <p role="alert" className="type-body-sm text-danger-ink">
+          {error}
+        </p>
+      ) : null}
       {folderReady ? (
         <div className="gap-space-4 flex flex-col">
-          {error ? (
-            <p role="alert" className="type-body-sm text-danger-ink">
-              {error}
-            </p>
-          ) : null}
           <TextField label={t.search} placeholder={t.searchPlaceholder} value={query} autoComplete="off" onChange={(event) => setQuery(event.target.value)} />
           {files.length === 0 ? <p className="type-body-sm text-muted-foreground">{t.none}</p> : null}
           {files.length > 0 && matches.length === 0 ? <p className="type-body-sm text-muted-foreground">{t.empty}</p> : null}
@@ -90,6 +108,17 @@ export function FilePickerDialog({ open, onOpenChange, itemTitle, files, folderR
           <Button onClick={onConnect}>{copy.stageConsole.folderConnect}</Button>
         </div>
       )}
+      <form onSubmit={(event) => void addDeck(event)} aria-label={t.gslides.title} className="gap-space-3 border-line pt-space-4 flex flex-col border-t-2">
+        <h3 className="type-label text-foreground">{t.gslides.title}</h3>
+        <p className="type-body-sm text-muted-foreground">{t.gslides.help}</p>
+        <TextField label={t.gslides.linkLabel} hint={t.gslides.linkHint} value={link} autoComplete="off" autoCapitalize="none" spellCheck={false} onChange={(event) => setLink(event.target.value)} />
+        <TextField label={t.gslides.nameLabel} value={deckName} maxLength={80} autoComplete="off" onChange={(event) => setDeckName(event.target.value)} />
+        <p className="type-caption text-text-subtle">{t.gslides.tip}</p>
+        <Button type="submit" variant="secondary" disabled={pending || link.trim() === ""}>
+          {t.gslides.add}
+        </Button>
+      </form>
+      </div>
     </FormDialog>
   );
 }

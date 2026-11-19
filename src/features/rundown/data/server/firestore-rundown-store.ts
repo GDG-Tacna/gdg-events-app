@@ -6,7 +6,7 @@ import { EVENT_CONFIG_COLLECTION, eventCollection } from "@/shared/lib/firebase/
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import type { RundownStore, StoredCues } from "../../domain/manage";
-import { parseCues, type MediaCue } from "../../domain/rundown";
+import { parseCues, type StoredCue } from "../../domain/rundown";
 
 export const RUNDOWN_DOC = "rundown";
 
@@ -30,7 +30,7 @@ export class FirestoreRundownStore implements RundownStore {
       const snapshot = await (await this.ref()).get();
       const items: unknown = snapshot.exists ? snapshot.data()?.items : undefined;
       if (typeof items !== "object" || items === null) return ok({});
-      const stored: Record<string, readonly MediaCue[]> = {};
+      const stored: Record<string, readonly StoredCue[]> = {};
       for (const [itemId, raw] of Object.entries(items)) {
         const cues = parseCues(raw);
         if (cues === null) logServerError("rundown.parse", new Error(`the pieces of ${itemId} break the rules; read as none`));
@@ -43,9 +43,10 @@ export class FirestoreRundownStore implements RundownStore {
     }
   }
 
-  async saveItem(itemId: string, cues: readonly MediaCue[]): Promise<Result<void, { code: string }>> {
+  async saveItem(itemId: string, cues: readonly StoredCue[]): Promise<Result<void, { code: string }>> {
     try {
-      const plain = cues.map(({ id, kind, name, path }) => ({ id, kind, name, path }));
+      // Only the fields each kind has: a file keeps its path, a Google Slides piece its presentation.
+      const plain = cues.map((cue) => (cue.kind === "gslides" ? { id: cue.id, kind: cue.kind, name: cue.name, deckId: cue.deckId, published: cue.published } : { id: cue.id, kind: cue.kind, name: cue.name, path: cue.path }));
       await (await this.ref()).set({ items: { [itemId]: plain }, updatedAt: new Date() }, { merge: true });
       return ok(undefined);
     } catch (cause) {

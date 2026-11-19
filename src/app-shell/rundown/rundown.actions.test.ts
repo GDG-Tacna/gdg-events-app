@@ -34,6 +34,14 @@ describe("saveCuesAction", () => {
     expect(permissions.mayEdit).toHaveBeenCalledWith(expect.anything(), "stage");
   });
 
+  it("lets a Google Slides piece through to the use case with every one of its fields", async () => {
+    const deck = { id: "cue-0009", kind: "gslides", name: "Keynote", deckId: "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", published: false };
+    server.saveItemCues.mockResolvedValue({ ok: true, value: [deck] });
+
+    expect(await saveCuesAction({ itemId: "keynote", cues: [deck] })).toEqual({ ok: true, cues: [deck] });
+    expect(server.saveItemCues).toHaveBeenCalledWith({ marker: "rundown" }, { uid: "a1", role: "admin" }, { itemId: "keynote", cues: [deck] });
+  });
+
   it("does nothing with the admin or the stage module off", async () => {
     features.FEATURES.admin = false;
     expect(await saveCuesAction({ itemId: "keynote", cues: CUES })).toEqual({ ok: false, code: "disabled" });

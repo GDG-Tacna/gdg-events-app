@@ -107,6 +107,23 @@ describe("MediaProgram", () => {
     expect(heard).toContainEqual({ type: "loaded", cueId: "cue-slides", slides: 12 });
   });
 
+  it("shows a Google Slides deck in Google's own frame, sandboxed, and says it is ready when it loads", async () => {
+    const { heard, say } = setup({} as never);
+    const deck = { id: "cue-deck", kind: "gslides" as const, name: "Keynote en Google Slides", deckId: "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", published: false };
+
+    await say({ type: "program", cue: deck, slide: 1, playing: false });
+
+    const frame = screen.getByTitle("Keynote en Google Slides");
+    expect(frame).toHaveAttribute("src", "https://docs.google.com/presentation/d/1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789/preview");
+    expect(frame.getAttribute("sandbox")).toContain("allow-scripts");
+    expect(frame.getAttribute("sandbox")).not.toContain("allow-top-navigation");
+    expect(frame).toHaveAttribute("referrerpolicy", "no-referrer");
+    fireEvent.load(frame);
+    expect(heard).toContainEqual({ type: "loaded", cueId: "cue-deck", slides: null });
+    // It needs no file from the folder: nothing is reported missing.
+    expect(heard.some((message) => message.type === "failed")).toBe(false);
+  });
+
   it("plays a video from the folder when the console says so, and pauses it when it says to", async () => {
     const { say } = setup();
     await say({ type: "program", cue: VIDEO, slide: 1, playing: true });

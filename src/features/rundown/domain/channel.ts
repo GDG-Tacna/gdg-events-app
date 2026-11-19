@@ -1,16 +1,11 @@
-import { MEDIA_KINDS, isMediaPath, type MediaKind } from "./rundown";
+import { MEDIA_KINDS, isMediaPath, parseCue, type StoredCue } from "./rundown";
 
 /**
  * What the console and the projector's window say to each other. They run in the same browser on the same computer
  * (that is where the files are), so they talk over a `BroadcastChannel`: instant and free, nothing goes through the
  * server. A message is checked on arrival like any input.
  */
-export interface ProgramCue {
-  id: string;
-  kind: MediaKind;
-  name: string;
-  path: string;
-}
+export type ProgramCue = StoredCue;
 
 export type ConsoleMessage =
   /** What is on the air now (a file) or `null` for anything else (the screen goes back to its own scenes). */
@@ -36,10 +31,12 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 const isSlide = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 5000;
 const isCueId = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 60;
 
+/** A piece on the air: checked like one read from the store (a file's path stays inside the folder). */
 function parseProgramCue(value: unknown): ProgramCue | null {
-  if (!isRecord(value) || !isCueId(value.id) || typeof value.name !== "string" || value.name.length > 120) return null;
-  if (!(MEDIA_KINDS as readonly unknown[]).includes(value.kind) || !isMediaPath(value.path)) return null;
-  return { id: value.id, kind: value.kind as MediaKind, name: value.name, path: value.path };
+  if (!isRecord(value) || !isCueId(value.id)) return null;
+  const known = value.kind === "gslides" || (MEDIA_KINDS as readonly unknown[]).includes(value.kind);
+  if (!known || (value.kind !== "gslides" && !isMediaPath(value.path))) return null;
+  return parseCue(value);
 }
 
 /** A message from the other window, or `null` when it is not one of ours. */

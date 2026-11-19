@@ -1,4 +1,4 @@
-import type { MediaCue, QueueEntry, RundownCue } from "./rundown";
+import type { QueueEntry, RundownCue, StoredCue } from "./rundown";
 
 /**
  * What the operator has on the air and what comes next, like a switcher: the PROGRAM (what the audience sees), the
@@ -35,8 +35,8 @@ export function cueOf(queue: readonly QueueEntry[], cueId: string | null): Rundo
   return index < 0 ? null : queue[index].cue;
 }
 
-/** The piece on the program when it is a file (a video, a deck, a picture), or `null` (a data scene or the QR). */
-export function mediaOnProgram(state: PlayoutState, queue: readonly QueueEntry[]): MediaCue | null {
+/** The piece on the program when it is something the projector's window shows by itself (a file or a Google Slides deck), or `null` (a data scene or the QR). */
+export function mediaOnProgram(state: PlayoutState, queue: readonly QueueEntry[]): StoredCue | null {
   if (state.program?.type !== "cue") return null;
   const cue = cueOf(queue, state.program.cueId);
   return cue && cue.kind !== "qr" ? cue : null;

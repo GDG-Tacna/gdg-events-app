@@ -12,7 +12,8 @@ import { FEATURES } from "@/shared/config/features";
 /** Shape only; the use case checks every piece again (the path above all). */
 const inputSchema = z.object({
   itemId: z.string().max(60),
-  cues: z.array(z.object({ id: z.string().max(60), kind: z.string().max(10), name: z.string().max(120), path: z.string().max(300) })).max(60),
+  // Every field of every kind is listed, or zod would drop it before the use case sees it.
+  cues: z.array(z.object({ id: z.string().max(60), kind: z.string().max(10), name: z.string().max(120), path: z.string().max(300).optional(), deckId: z.string().max(220).optional(), published: z.boolean().optional() })).max(60),
 });
 
 /**

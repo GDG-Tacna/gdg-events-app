@@ -69,6 +69,15 @@ describe("FirestoreRundownStore", () => {
     expect(await store.read()).toEqual(ok({ keynote: [SLIDES] }));
   });
 
+  it("stores a Google Slides piece with its presentation and no path, and reads it back", async () => {
+    const deck = { id: "cue-0009", kind: "gslides", name: "Keynote", deckId: "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", published: true } as const;
+
+    await store.saveItem("keynote", [SLIDES, deck]);
+
+    expect(fake.store.get("events/e1/config/rundown")?.items).toEqual({ keynote: [SLIDES, deck] });
+    expect(await store.read()).toEqual(ok({ keynote: [SLIDES, deck] }));
+  });
+
   it("reports a failed read or write", async () => {
     const broken = new FirestoreRundownStore(() => {
       throw new Error("down");

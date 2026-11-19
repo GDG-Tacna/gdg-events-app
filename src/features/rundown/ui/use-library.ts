@@ -10,8 +10,8 @@ export interface LibraryView {
   folder: string | null;
   /** Changes whenever the library's state does, so what was read before is read again. */
   revision: number;
-  /** Opens the browser's folder picker. Call it from a click. */
-  connect: () => Promise<void>;
+  /** Opens the browser's folder picker. Call it from a click. Answers `true` when a folder was connected (not when the picker was closed). */
+  connect: () => Promise<boolean>;
   /** Asks the browser for permission to read the remembered folder. Call it from a click. */
   allow: () => Promise<void>;
 }
@@ -46,10 +46,11 @@ export function useMediaLibrary(injected?: MediaLibrary): LibraryView {
   }, [injected, refresh]);
 
   const connect = useCallback(async () => {
-    if (!library) return;
-    await library.connect();
+    if (!library) return false;
+    const connected = await library.connect();
     await refresh(library);
     setRevision((count) => count + 1);
+    return connected.ok;
   }, [library, refresh]);
 
   const allow = useCallback(async () => {

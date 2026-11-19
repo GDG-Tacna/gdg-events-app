@@ -2574,6 +2574,15 @@ export const copy = {
     folderNone: "Sin carpeta",
     folderConnect: "Conectar carpeta",
     folderAllow: "Permitir",
+    folderChange: "Cambiar carpeta",
+    changeFolder: {
+      title: "¿Cambiar la carpeta de archivos?",
+      /** Placeholder: {n}. */
+      description: "Si cambias de carpeta, se quitan de la agenda los {n} archivos que ya agregaste (videos, PDF e imágenes), porque sus rutas son de la carpeta actual. Las presentaciones de Google Slides, los QR y las escenas no se tocan. Después vuelve a añadir tus archivos desde la nueva carpeta.",
+      descriptionNone: "Elige la nueva carpeta. Aún no hay archivos en la agenda, así que no se quita nada.",
+      confirm: "Elegir otra carpeta",
+      done: "Carpeta cambiada. Se quitaron de la agenda los archivos de la carpeta anterior.",
+    },
     rundown: {
       title: "Orden del evento",
       /** Placeholders: {points}, {files}. */
@@ -2595,7 +2604,8 @@ export const copy = {
       qrMeta: "Asistencia · se genera sola",
       /** Placeholder: {total}. */
       slidesCount: "{total} láminas",
-      kinds: { video: "Video", slides: "Diapositivas", image: "Imagen", qr: "QR de la charla" },
+      kinds: { video: "Video", slides: "Diapositivas", image: "Imagen", gslides: "Google Slides", qr: "QR de la charla" },
+      gslidesMeta: "Google Slides · se pasa en la pantalla",
       expand: "Mostrar las piezas de {title}",
     },
     program: {
@@ -2609,6 +2619,7 @@ export const copy = {
       /** Placeholders: {n}, {total}. */
       slide: "Lámina {n} de {total}",
       loading: "Preparando…",
+      googleSlides: "Se pasa en la pantalla",
       failed: "No se pudo leer el archivo",
       sceneStatus: "En vivo",
     },
@@ -2654,6 +2665,16 @@ export const copy = {
       pathHint: "Por ejemplo genkit/agente-genkit.pdf",
       add: "Añadir",
       badPath: "Esa ruta no sirve: debe ser relativa a la carpeta y de un video, un PDF o una imagen.",
+      gslides: {
+        title: "Presentación de Google Slides",
+        help: "Pega el enlace de la presentación. Se muestra en la pantalla tal como la ve Google, y las láminas se pasan en la ventana del proyector (clic o flechas), no desde esta consola. Para pasarlas desde aquí, descárgala como PDF (Archivo › Descargar › PDF) y añádela como archivo.",
+        linkLabel: "Enlace de la presentación",
+        linkHint: "Por ejemplo https://docs.google.com/presentation/d/…",
+        nameLabel: "Nombre (opcional)",
+        add: "Añadir presentación",
+        bad: "Ese enlace no es de una presentación de Google Slides.",
+        tip: "Para que se vea en la pantalla, la presentación debe poder abrirse con el enlace: Compartir › Cualquier persona con el enlace, o Archivo › Compartir › Publicar en la Web.",
+      },
       saving: "Guardando…",
     },
     setup: {
