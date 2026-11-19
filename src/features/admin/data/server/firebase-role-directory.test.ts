@@ -72,6 +72,15 @@ describe("FirebaseRoleDirectory.setRole", () => {
     expect(auth.revokeRefreshTokens).toHaveBeenCalledWith("u1");
   });
 
+  it("puts the cadet's own claim back for someone who is a cadet again", async () => {
+    const { auth, directory } = fakeAuth({ theme: "dark", role: "staff" });
+
+    await directory.setRole("u1", "attendee");
+
+    expect(auth.setCustomUserClaims).toHaveBeenCalledWith("u1", { theme: "dark", role: "attendee" });
+    expect(auth.revokeRefreshTokens).toHaveBeenCalledWith("u1");
+  });
+
   it("works for an account without any claims", async () => {
     const { auth, directory } = fakeAuth(undefined);
 

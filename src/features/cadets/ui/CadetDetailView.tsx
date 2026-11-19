@@ -7,7 +7,7 @@ import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { Button, ButtonLink, Card, InlineAlert, SelectField, TextAreaField, TextField, useConfirm } from "@/shared/ui";
 import { BAN_REASON_MAX, type CadetsErrorCode } from "../domain/manage";
-import type { BanCadetAction, CadetActionResult, CadetDetailData, ChangeCadetSquadAction, DeleteCadetAction, RenameCadetAction, UnbanCadetAction } from "./actions";
+import type { BanCadetAction, CadetActionResult, CadetDetailData, CadetTeamControls, CadetTeamRole, ChangeCadetSquadAction, DeleteCadetAction, RenameCadetAction, TeamRoleActionResult, UnbanCadetAction } from "./actions";
 
 export interface CadetDetailViewProps {
   cadet: CadetDetailData;
@@ -24,6 +24,8 @@ export interface CadetDetailViewProps {
   canDelete: boolean;
   /** Whether the session may change cadets (edit level in the section); without it the page only shows. */
   canEdit: boolean;
+  /** Giving and taking a team role; without it the page does not offer it (the viewer may not manage the team). */
+  team?: CadetTeamControls;
   /** Whether this cadet is the one looking (they cannot block or delete themselves). */
   isSelf: boolean;
   /** Plain path of the list, where deleting leads. */
@@ -41,7 +43,7 @@ const when = (value: string | null) => (value ? date.format(new Date(value)) : n
  * alias or squad, block them (their account is disabled and their sessions end) and, for an admin of every edition,
  * delete them. Every change is a server command; this screen shows the answer.
  */
-export function CadetDetailView({ cadet, squads, rename, changeSquad, changeTicket, ban, unban, remove, canDelete, canEdit, isSelf, listHref }: CadetDetailViewProps) {
+export function CadetDetailView({ cadet, squads, rename, changeSquad, changeTicket, ban, unban, remove, team, canDelete, canEdit, isSelf, listHref }: CadetDetailViewProps) {
   const t = copy.admin.cadets;
   const router = useRouter();
   const [alias, setAlias] = useState(cadet.alias);
@@ -49,6 +51,7 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, changeTick
   const [ticket, setTicket] = useState<TicketType>(cadet.ticket);
   const [reason, setReason] = useState("");
   const [confirmAlias, setConfirmAlias] = useState("");
+  const [roleToGive, setRoleToGive] = useState<CadetTeamRole | "">(team?.assignable.find((option) => option !== team.role) ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const { confirm, dialog } = useConfirm();
   const [notice, setNotice] = useState<Notice>(null);
@@ -106,6 +109,37 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, changeTick
     setBusy(null);
     if (!result.ok) return setNotice({ kind: "error", text: t.errors[result.code] });
     router.push(listHref);
+    router.refresh();
+  }
+
+  /** Gives or takes a team role with the Equipo screen's own actions; the email is the cadet's account. */
+  async function changeTeamRole(kind: "give" | "take"): Promise<void> {
+    const email = cadet.account?.email;
+    if (!team || !email || busy !== null) return;
+    const role = kind === "give" ? roleToGive : null;
+    if (kind === "give" && !role) return;
+    const roleName = role ? copy.admin.team.roles[role] : "";
+    const yes = await confirm(
+      kind === "give"
+        ? { title: interpolate(t.team.confirmGiveTitle, { alias: cadet.alias, role: roleName }), description: role === "admin" ? t.team.confirmGiveAdmin : t.team.confirmGive, confirmLabel: t.team.confirmGiveButton }
+        : { title: interpolate(t.team.confirmTakeTitle, { alias: cadet.alias }), description: t.team.confirmTake, confirmLabel: t.team.confirmTakeButton, tone: "danger" },
+    );
+    if (!yes) return;
+    const success = kind === "give" ? interpolate(t.team.givenDone, { alias: cadet.alias, role: roleName }) : interpolate(t.team.takenDone, { alias: cadet.alias });
+    setBusy(kind === "give" ? "team-give" : "team-take");
+    setNotice(null);
+    let result: TeamRoleActionResult;
+    try {
+      result = kind === "give" && role ? await team.give({ email, role }) : await team.take({ email });
+    } catch {
+      result = { ok: false, code: "unknown" };
+    }
+    setBusy(null);
+    if (!result.ok) {
+      const errors = copy.admin.team.errors as Record<string, string>;
+      return setNotice({ kind: "error", text: errors[result.code] ?? errors.unknown });
+    }
+    setNotice({ kind: "success", text: success });
     router.refresh();
   }
 
@@ -192,6 +226,48 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, changeTick
               </Button>
             </form>
           </Card>
+
+          {team ? (
+            <Card className="gap-space-3 flex flex-col">
+              <h2 className="type-heading text-foreground">{t.team.title}</h2>
+              <p className="type-body-sm text-muted-foreground">{t.team.help}</p>
+              <p className="type-label text-foreground">{interpolate(t.team.current, { role: team.role ? copy.admin.team.roles[team.role] : t.team.none })}</p>
+              {isSelf ? (
+                <p className="type-body-sm text-muted-foreground">{t.team.ownAccount}</p>
+              ) : !cadet.account?.email ? (
+                <p className="type-body-sm text-muted-foreground">{t.team.noEmail}</p>
+              ) : (
+                <>
+                  {team.assignable.filter((option) => option !== team.role).length > 0 ? (
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void changeTeamRole("give");
+                      }}
+                      noValidate
+                      className="gap-space-3 flex flex-col"
+                    >
+                      <SelectField
+                        label={t.team.roleLabel}
+                        options={team.assignable.filter((option) => option !== team.role).map((option) => ({ value: option, label: copy.admin.team.roles[option] }))}
+                        value={roleToGive}
+                        disabled={busy !== null}
+                        onChange={(event) => setRoleToGive(event.target.value as CadetTeamRole)}
+                      />
+                      <Button type="submit" loading={busy === "team-give"} disabled={busy !== null || roleToGive === "" || roleToGive === team.role}>
+                        {busy === "team-give" ? t.team.giving : t.team.give}
+                      </Button>
+                    </form>
+                  ) : null}
+                  {team.role && team.assignable.includes(team.role) ? (
+                    <Button variant="secondary" loading={busy === "team-take"} disabled={busy !== null} onClick={() => void changeTeamRole("take")}>
+                      {busy === "team-take" ? t.team.taking : t.team.take}
+                    </Button>
+                  ) : null}
+                </>
+              )}
+            </Card>
+          ) : null}
 
           <Card>
             <form onSubmit={saveTicket} noValidate className="gap-space-3 flex flex-col">

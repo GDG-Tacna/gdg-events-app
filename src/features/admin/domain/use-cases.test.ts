@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { err, ok, type Result } from "@/shared/lib/result";
-import type { AuditLog, RoleDirectory, TeamRepository } from "./ports";
+import type { AuditLog, CadetProfiles, RoleDirectory, TeamRepository } from "./ports";
 import type { Account, ManagedRole, TeamMember } from "./team";
 import { teamError, type TeamError } from "./team-error";
 import { grantRole, listTeam, revokeRole, type Actor, type TeamDeps } from "./use-cases";
@@ -20,6 +20,9 @@ interface Setup {
   /** The person's records in the team of every edition, as they stand after the change. */
   elsewhere?: ReadonlyArray<{ eventId: string; role: "staff" | "organizer" }>;
   rolesError?: TeamError;
+  /** Whether the account has a cadet profile; leave it out to build the deps without the port. */
+  profile?: boolean;
+  profileError?: TeamError;
 }
 
 function setup({
@@ -32,6 +35,8 @@ function setup({
   members = [],
   elsewhere = [],
   rolesError,
+  profile,
+  profileError,
 }: Setup = {}) {
   const directory: RoleDirectory = {
     findByEmail: vi.fn(async (): Promise<Result<Account | null, TeamError>> => (findError ? err(findError) : ok(account))),
@@ -45,8 +50,9 @@ function setup({
     change: vi.fn(async () => (changeError ? err(changeError) : ok({ previous }))),
   };
   const audit: AuditLog = { append: vi.fn(async () => (auditError ? err(auditError) : ok(undefined))) };
-  const deps: TeamDeps = { directory, team, audit, now: () => NOW };
-  return { deps, directory, team, audit };
+  const profiles: CadetProfiles = { hasProfile: vi.fn(async () => (profileError ? err(profileError) : ok(profile === true))) };
+  const deps: TeamDeps = { directory, team, audit, now: () => NOW, ...(profile !== undefined || profileError ? { profiles } : {}) };
+  return { deps, directory, team, audit, profiles };
 }
 
 beforeEach(() => {
@@ -292,6 +298,73 @@ describe("the role claim", () => {
     expect(result).toEqual(err(teamError("unknown")));
     expect(t.directory.setRole).not.toHaveBeenCalled();
     expect(t.team.change).toHaveBeenLastCalledWith(ana, null);
+  });
+});
+
+describe("taking the last role away from a cadet", () => {
+  it("puts the cadet's own claim back when the account already has a cadet profile, so they go on playing", async () => {
+    const t = setup({ previous: "staff", account: { ...ana, claim: "staff" }, profile: true });
+
+    const result = await revokeRole(t.deps, ADMIN, { email: "ana@example.com" });
+
+    expect(result).toEqual(ok(null));
+    expect(t.profiles.hasProfile).toHaveBeenCalledWith("u-ana");
+    expect(t.directory.setRole).toHaveBeenCalledWith("u-ana", "attendee");
+    expect(t.audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "role.revoked", details: { role: null, previous: "staff" } }));
+  });
+
+  it("clears the claim when there is no cadet profile (they register on their next visit), as before", async () => {
+    const t = setup({ previous: "admin", account: { ...ana, claim: "admin" }, profile: false });
+
+    await revokeRole({ ...t.deps }, { uid: "admin-2", role: "admin" }, { email: "ana@example.com" });
+
+    expect(t.directory.setRole).toHaveBeenCalledWith("u-ana", null);
+  });
+
+  it("clears the claim as before when the deps have no profiles port", async () => {
+    const t = setup({ previous: "staff", account: { ...ana, claim: "staff" } });
+
+    await revokeRole(t.deps, ADMIN, { email: "ana@example.com" });
+
+    expect(t.directory.setRole).toHaveBeenCalledWith("u-ana", null);
+    expect(t.profiles.hasProfile).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when the claim is already the cadet's", async () => {
+    const t = setup({ previous: "staff", account: { ...ana, claim: "attendee" }, profile: true });
+
+    await revokeRole(t.deps, ADMIN, { email: "ana@example.com" });
+
+    expect(t.directory.setRole).not.toHaveBeenCalled();
+    expect(t.audit.append).toHaveBeenCalled();
+  });
+
+  it("keeps the strongest role they hold in another edition and does not even ask about the profile", async () => {
+    const t = setup({ previous: "staff", account: { ...ana, claim: "staff" }, elsewhere: [{ eventId: "devfest-2025", role: "organizer" }], profile: true });
+
+    await revokeRole(t.deps, ADMIN, { email: "ana@example.com" });
+
+    expect(t.directory.setRole).toHaveBeenCalledWith("u-ana", "organizer");
+    expect(t.profiles.hasProfile).not.toHaveBeenCalled();
+  });
+
+  it("puts the team record back when the profile cannot be read", async () => {
+    const t = setup({ previous: "staff", account: { ...ana, claim: "staff" }, profileError: teamError("unknown") });
+
+    const result = await revokeRole(t.deps, ADMIN, { email: "ana@example.com" });
+
+    expect(result).toEqual(err(teamError("unknown")));
+    expect(t.directory.setRole).not.toHaveBeenCalled();
+    expect(t.team.change).toHaveBeenLastCalledWith(expect.objectContaining({ uid: "u-ana" }), "staff");
+  });
+
+  it("a role given to someone does not look at the profile at all", async () => {
+    const t = setup({ profile: true });
+
+    await grantRole(t.deps, ADMIN, { email: "ana@example.com", role: "staff" });
+
+    expect(t.profiles.hasProfile).not.toHaveBeenCalled();
+    expect(t.directory.setRole).toHaveBeenCalledWith("u-ana", "staff");
   });
 });
 
