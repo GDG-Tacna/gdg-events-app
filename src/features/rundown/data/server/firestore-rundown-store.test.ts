@@ -94,18 +94,32 @@ describe("FirestoreRundownStore", () => {
     await store.saveMinutes("keynote", 20);
     await store.saveMinutes("cafe", 15);
 
-    expect(await store.readPlan()).toEqual(ok({ points: [cafe, welcome], minutes: { keynote: 20, cafe: 15 } }));
+    expect(await store.readPlan()).toEqual(ok({ points: [cafe, welcome], minutes: { keynote: 20, cafe: 15 }, playlist: [] }));
 
     await store.savePoints([welcome]);
     await store.saveMinutes("cafe", null);
-    expect(await store.readPlan()).toEqual(ok({ points: [welcome], minutes: { keynote: 20 } }));
+    expect(await store.readPlan()).toEqual(ok({ points: [welcome], minutes: { keynote: 20 }, playlist: [] }));
+  });
+
+  it("stores the playlist as a whole and reads it back, and reads a broken one as empty", async () => {
+    const intro = { id: "song-0001", name: "Intro", path: "musica/intro.mp3" };
+    const outro = { id: "song-0002", name: "Cierre", path: "musica/cierre.m4a" };
+    await store.savePlaylist([intro, outro]);
+    expect((await store.readPlan()).ok && (await store.readPlan())).toMatchObject({ value: { playlist: [intro, outro] } });
+
+    await store.savePlaylist([outro]);
+    expect(await store.readPlan()).toMatchObject({ value: { playlist: [outro] } });
+
+    fake.store.set("events/e1/config/rundown", { playlist: [{ id: "x", name: "y", path: "../z.mp3" }] });
+    expect(await store.readPlan()).toMatchObject({ value: { playlist: [] } });
+    expect(console.error).toHaveBeenCalled();
   });
 
   it("reads an edition with nothing planned as empty, and leaves out what breaks the rules", async () => {
-    expect(await store.readPlan()).toEqual(ok({ points: [], minutes: {} }));
+    expect(await store.readPlan()).toEqual(ok({ points: [], minutes: {}, playlist: [] }));
 
     fake.store.set("events/e1/config/rundown", { points: [{ id: "BAD", title: "x" }], minutes: { keynote: 20, cafe: -5, foo: "3" } });
-    expect(await store.readPlan()).toEqual(ok({ points: [], minutes: { keynote: 20 } }));
+    expect(await store.readPlan()).toEqual(ok({ points: [], minutes: { keynote: 20 }, playlist: [] }));
     expect(console.error).toHaveBeenCalled();
   });
 

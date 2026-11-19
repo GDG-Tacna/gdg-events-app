@@ -1,5 +1,5 @@
 import { err, ok, type Result } from "@/shared/lib/result";
-import { isMediaPath, kindOfPath } from "../../domain/rundown";
+import { isAudioPath, isFilePath, kindOfPath } from "../../domain/rundown";
 
 /**
  * The folder with the event's files, on the operator's own computer. The browser cannot read a path somebody typed, so
@@ -104,7 +104,7 @@ export function createFolderAccessLibrary({ picker, handles }: { picker: Directo
     },
 
     async resolve(path) {
-      if (!isMediaPath(path)) return err("unsupported-path");
+      if (!isFilePath(path)) return err("unsupported-path");
       const handle = await current();
       if (!handle) return err("no-library");
       if ((await permission(handle).catch(() => "denied")) !== "granted") return err("denied");
@@ -130,7 +130,7 @@ export function createFolderAccessLibrary({ picker, handles }: { picker: Directo
         for await (const entry of directory.values()) {
           if (found.length >= LIST_MAX) return;
           if (entry.kind === "directory") await walk(entry, `${prefix}${entry.name}/`, depth + 1);
-          else if (kindOfPath(entry.name) !== null) found.push(`${prefix}${entry.name}`);
+          else if (kindOfPath(entry.name) !== null || isAudioPath(entry.name)) found.push(`${prefix}${entry.name}`);
         }
       }
       try {
@@ -178,13 +178,13 @@ export function createFolderInputLibrary(pickFiles: () => Promise<readonly File[
       return files.size > 0;
     },
     async resolve(path) {
-      if (!isMediaPath(path)) return err("unsupported-path");
+      if (!isFilePath(path)) return err("unsupported-path");
       if (files.size === 0) return err("no-library");
       const file = files.get(path);
       return file ? ok(file) : err("missing");
     },
     async list() {
-      return [...files.keys()].filter((path) => kindOfPath(path) !== null).sort((a, b) => a.localeCompare(b, "es")).slice(0, LIST_MAX);
+      return [...files.keys()].filter((path) => kindOfPath(path) !== null || isAudioPath(path)).sort((a, b) => a.localeCompare(b, "es")).slice(0, LIST_MAX);
     },
   };
 }

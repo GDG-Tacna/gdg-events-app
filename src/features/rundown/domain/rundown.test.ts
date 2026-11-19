@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRundown, cueFromPath, isMinutes, isSeconds, mergeAgenda, parseExtraPoint, parseExtraPoints, googleSlidesCueFromLink, googleSlidesEmbedUrl, googleSlidesPdfUrl, isFileCue, isMediaPath, kindOfPath, moveCue, nameFromPath, parseCue, parseCues, parseGoogleSlidesLink, qrCueId, queueOf } from "./rundown";
+import { buildRundown, cueFromPath, isAudioPath, isFilePath, isMinutes, isSeconds, mergeAgenda, parseExtraPoint, parseExtraPoints, googleSlidesCueFromLink, googleSlidesEmbedUrl, googleSlidesPdfUrl, isFileCue, isMediaPath, kindOfPath, moveCue, nameFromPath, parseCue, parseCues, parseGoogleSlidesLink, qrCueId, queueOf } from "./rundown";
 
 const SLIDES = { id: "cue-0001", kind: "slides", name: "Keynote", path: "apertura/keynote.pdf" } as const;
 
@@ -209,5 +209,17 @@ describe("points made in the console", () => {
     expect(merged.find((point) => point.id === "keynote")).toMatchObject({ minutes: 20 });
     expect(merged.find((point) => point.id === "keynote")?.custom).toBeUndefined();
     expect(merged.find((point) => point.id === "genkit")?.minutes).toBeUndefined();
+  });
+});
+
+describe("audio paths", () => {
+  it("accepts the audio formats a browser plays, with the same limits as any path, and keeps them out of the pieces", () => {
+    for (const path of ["musica/intro.mp3", "a/b/c.M4A", "wav.wav", "x.ogg", "x.flac", "x.aac"]) expect(isAudioPath(path)).toBe(true);
+    for (const path of ["musica/video.mp4", "deck.pdf", "../intro.mp3", "/intro.mp3", "C:\\musica\\intro.mp3", "musica//intro.mp3", "intro", "", 5]) expect(isAudioPath(path)).toBe(false);
+    // A song is no piece of the order, and a piece is no song.
+    expect(isMediaPath("musica/intro.mp3")).toBe(false);
+    expect(isAudioPath("deck.pdf")).toBe(false);
+    expect(cueFromPath("musica/intro.mp3", "cue-0001")).toBeNull();
+    expect([isFilePath("a.mp3"), isFilePath("a.pdf"), isFilePath("a.exe")]).toEqual([true, true, false]);
   });
 });

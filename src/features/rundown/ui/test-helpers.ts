@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import { err, ok } from "@/shared/lib/result";
 import type { LibraryStatus, MediaLibrary } from "../data/client/media-library";
 import { openStageChannel, type ChannelLike, type StageChannel } from "../data/client/stage-channel";
-import { isMediaPath } from "../domain/rundown";
+import { isFilePath } from "../domain/rundown";
 
 /** Two ends of one channel, like two windows of a browser: what one posts the other hears, never itself. */
 export function channelPair(): { console: StageChannel; stage: StageChannel } {
@@ -37,7 +37,7 @@ export function fakeLibrary(files: Record<string, File> = {}, initial: LibrarySt
       return true;
     }),
     resolve: async (path) => {
-      if (!isMediaPath(path)) return err("unsupported-path");
+      if (!isFilePath(path)) return err("unsupported-path");
       if (status === "none") return err("no-library");
       if (status === "needs-permission") return err("denied");
       return files[path] ? ok(files[path]) : err("missing");
@@ -49,4 +49,5 @@ export function fakeLibrary(files: Record<string, File> = {}, initial: LibrarySt
 
 export const pdf = (name = "keynote.pdf") => new File(["%PDF"], name, { type: "application/pdf" });
 export const mp4 = (name = "video.mp4") => new File(["video"], name, { type: "video/mp4" });
+export const mp3 = (name = "cancion.mp3") => new File(["audio"], name, { type: "audio/mpeg" });
 export const png = (name = "portada.png") => new File(["png"], name, { type: "image/png" });
