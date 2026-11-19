@@ -10,6 +10,7 @@ const attendee: Attendee = {
   squad: "firebase",
   xp: 120,
   credits: 4,
+  ticket: { type: "premium", source: "list" },
   createdAt: new Date("2026-10-04T12:00:00Z"),
 };
 

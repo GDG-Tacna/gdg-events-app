@@ -111,7 +111,8 @@ const NOVA: Doc = { alias: "Nova", aliasLower: "nova", role: "attendee", squad: 
 
 describe("toCadet", () => {
   it("reads a participant, its squad, dates and block", () => {
-    expect(toCadet("u1", { ...NOVA, banned: true })).toEqual({ uid: "u1", alias: "Nova", squad: "firebase", xp: 120, credits: 30, createdAt: CREATED, attendedAt: CREATED, banned: true });
+    expect(toCadet("u1", { ...NOVA, banned: true })).toEqual({ uid: "u1", alias: "Nova", squad: "firebase", xp: 120, credits: 30, createdAt: CREATED, attendedAt: CREATED, banned: true, ticket: "general" });
+    expect(toCadet("u3", { ...NOVA, ticketType: "premium", ticketSource: "manual" })).toMatchObject({ ticket: "premium" });
     expect(toCadet("u2", { alias: "Cero", squad: "", xp: "x" })).toMatchObject({ squad: null, xp: 0, credits: 0, createdAt: null, attendedAt: null, banned: false });
   });
 
@@ -192,6 +193,16 @@ describe("FirestoreCadetStore", () => {
         banReason: "Spam",
         activity: { checkIns: 2, missions: 1, badges: 1, contacts: 1 },
       });
+    });
+
+    it("reads the ticket and where it came from, defaulting to a general ticket from the default", async () => {
+      fake.store.set("events/e1/participants/u-nova", { ...NOVA, ticketType: "premium", ticketSource: "manual", ticketSetBy: "staff-1", ticketSetAt: CREATED });
+
+      const manual = await store.get("u-nova");
+      const plain = await store.get("u-mia");
+
+      expect(manual.ok && manual.value).toMatchObject({ ticket: "premium", ticketSource: "manual", ticketSetBy: "staff-1", ticketSetAt: CREATED });
+      expect(plain.ok && plain.value).toMatchObject({ ticket: "general", ticketSource: "default", ticketSetBy: null, ticketSetAt: null });
     });
 
     it("answers null for a missing cadet or a document with no alias", async () => {

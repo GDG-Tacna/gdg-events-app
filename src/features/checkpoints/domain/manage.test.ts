@@ -22,7 +22,7 @@ import { manageError } from "./manage-error";
 
 const NOW = new Date("2026-10-20T13:00:00Z");
 const ADMIN: ManageActor = { uid: "a1", role: "admin" };
-const NONE = { minLevel: null, minTalks: null };
+const NONE = { minLevel: null, minTalks: null, minTicket: null };
 const LUNCH: ManagedCheckpoint = { id: "lunch-1", kind: "catering", name: "Almuerzo", active: true, description: "", image: null, requirements: NONE };
 const LOGO = "public/e1/checkpoint/abcdef123456.webp";
 const LOGO_REF = { path: LOGO, url: `/media/${LOGO}` };
@@ -291,7 +291,7 @@ describe("createCheckpoint with a description and an image", () => {
 
 describe("editCheckpoint", () => {
   const STAND: ManagedCheckpoint = { id: "louis-3d", kind: "stand", name: "Louis 3D", active: true, description: "", image: null, requirements: NONE };
-  const GATED = { minLevel: 2, minTalks: 3 };
+  const GATED = { minLevel: 2, minTalks: 3, minTicket: null };
 
   it("always saves the name, description and image, and audits what changed", async () => {
     const after = { ...STAND, name: "Louis 3D Lab", description: "Impresión 3D", image: LOGO_REF };
@@ -392,7 +392,7 @@ describe("editCheckpoint", () => {
   it("saves a meal's food gate and audits it", async () => {
     const t = setup({ update: ok({ before: LUNCH, after: { ...LUNCH, requirements: GATED } }) });
 
-    await editCheckpoint(t.deps, ADMIN, { id: "lunch-1", name: "Almuerzo", description: "", requirements: { minLevel: 2, minTalks: 3 } });
+    await editCheckpoint(t.deps, ADMIN, { id: "lunch-1", name: "Almuerzo", description: "", requirements: { minLevel: 2, minTalks: 3, minTicket: null } });
 
     expect(t.store.update).toHaveBeenCalledWith("lunch-1", { name: "Almuerzo", description: "", requirements: GATED });
     expect(t.audit.append).toHaveBeenCalledWith(expect.objectContaining({ details: expect.objectContaining({ changed: "requirements", minLevel: "2", minTalks: "3" }) }));
@@ -409,10 +409,10 @@ describe("editCheckpoint", () => {
     expect(await editCheckpoint(t.deps, ADMIN, { ...base, imagePath: "https://evil.example/x.png" })).toEqual(err(manageError("invalid-image")));
     expect(await editCheckpoint(t.deps, ADMIN, { ...base, kind: "talk" })).toEqual(err(manageError("invalid-kind")));
     expect(await editCheckpoint(t.deps, ADMIN, { ...base, newId: "No Valid" })).toEqual(err(manageError("invalid-id")));
-    expect(await editCheckpoint(t.deps, ADMIN, { ...base, requirements: { minLevel: 11, minTalks: null } })).toEqual(err(manageError("invalid-level")));
+    expect(await editCheckpoint(t.deps, ADMIN, { ...base, requirements: { minLevel: 11, minTalks: null, minTicket: null } })).toEqual(err(manageError("invalid-level")));
     expect(t.store.list).not.toHaveBeenCalled();
     // A food gate only for a meal.
-    expect(await editCheckpoint(t.deps, ADMIN, { ...base, requirements: { minLevel: 2, minTalks: null } })).toEqual(err(manageError("not-catering")));
+    expect(await editCheckpoint(t.deps, ADMIN, { ...base, requirements: { minLevel: 2, minTalks: null, minTicket: null } })).toEqual(err(manageError("not-catering")));
     expect(t.store.update).not.toHaveBeenCalled();
   });
 

@@ -11,7 +11,7 @@ const request = (path: string, withCookie = false) =>
 const redirectTarget = (response: Response) => response.headers.get("location");
 
 describe("proxy", () => {
-  it.each(["/dashboard", "/dashboard/anything", "/onboarding", "/squad", "/scan", "/pass", "/map", "/missions", "/odyssey", "/achievements", "/minigame/ai-quiz", "/red", "/escenario", "/staff", "/staff/scan", "/admin", "/speaker", "/encuesta", "/avatar"])(
+  it.each(["/dashboard", "/dashboard/anything", "/onboarding", "/squad", "/scan", "/pass", "/map", "/missions", "/odyssey", "/achievements", "/minigame/ai-quiz", "/red", "/escenario", "/staff", "/staff/scan", "/staff/entradas", "/admin", "/admin/cadetes/entradas", "/speaker", "/encuesta", "/avatar"])(
     "sends %s to /login when there is no session cookie",
     (path) => {
       const response = proxy(request(path));

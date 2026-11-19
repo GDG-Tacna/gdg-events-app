@@ -102,6 +102,12 @@ describe("input validation", () => {
       { uid: "a1", role: "admin" },
       { id: "lunch-1", name: "Almuerzo", description: "", imagePath: null, requirements: { minLevel: null, minTalks: 3 } },
     );
+    await editCheckpointAction({ id: "lunch-1", name: "Almuerzo", description: "", requirements: { minLevel: null, minTalks: null, minTicket: "premium" } });
+    expect(server.editCheckpoint).toHaveBeenLastCalledWith(
+      { marker: "deps" },
+      { uid: "a1", role: "admin" },
+      { id: "lunch-1", name: "Almuerzo", description: "", requirements: { minLevel: null, minTalks: null, minTicket: "premium" } },
+    );
     // Name, description, image and requirements never need the delete permission.
     expect(deletion.mayDeleteItems).not.toHaveBeenCalled();
   });

@@ -1,3 +1,4 @@
+import type { TicketType } from "@/features/tickets";
 import type { StationKind } from "../domain/serve";
 import type { ServeErrorCode } from "../domain/serve-error";
 
@@ -19,11 +20,13 @@ export type ServeActionResult =
       firstEntrance: boolean;
       alias: string;
       squadId: string | null;
+      /** The ticket of the cadet, shown with the verdict. */
+      ticketType: TicketType;
       servedCount: number | null;
       /** Missions this scan completed (only at a stand); empty otherwise. */
       missions: readonly StationMission[];
     }
-  /** `missing` comes only with `not-eligible`: the level to reach and the talks still missing. */
-  | { ok: false; code: ServeErrorCode; missing?: { level: number | null; levelName: string | null; talks: number | null } };
+  /** `missing` comes only with `not-eligible`: the level to reach, the talks still missing and the ticket the meal asks for. */
+  | { ok: false; code: ServeErrorCode; missing?: { level: number | null; levelName: string | null; talks: number | null; ticket: TicketType | null } };
 
 export type ServeAction = (input: { checkpointId: string; payload: string }) => Promise<ServeActionResult>;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TicketChip } from "@/features/tickets";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { Button, ButtonLink, Card } from "@/shared/ui";
@@ -13,7 +14,7 @@ export interface CadetsListViewProps {
   /** The address of the next page, or `null` at the end. */
   nextHref: string | null;
   /** Plain paths (a view cannot receive functions from a server page): a cadet opens at `${detailBase}/${uid}`. */
-  hrefs: { list: string; detailBase: string };
+  hrefs: { list: string; detailBase: string; /** The page that loads the edition's list of ticket holders; absent hides the link. */ tickets?: string };
 }
 
 const chip = "type-caption border-line-strong text-foreground px-space-3 rounded-full border py-1";
@@ -29,6 +30,11 @@ export function CadetsListView({ cadets, total, search, nextHref, hrefs }: Cadet
       <header className="gap-space-1 flex flex-col">
         <h1 className="type-title-xl text-foreground">{t.title}</h1>
         <p className="type-body text-muted-foreground">{interpolate(t.subtitle, { n: formatNumber(total) })}</p>
+        {hrefs.tickets ? (
+          <ButtonLink href={hrefs.tickets} variant="secondary" size="sm" className="mt-space-2 self-start">
+            {t.ticketsLink}
+          </ButtonLink>
+        ) : null}
       </header>
 
       <form action={hrefs.list} method="get" role="search" className="gap-space-2 flex">
@@ -80,6 +86,7 @@ export function CadetsListView({ cadets, total, search, nextHref, hrefs }: Cadet
                   </p>
                 </div>
                 <div className="gap-space-2 flex shrink-0 flex-wrap items-center">
+                  <TicketChip type={cadet.ticket} />
                   {cadet.banned ? <span className={`${chip} border-danger text-danger-ink`}>{t.banned}</span> : null}
                   <span className={chip}>{cadet.attended ? t.attended : t.notArrived}</span>
                 </div>

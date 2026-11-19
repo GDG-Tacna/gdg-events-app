@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
 import { answerConfirm } from "@/test-utils/confirm";
+import type { ChangeCadetTicketAction } from "@/features/tickets";
 import type { BanCadetAction, CadetDetailData, CadetRow, ChangeCadetSquadAction, DeleteCadetAction, RenameCadetAction, UnbanCadetAction } from "./actions";
 import { CadetDetailView } from "./CadetDetailView";
 import { CadetsListView } from "./CadetsListView";
@@ -15,7 +16,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => router }));
 const t = copy.admin.cadets;
 const HREFS = { list: "/admin/cadetes", detailBase: "/admin/cadetes" };
 
-const ROW = (uid: string, alias: string, extra: Partial<CadetRow> = {}): CadetRow => ({ uid, alias, name: "Ana Quispe", email: "ana@example.com", squadName: "Firebase", xp: 1200, credits: 30, attended: true, banned: false, ...extra });
+const ROW = (uid: string, alias: string, extra: Partial<CadetRow> = {}): CadetRow => ({ uid, alias, name: "Ana Quispe", email: "ana@example.com", squadName: "Firebase", xp: 1200, credits: 30, attended: true, banned: false, ticket: "general", ...extra });
 
 describe("CadetsListView", () => {
   const renderList = (props: Partial<Parameters<typeof CadetsListView>[0]> = {}) =>
@@ -32,6 +33,22 @@ describe("CadetsListView", () => {
     expect(items[1]).toHaveTextContent(t.banned);
     expect(screen.getByRole("link", { name: "Nova" })).toHaveAttribute("href", "/admin/cadetes/u1");
     expect(screen.getByText(/42 en total/)).toBeInTheDocument();
+  });
+
+  it("shows each cadet's ticket as a chip, and links to the page that loads the list of tickets", () => {
+    renderList({ cadets: [ROW("u1", "Nova", { ticket: "premium" }), ROW("u2", "Mia", { ticket: "pro" }), ROW("u3", "Eva")], hrefs: { ...HREFS, tickets: "/admin/cadetes/entradas" } });
+
+    const items = within(screen.getByRole("list", { name: t.listLabel })).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Entrada Premium");
+    expect(items[1]).toHaveTextContent("Entrada Pro");
+    expect(items[2]).toHaveTextContent("Entrada General");
+    expect(screen.getByRole("link", { name: t.ticketsLink })).toHaveAttribute("href", "/admin/cadetes/entradas");
+  });
+
+  it("shows no link to the tickets page when it is not given", () => {
+    renderList();
+
+    expect(screen.queryByRole("link", { name: t.ticketsLink })).not.toBeInTheDocument();
   });
 
   it("shows each cadet's real name and email under the alias, or says they are missing", () => {
@@ -87,6 +104,8 @@ const CADET: CadetDetailData = {
   activity: { checkIns: 2, missions: 1, badges: 0, contacts: 3 },
   bannedAt: null,
   banReason: null,
+  ticketSource: "default",
+  ticketSetByName: null,
   account: { email: "nova@example.com", displayName: "Nova Cadet", disabled: false },
 };
 const SQUADS = [
@@ -99,13 +118,14 @@ describe("CadetDetailView", () => {
   const renderDetail = (extra: Partial<Parameters<typeof CadetDetailView>[0]> = {}) => {
     const rename = vi.fn<RenameCadetAction>(async () => ok);
     const changeSquad = vi.fn<ChangeCadetSquadAction>(async () => ok);
+    const changeTicket = vi.fn<ChangeCadetTicketAction>(async () => ok);
     const ban = vi.fn<BanCadetAction>(async () => ok);
     const unban = vi.fn<UnbanCadetAction>(async () => ok);
     const remove = vi.fn<DeleteCadetAction>(async () => ({ ok: true, alias: "Nova" }));
     const view = render(
-      <CadetDetailView cadet={CADET} squads={SQUADS} rename={rename} changeSquad={changeSquad} ban={ban} unban={unban} remove={remove} canDelete canEdit isSelf={false} listHref="/admin/cadetes" {...extra} />,
+      <CadetDetailView cadet={CADET} squads={SQUADS} rename={rename} changeSquad={changeSquad} changeTicket={changeTicket} ban={ban} unban={unban} remove={remove} canDelete canEdit isSelf={false} listHref="/admin/cadetes" {...extra} />,
     );
-    return { ...view, rename, changeSquad, ban, unban, remove, user: userEvent.setup() };
+    return { ...view, rename, changeSquad, changeTicket, ban, unban, remove, user: userEvent.setup() };
   };
 
   beforeEach(() => {
@@ -121,6 +141,53 @@ describe("CadetDetailView", () => {
     expect(screen.getByText("2 asistencias · 1 misiones · 0 insignias · 3 contactos")).toBeInTheDocument();
     expect(screen.getByText(t.notArrived)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: t.back })).toHaveAttribute("href", "/admin/cadetes");
+  });
+
+  it("sets the ticket by hand, says so and refreshes; the button waits for a change", async () => {
+    const { changeTicket, user } = renderDetail();
+    const save = screen.getByRole("button", { name: t.saveTicket });
+    expect(save).toBeDisabled();
+    expect(screen.getByLabelText(t.ticketLabel)).toHaveValue("general");
+
+    await user.selectOptions(screen.getByLabelText(t.ticketLabel), "premium");
+    await user.click(save);
+
+    expect(changeTicket).toHaveBeenCalledWith({ uid: "cadet-0001", type: "premium" });
+    expect(await screen.findByText(t.ticketDone)).toBeInTheDocument();
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("says where the ticket came from: the list, the default, or who set it by hand", () => {
+    const { unmount } = renderDetail({ cadet: { ...CADET, ticket: "pro", ticketSource: "list" } });
+    expect(screen.getByText(copy.tickets.sources.list)).toBeInTheDocument();
+    unmount();
+
+    const byDefault = renderDetail();
+    expect(screen.getByText(copy.tickets.sources.default)).toBeInTheDocument();
+    byDefault.unmount();
+
+    const byHand = renderDetail({ cadet: { ...CADET, ticket: "premium", ticketSource: "manual", ticketSetByName: "Luis Staff" } });
+    expect(screen.getByText("Asignada por Luis Staff")).toBeInTheDocument();
+    byHand.unmount();
+
+    renderDetail({ cadet: { ...CADET, ticket: "premium", ticketSource: "manual" } });
+    expect(screen.getByText(copy.tickets.sources.manualUnknown)).toBeInTheDocument();
+  });
+
+  it("shows why a ticket could not be changed, with the ticket wording", async () => {
+    const changeTicket = vi.fn<ChangeCadetTicketAction>(async () => ({ ok: false, code: "not-found" }));
+    const { user } = renderDetail({ changeTicket });
+
+    await user.selectOptions(screen.getByLabelText(t.ticketLabel), "pro");
+    await user.click(screen.getByRole("button", { name: t.saveTicket }));
+
+    expect(await screen.findByText(copy.tickets.errors["not-found"])).toBeInTheDocument();
+  });
+
+  it("does not offer the ticket form to a session that may not edit", () => {
+    renderDetail({ canEdit: false });
+
+    expect(screen.queryByLabelText(t.ticketLabel)).not.toBeInTheDocument();
   });
 
   it("still shows the page when the account could not be read", () => {

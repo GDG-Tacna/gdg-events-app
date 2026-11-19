@@ -128,6 +128,11 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // Who bought which ticket (emails and names of the people on the edition's list): server only.
+      match /ticketHolders/{holder} {
+        allow read, write: if false;
+      }
+
       // Staff and organizers of this edition: written and read by the server (the rules above read it for organizers).
       match /team/{uid} {
         allow read, write: if false;

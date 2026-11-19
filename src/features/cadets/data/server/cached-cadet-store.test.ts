@@ -17,6 +17,7 @@ const CADET: IndexedCadet = {
   createdAt: null,
   attendedAt: null,
   banned: false,
+  ticket: "general",
 };
 const EVERYONE = { cadets: [CADET], total: 1 };
 
@@ -84,6 +85,17 @@ describe("CachedCadetStore", () => {
     await store.listAll();
 
     expect(inner.listAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the list again after forget(), for a change made outside this store", async () => {
+    const inner = fakeStore();
+    const store = new CachedCadetStore(inner);
+    await store.listAll();
+
+    store.forget();
+    await store.listAll();
+
+    expect(inner.listAll).toHaveBeenCalledTimes(2);
   });
 
   it("keeps one list per edition", async () => {

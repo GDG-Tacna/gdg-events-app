@@ -1,3 +1,5 @@
+import type { TicketType } from "@/features/tickets";
+
 export type ServeErrorCode =
   | "invalid-code"
   /** A genuine pass whose minute is over: ask the attendee to open their pass again. */
@@ -18,8 +20,8 @@ export type ServeErrorCode =
 
 export interface ServeError {
   code: ServeErrorCode;
-  /** Only with `not-eligible`: the level to reach and the talks still missing. */
-  missing?: { level: number | null; talks: number | null };
+  /** Only with `not-eligible`: the level to reach, the talks still missing and the ticket the meal asks for. */
+  missing?: { level: number | null; talks: number | null; ticket: TicketType | null };
 }
 
 export const serveError = (code: ServeErrorCode, missing?: ServeError["missing"]): ServeError => (missing ? { code, missing } : { code });

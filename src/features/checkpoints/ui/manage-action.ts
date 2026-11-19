@@ -1,5 +1,6 @@
 import type { CheckpointKind } from "@/features/checkins";
 import type { ImageRef } from "@/features/media/constants";
+import type { TicketType } from "@/features/tickets";
 import type { ManageErrorCode } from "../domain/manage-error";
 
 export interface CheckpointView {
@@ -12,7 +13,7 @@ export interface CheckpointView {
   /** Its logo or photo, or null. */
   image: ImageRef | null;
   /** The food gate of a meal (none for other kinds). */
-  requirements: { minLevel: number | null; minTalks: number | null };
+  requirements: { minLevel: number | null; minTalks: number | null; minTicket: TicketType | null };
 }
 
 /**
@@ -39,6 +40,6 @@ export type EditCheckpointAction = (input: {
   imagePath?: string | null;
   kind?: string;
   newId?: string;
-  requirements?: { minLevel: number | null; minTalks: number | null };
+  requirements?: { minLevel: number | null; minTalks: number | null; minTicket: TicketType | null };
 }) => Promise<ManageActionResult>;
 export type SetCheckpointActiveAction = (input: { id: string; active: boolean }) => Promise<ManageActionResult>;

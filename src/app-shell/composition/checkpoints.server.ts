@@ -8,12 +8,12 @@ import { FirestoreCheckInCounter, InMemoryAttemptLimiter } from "@/features/chec
 import { PassVerifier } from "@/features/pass/server";
 import { ConsoleAnalytics } from "@/shared/lib/analytics/console-analytics";
 
-/** What the staff screen shows about a person: their alias and squad, read through the attendee feature's repository. */
+/** What the staff screen shows about a person: their alias, squad and ticket, read through the attendee feature's repository. */
 const attendees: AttendeeLookup = {
   async find(uid) {
     const found = await attendeeDeps.attendees.findByUid(uid);
     if (!found.ok) return { ok: false, error: { code: found.error.code } };
-    return { ok: true, value: found.value === null ? null : { alias: found.value.alias, squadId: found.value.squad } };
+    return { ok: true, value: found.value === null ? null : { alias: found.value.alias, squadId: found.value.squad, ticket: found.value.ticket.type } };
   },
 };
 

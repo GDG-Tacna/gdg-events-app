@@ -12,7 +12,8 @@ import type { Firestore } from "firebase-admin/firestore";
  *
  * A collection can be read by several features, but each field has one owner (documented in
  * docs/architecture.md): the attendee feature owns alias, role, xp and credits; the squads feature
- * owns `squad`; the check-ins feature owns `attendedAt`.
+ * owns `squad`; the check-ins feature owns `attendedAt`; the tickets feature owns `ticketType`,
+ * `ticketSource`, `ticketSetBy` and `ticketSetAt` (the attendee feature only writes them when the profile is created).
  */
 export const CONFIG_COLLECTION = "config";
 export const APP_CONFIG_DOC = "app";
@@ -86,6 +87,9 @@ export const INVITES_COLLECTION = "invites";
 /** The stations a staff account is limited to in one edition (`events/{eventId}/staffScopes/{uid}`); none means every station. */
 export const STAFF_SCOPES_COLLECTION = "staffScopes";
 
+/** Who bought which ticket in one edition (`events/{eventId}/ticketHolders/{encoded email}`). Personal data: server only, never copied to another edition. */
+export const TICKET_HOLDERS_COLLECTION = "ticketHolders";
+
 export type EventCollection =
   | typeof SPEAKERS_COLLECTION
   | typeof POLLS_COLLECTION
@@ -115,7 +119,8 @@ export type EventCollection =
   | typeof CHECKPOINTS_COLLECTION
   | typeof EDITION_TEAM_COLLECTION
   | typeof INVITES_COLLECTION
-  | typeof STAFF_SCOPES_COLLECTION;
+  | typeof STAFF_SCOPES_COLLECTION
+  | typeof TICKET_HOLDERS_COLLECTION;
 
 /** The document of one edition itself (its name and when it ends). */
 export function eventDocument(db: Firestore, eventId: string) {

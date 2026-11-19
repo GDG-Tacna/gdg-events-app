@@ -1,4 +1,5 @@
 import { RANKS, rankProgress, type Attendee, type RankId, type RankLadder } from "@/features/attendee";
+import type { TicketType } from "@/features/tickets";
 import type { SquadId } from "@/shared/types/squad";
 
 /** Everything the dashboard needs to draw the attendee card. Plain data: it crosses to client components. */
@@ -18,6 +19,8 @@ export interface DashboardOverview {
   /** 0 to 100: how far the attendee is from the next rank. 100 at the top. */
   progressPercent: number;
   squadId: SquadId | null;
+  /** The ticket the cadet has (General, Pro or Premium). */
+  ticket: TicketType;
 }
 
 /** Attendee entity to the card's view model. The rank is derived from XP, never stored. */
@@ -42,6 +45,7 @@ export function buildOverview(attendee: Attendee, ladder: RankLadder = RANKS, wa
       : null,
     progressPercent: progress.percent,
     squadId: attendee.squad,
+    ticket: attendee.ticket.type,
   };
 }
 

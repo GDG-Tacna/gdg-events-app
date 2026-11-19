@@ -254,7 +254,7 @@ describe("stand check-in with ephemeral codes", () => {
     const serveDeps = {
       checkpoints: w.checkInDeps.catalog,
       passes: new PassVerifier({ signer, now: () => w.clock.now }),
-      attendees: { find: async () => ok({ alias: "Nova_7", squadId: null }) },
+      attendees: { find: async () => ok({ alias: "Nova_7", squadId: null, ticket: "general" as const }) },
       recorder: w.checkIns,
       counter: { count: async () => ok(1) },
       gate: new AllowAllServeGate(),

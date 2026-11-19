@@ -1,3 +1,4 @@
+import type { TicketSource, TicketType } from "@/features/tickets";
 import type { CadetsErrorCode } from "../domain/manage";
 
 /** A cadet as the list shows them. Plain data: it crosses the client boundary. */
@@ -13,6 +14,8 @@ export interface CadetRow {
   /** Whether their first entrance was scanned. */
   attended: boolean;
   banned: boolean;
+  /** Their ticket. */
+  ticket: TicketType;
 }
 
 /** A cadet's page. Dates as ISO text. */
@@ -23,6 +26,9 @@ export interface CadetDetailData extends CadetRow {
   activity: { checkIns: number; missions: number; badges: number; contacts: number };
   bannedAt: string | null;
   banReason: string | null;
+  /** Where the ticket came from, and who set it by hand (their name, or `null` when it is not by hand or the account could not be read). */
+  ticketSource: TicketSource;
+  ticketSetByName: string | null;
   /** From the sign-in account; `null` when it could not be read. */
   account: { email: string | null; displayName: string | null; disabled: boolean } | null;
 }

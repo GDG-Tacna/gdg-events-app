@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { isCheckpointId, type CheckpointKind } from "@/features/checkins";
 import { ImageField, type ImageRef, type UploadImageAction } from "@/features/media";
+import type { TicketType } from "@/features/tickets";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
@@ -148,7 +149,7 @@ function EditCheckpointForm({ checkpoint, lock, levels, upload, busy, error, onS
     if (busy) return;
     setTouched(true);
     if (normalizeName(name) === null || (!locked && !isCheckpointId(id))) return;
-    let gate: { minLevel: number | null; minTalks: number | null } | undefined;
+    let gate: { minLevel: number | null; minTalks: number | null; minTicket: TicketType | null } | undefined;
     if (kind === "catering") {
       const read = readDraft(requirements);
       if (!read.ok) return setRequirementsError(t.errors[read.code]);

@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/pass/issue-pass.action", () => ({ issuePassAction: async () => ({ ok: false, code: "unknown" }) }));
 
+vi.mock("@/app-shell/composition/attendee.server", () => ({ attendeeDeps: { marker: "attendee" } }));
+const attendeeServer = vi.hoisted(() => ({ getAttendee: vi.fn() }));
+vi.mock("@/features/attendee/server", () => attendeeServer);
+
 const guards = { requireAttendee: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
@@ -40,6 +44,7 @@ describe("pass page", () => {
     vi.resetAllMocks();
     features.FEATURES.checkins = true;
     guards.requireAttendee.mockResolvedValue({ uid: "u1", role: "attendee", displayName: null, photoUrl: null });
+    attendeeServer.getAttendee.mockResolvedValue({ ok: true, value: { ticket: { type: "premium", source: "list" } } });
   });
 
   it("is only for attendees: the attendee guard decides who gets in", async () => {
@@ -65,5 +70,13 @@ describe("pass page", () => {
     const tree = await PassPage();
 
     expect(findElement(tree, PassDisplay)?.props.issue).toBe(issuePassAction);
+  });
+
+  it("shows the cadet's ticket under the code, and still shows the pass when it cannot be read", async () => {
+    expect(findElement(await PassPage(), PassDisplay)?.props.ticket).toBe("premium");
+    expect(attendeeServer.getAttendee).toHaveBeenCalledWith({ marker: "attendee" }, "u1");
+
+    attendeeServer.getAttendee.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+    expect(findElement(await PassPage(), PassDisplay)?.props.ticket).toBeNull();
   });
 });

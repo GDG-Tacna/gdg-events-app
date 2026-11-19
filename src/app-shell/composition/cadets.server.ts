@@ -5,14 +5,19 @@ import { CachedCadetStore, FirebaseAccountDirectory, FirestoreCadetStore, type C
 import { err, ok } from "@/shared/lib/result";
 import { squadStore } from "./squads.server";
 
+// The search reads every cadet: kept for a minute, and dropped whenever a change goes through this store.
+const cadetStore = new CachedCadetStore(new FirestoreCadetStore());
+
+/** Drops the kept list of cadets: for a change to a cadet's profile that does not go through the cadets store. */
+export const forgetCadetList = (): void => cadetStore.forget();
+
 /**
  * Composition root for managing the edition's cadets. The alias rules come from the attendee feature and the squads
  * from the squads catalog (read fresh: a squad made a moment ago must be choosable), so the cadets feature imports
  * neither; changes go to the admin audit trail.
  */
 export const cadetsDeps: CadetsDeps = {
-  // The search reads every cadet: kept for a minute, and dropped whenever a change goes through this store.
-  store: new CachedCadetStore(new FirestoreCadetStore()),
+  store: cadetStore,
   accounts: new FirebaseAccountDirectory(),
   aliases: { check: createAlias },
   squads: {

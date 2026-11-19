@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ScanReticle, useScanSession, type QrCamera } from "@/features/scanner";
+import { ticketName, type TicketType } from "@/features/tickets";
 import { copy } from "@/shared/copy/es";
 import { rankWithLevel } from "@/shared/copy/rank-name";
 import { formatNumber, interpolate } from "@/shared/lib/format";
@@ -27,20 +28,23 @@ export interface ServeScreenProps {
   initialCount: number | null;
   /** Where "Cambiar de puesto" goes. */
   backHref: string;
+  /** Where "Cambiar entrada" goes (staff change a cadet's ticket there). Absent hides the link. */
+  changeTicketHref?: string;
 }
 
 const FAILED: ServeActionResult = { ok: false, code: "unknown" };
 
 /** How long a result stays up before the camera looks for the next person. A tap skips the wait. */
-const SHOW_MS = { served: 1800, refused: 3200, missing: 5000 } as const;
+const SHOW_MS = { served: 1800, refused: 3200, missing: 5000, ticket: 9000 } as const;
 
 type Verdict = "served" | "already" | "refused";
 
-/** What the person lacks, said to the staff ("Le falta llegar a Piloto (NV 2)", "Le faltan 2 charlas más"). */
-export function servingShortfall(missing: { level: number | null; levelName: string | null; talks: number | null }): string[] {
+/** What the person lacks, said to the staff ("Le falta llegar a Piloto (NV 2)", "Le faltan 2 charlas más", "Necesita entrada Premium"). */
+export function servingShortfall(missing: { level: number | null; levelName: string | null; talks: number | null; ticket: TicketType | null }): string[] {
   const lines: string[] = [];
   if (missing.level !== null) lines.push(interpolate(copy.staff.missing.level, { rank: rankWithLevel(missing.level, missing.levelName) }));
   if (missing.talks !== null) lines.push(missing.talks === 1 ? copy.staff.missing.talksOne : interpolate(copy.staff.missing.talksMany, { n: formatNumber(missing.talks) }));
+  if (missing.ticket !== null && missing.ticket !== "general") lines.push(copy.staff.missing.ticket[missing.ticket]);
   return lines;
 }
 
@@ -59,7 +63,7 @@ const VERDICT_CLASSES: Record<Verdict, string> = {
  * lists the missions it completed, to tell the cadet. It clears by itself after a moment or on a tap, and the
  * station's count stays on top. The server decides everything.
  */
-export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, description, image, initialCount, backHref }: ServeScreenProps) {
+export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, description, image, initialCount, backHref, changeTicketHref }: ServeScreenProps) {
   const [count, setCount] = useState(initialCount);
 
   const submit = useCallback(
@@ -84,10 +88,10 @@ export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, d
     if (verdict === null) return;
     navigator.vibrate?.(verdict === "refused" ? [200, 100, 200] : 80);
     // What a person lacks takes longer to read out to them.
-    const wait = verdict !== "refused" ? SHOW_MS.served : result && !result.ok && result.missing ? SHOW_MS.missing : SHOW_MS.refused;
+    const wait = verdict !== "refused" ? SHOW_MS.served : result && !result.ok && result.missing ? (result.missing.ticket !== null && changeTicketHref ? SHOW_MS.ticket : SHOW_MS.missing) : SHOW_MS.refused;
     const timer = setTimeout(scanAgain, wait);
     return () => clearTimeout(timer);
-  }, [verdict, result, scanAgain]);
+  }, [verdict, result, scanAgain, changeTicketHref]);
 
   const statusText = state.status === "sending" ? copy.staff.sending : copy.staff.hint;
 
@@ -156,6 +160,7 @@ export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, d
         >
           <Icon name={verdict === "refused" ? "alert" : "check"} size={96} />
           {result.ok ? <p className="type-title-xl break-all text-[40px] leading-tight">{result.alias}</p> : null}
+          {result.ok ? <p className="type-title text-2xl leading-tight">{interpolate(copy.staff.ticket, { name: ticketName(result.ticketType) })}</p> : null}
           <p className="type-title-xl text-[32px] leading-tight">
             {result.ok
               ? verdict === "served"
@@ -193,6 +198,14 @@ export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, d
           ) : null}
           <p className="type-caption mt-space-6 opacity-80">{copy.staff.tap}</p>
         </button>
+      ) : null}
+      {/* Outside the verdict's button (a link cannot sit inside one): for a cadet who has not got the ticket the meal asks for, e.g. who buys it now. */}
+      {result && !result.ok && result.missing && result.missing.ticket !== null && changeTicketHref ? (
+        <div className="pb-safe px-space-6 pt-space-4 fixed inset-x-0 bottom-0 z-[60] flex justify-center">
+          <ButtonLink href={changeTicketHref} variant="secondary" className="w-full max-w-[520px]">
+            {copy.staff.changeTicketLink}
+          </ButtonLink>
+        </div>
       ) : null}
     </div>
   );

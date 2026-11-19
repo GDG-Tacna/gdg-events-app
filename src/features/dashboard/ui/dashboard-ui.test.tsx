@@ -28,6 +28,7 @@ const overview = (xp: number, overrides: Partial<DashboardOverview> = {}): Dashb
     squad: null,
     xp,
     credits: 12,
+    ticket: { type: "general", source: "default" },
     createdAt: new Date("2026-10-04T12:00:00Z"),
   }),
   ...overrides,
@@ -96,6 +97,22 @@ describe("PlayerCard", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Nova_7" })).toBeInTheDocument();
     expect(screen.getByText("NV 2")).toBeInTheDocument();
     expect(screen.getByText(copy.ranks.pilot)).toBeInTheDocument();
+  });
+
+  it("shows the ticket next to the rank, with what it includes", () => {
+    const { unmount } = render(<PlayerCard overview={overview(120, { ticket: "premium" })} />);
+    expect(screen.getByText("Entrada Premium")).toBeInTheDocument();
+    expect(screen.getByText(copy.tickets.includes.premium)).toBeInTheDocument();
+    unmount();
+
+    const pro = render(<PlayerCard overview={overview(120, { ticket: "pro" })} />);
+    expect(screen.getByText("Entrada Pro")).toBeInTheDocument();
+    expect(screen.getByText(copy.tickets.includes.pro)).toBeInTheDocument();
+    pro.unmount();
+
+    render(<PlayerCard overview={overview(120)} />);
+    expect(screen.getByText("Entrada General")).toBeInTheDocument();
+    expect(screen.queryByText(/Incluye/)).not.toBeInTheDocument();
   });
 
   it("shows the progress to the next rank, visually and to assistive tech", () => {

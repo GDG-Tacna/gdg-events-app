@@ -9,6 +9,7 @@ const attendee = (overrides: Partial<Attendee> = {}): Attendee => ({
   squad: null,
   xp: 0,
   credits: 0,
+  ticket: { type: "general", source: "default" },
   createdAt: new Date("2026-10-04T12:00:00Z"),
   ...overrides,
 });
@@ -25,6 +26,7 @@ describe("buildOverview", () => {
       nextRank: { id: "pilot", level: 2, minXp: 100 },
       progressPercent: 0,
       squadId: null,
+      ticket: "general",
     });
   });
 
@@ -62,7 +64,7 @@ describe("buildOverview", () => {
   it("does not leak fields the card does not need", () => {
     const keys = Object.keys(buildOverview(attendee())).sort();
 
-    expect(keys).toEqual(["alias", "credits", "creditsEnabled", "nextRank", "progressPercent", "rank", "squadId", "walletBalance", "xp"]);
+    expect(keys).toEqual(["alias", "credits", "creditsEnabled", "nextRank", "progressPercent", "rank", "squadId", "ticket", "walletBalance", "xp"]);
   });
 });
 

@@ -9,6 +9,8 @@ vi.mock("@/app-shell/composition/checkpoints.server", () => ({ serveDeps: { mark
 
 const guards = { requireRole: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
+const permissions = vi.hoisted(() => ({ staffStations: vi.fn(), staffCheckpoints: vi.fn() }));
+vi.mock("@/app-shell/permissions.server", () => permissions);
 
 const server = { listServePoints: vi.fn() };
 vi.mock("@/features/checkpoints/server", () => server);
@@ -19,6 +21,8 @@ describe("staff home page", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     guards.requireRole.mockResolvedValue({ uid: "s1", role: "staff", displayName: null, photoUrl: null });
+    permissions.staffStations.mockResolvedValue(["entrance", "catering", "stand"]);
+    permissions.staffCheckpoints.mockResolvedValue(undefined);
     server.listServePoints.mockResolvedValue({
       ok: true,
       value: [
@@ -54,6 +58,7 @@ describe("staff home page", () => {
       copy.staff.kinds.entrance,
       copy.staff.kinds.catering,
       copy.staff.kinds.stand,
+      copy.staff.tickets.card.title,
     ]);
     const catering = screen.getByRole("region", { name: copy.staff.kinds.catering });
     expect(within(catering).getByText("120 raciones entregadas")).toBeInTheDocument();
@@ -82,12 +87,29 @@ describe("staff home page", () => {
     expect(server.listServePoints).toHaveBeenCalledWith({ marker: "deps" }, { uid: "s1", role: "staff", kinds: ["entrance", "catering", "stand"], checkpointIds: ["stand-cloud"] });
   });
 
+  it("offers «Cambiar entrada», for the staff to set a cadet's ticket, even when there is no station", async () => {
+    server.listServePoints.mockResolvedValue({ ok: true, value: [] });
+
+    render(await StaffHomePage());
+
+    expect(screen.getByRole("link", { name: copy.staff.tickets.card.title })).toHaveAttribute("href", "/staff/entradas");
+  });
+
+  it("leaves the card out for staff an organizer limited to no station, who cannot change tickets either", async () => {
+    server.listServePoints.mockResolvedValue({ ok: true, value: [] });
+    permissions.staffCheckpoints.mockResolvedValue([]);
+
+    render(await StaffHomePage());
+
+    expect(screen.queryByRole("link", { name: copy.staff.tickets.card.title })).not.toBeInTheDocument();
+  });
+
   it("leaves out a kind with no open station", async () => {
     server.listServePoints.mockResolvedValue({ ok: true, value: [{ id: "lunch-1", kind: "catering", name: "Almuerzo", servedCount: 1 }] });
 
     render(await StaffHomePage());
 
-    expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([copy.staff.kinds.catering]);
+    expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([copy.staff.kinds.catering, copy.staff.tickets.card.title]);
   });
 
   it("says so when there is nothing to serve", async () => {

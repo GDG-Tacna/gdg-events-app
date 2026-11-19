@@ -42,9 +42,9 @@ function world() {
       return ok({ kind: "recorded" as const, firstEntrance: false });
     },
   };
-  const profiles: Record<string, { alias: string; squadId: string | null }> = {
-    [UID_ANA]: { alias: "Nova_7", squadId: "gemini" },
-    [UID_BRUNO]: { alias: "Orion", squadId: null },
+  const profiles: Record<string, { alias: string; squadId: string | null; ticket: "general" | "pro" | "premium" }> = {
+    [UID_ANA]: { alias: "Nova_7", squadId: "gemini", ticket: "general" },
+    [UID_BRUNO]: { alias: "Orion", squadId: null, ticket: "general" },
   };
   const track = vi.fn();
   const serveDeps = {
@@ -93,8 +93,8 @@ describe("rations", () => {
   it("serves a ration from the attendee's own pass, and counts it", async () => {
     const w = world();
 
-    expect(await w.serve(UID_ANA)).toEqual(ok({ uid: UID_ANA, kind: "catering", status: "served", firstEntrance: false, alias: "Nova_7", squadId: "gemini", servedCount: 1 }));
-    expect(await w.serve(UID_BRUNO)).toEqual(ok({ uid: UID_BRUNO, kind: "catering", status: "served", firstEntrance: false, alias: "Orion", squadId: null, servedCount: 2 }));
+    expect(await w.serve(UID_ANA)).toEqual(ok({ uid: UID_ANA, kind: "catering", status: "served", firstEntrance: false, alias: "Nova_7", squadId: "gemini", ticketType: "general", servedCount: 1 }));
+    expect(await w.serve(UID_BRUNO)).toEqual(ok({ uid: UID_BRUNO, kind: "catering", status: "served", firstEntrance: false, alias: "Orion", squadId: null, ticketType: "general", servedCount: 2 }));
   });
 
   it("stops the double ration: scanning the same attendee again changes nothing", async () => {
@@ -102,7 +102,7 @@ describe("rations", () => {
     await w.serve(UID_ANA);
     w.clock.now += 20_000; // a fresh pass, a new scan
 
-    expect(await w.serve(UID_ANA)).toEqual(ok({ uid: UID_ANA, kind: "catering", status: "already-served", firstEntrance: false, alias: "Nova_7", squadId: "gemini", servedCount: 1 }));
+    expect(await w.serve(UID_ANA)).toEqual(ok({ uid: UID_ANA, kind: "catering", status: "already-served", firstEntrance: false, alias: "Nova_7", squadId: "gemini", ticketType: "general", servedCount: 1 }));
     expect(w.track).toHaveBeenCalledTimes(1);
   });
 

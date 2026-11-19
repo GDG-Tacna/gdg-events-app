@@ -37,12 +37,22 @@ describe("registerAttendee", () => {
           squad: null,
           xp: 0,
           credits: 0,
+          ticket: { type: "general", source: "default" },
           createdAt: NOW,
         },
       },
     });
     expect(d.roles.grantAttendeeRole).toHaveBeenCalledWith("u1");
     expect(d.analytics.track).toHaveBeenCalledWith({ name: "attendee_registered", uid: "u1" });
+  });
+
+  it("registers with the ticket it is given", async () => {
+    const d = deps();
+
+    const result = await registerAttendee(d.all, { uid: "u1", rawAlias: "Nova_7", ticket: { type: "premium", source: "list" } });
+
+    expect(result.ok && result.value.attendee.ticket).toEqual({ type: "premium", source: "list" });
+    expect(d.attendees.register).toHaveBeenCalledWith(expect.objectContaining({ ticket: { type: "premium", source: "list" } }), expect.anything());
   });
 
   it("stores the alias key used for uniqueness", async () => {
@@ -131,7 +141,7 @@ describe("createNewAttendee", () => {
 
     const attendee = createNewAttendee({ uid: "u2", alias: alias.value, now: NOW });
 
-    expect(attendee).toMatchObject({ role: "attendee", xp: 0, credits: 0, squad: null });
+    expect(attendee).toMatchObject({ role: "attendee", xp: 0, credits: 0, squad: null, ticket: { type: "general", source: "default" } });
   });
 });
 

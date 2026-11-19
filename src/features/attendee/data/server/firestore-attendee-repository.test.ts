@@ -52,7 +52,7 @@ function fakeFirestore() {
 
 const NOW = new Date("2026-10-04T12:00:00Z");
 const attendeeFor = (uid: string, alias: string) => ({
-  attendee: { uid, alias, role: "attendee" as const, squad: null, xp: 0, credits: 0, createdAt: NOW },
+  attendee: { uid, alias, role: "attendee" as const, squad: null, xp: 0, credits: 0, ticket: { type: "general" as const, source: "default" as const }, createdAt: NOW },
   alias: { display: alias, key: alias.toLowerCase() },
 });
 

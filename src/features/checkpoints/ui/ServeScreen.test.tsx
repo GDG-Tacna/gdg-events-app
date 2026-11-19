@@ -22,6 +22,7 @@ const served = (overrides: Partial<Extract<ServeActionResult, { ok: true }>> = {
   firstEntrance: false,
   alias: "Nova_7",
   squadId: "gemini",
+  ticketType: "general",
   servedCount: 43,
   missions: [],
   ...overrides,
@@ -32,9 +33,10 @@ async function renderScreen(
   scanner = fakeScanner(),
   initialCount: number | null = 42,
   kind: StationKind = "catering",
+  changeTicketHref?: string,
 ) {
   const view = render(
-    <ServeScreen camera={scanner.scanner} serve={serve} checkpointId="lunch-1" kind={kind} name="Almuerzo" initialCount={initialCount} backHref="/staff" />,
+    <ServeScreen camera={scanner.scanner} serve={serve} checkpointId="lunch-1" kind={kind} name="Almuerzo" initialCount={initialCount} backHref="/staff" changeTicketHref={changeTicketHref} />,
   );
   await act(async () => {
     await vi.advanceTimersByTimeAsync(0);
@@ -186,7 +188,7 @@ describe("ServeScreen going back to scanning", () => {
   });
 
   it("tells the staff what the person lacks for the meal, and keeps it up long enough to say it", async () => {
-    const t = await renderScreen(vi.fn(async () => ({ ok: false, code: "not-eligible", missing: { level: 2, levelName: "Piloto", talks: 2 } }) as const));
+    const t = await renderScreen(vi.fn(async () => ({ ok: false, code: "not-eligible", missing: { level: 2, levelName: "Piloto", talks: 2, ticket: null } }) as const));
     await t.see("pass-1");
 
     const overlay = screen.getByRole("button", { name: copy.staff.tap });
@@ -206,12 +208,50 @@ describe("ServeScreen going back to scanning", () => {
   });
 
   it("says one talk, or a level by its number when it has no name", async () => {
-    const t = await renderScreen(vi.fn(async () => ({ ok: false, code: "not-eligible", missing: { level: 6, levelName: null, talks: 1 } }) as const));
+    const t = await renderScreen(vi.fn(async () => ({ ok: false, code: "not-eligible", missing: { level: 6, levelName: null, talks: 1, ticket: null } }) as const));
     await t.see("pass-1");
 
     const overlay = screen.getByRole("button", { name: copy.staff.tap });
     expect(overlay).toHaveTextContent("Le falta llegar a NV 6");
     expect(overlay).toHaveTextContent("Le falta asistir a 1 charla más");
+  });
+
+  it("says the ticket the meal asks for, and offers to change the cadet's ticket when the meal asks for one they lack", async () => {
+    const t = await renderScreen(
+      vi.fn(async () => ({ ok: false, code: "not-eligible", missing: { level: null, levelName: null, talks: null, ticket: "premium" } }) as const),
+      undefined,
+      42,
+      "catering",
+      "/staff/entradas",
+    );
+    await t.see("pass-1");
+
+    expect(screen.getByRole("button", { name: copy.staff.tap })).toHaveTextContent("Necesita entrada Premium");
+    expect(screen.getByRole("link", { name: copy.staff.changeTicketLink })).toHaveAttribute("href", "/staff/entradas");
+
+    // The link outlives the usual wait, so the staff can reach it.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5200);
+    });
+    expect(screen.getByRole("link", { name: copy.staff.changeTicketLink })).toBeInTheDocument();
+  });
+
+  it("says Pro or Premium for a meal that asks for Pro, and offers no link for a refusal that is not about the ticket", async () => {
+    const pro = await renderScreen(vi.fn(async () => ({ ok: false, code: "not-eligible", missing: { level: null, levelName: null, talks: null, ticket: "pro" } }) as const), undefined, 42, "catering", "/staff/entradas");
+    await pro.see("pass-1");
+    expect(screen.getByRole("button", { name: copy.staff.tap })).toHaveTextContent("Necesita entrada Pro o Premium");
+    pro.unmount();
+
+    const talks = await renderScreen(vi.fn(async () => ({ ok: false, code: "not-eligible", missing: { level: null, levelName: null, talks: 1, ticket: null } }) as const), undefined, 42, "catering", "/staff/entradas");
+    await talks.see("pass-1");
+    expect(screen.queryByRole("link", { name: copy.staff.changeTicketLink })).not.toBeInTheDocument();
+  });
+
+  it("shows the cadet's ticket with the verdict", async () => {
+    const t = await renderScreen(vi.fn(async () => served({ ticketType: "premium" })));
+    await t.see("pass-1");
+
+    expect(screen.getByRole("button", { name: copy.staff.tap })).toHaveTextContent("Entrada Premium");
   });
 
   it("goes back at once on a tap", async () => {

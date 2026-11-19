@@ -37,6 +37,11 @@ export class CachedCadetStore implements CadetStore {
   setBan: CadetStore["setBan"] = async (uid, ban) => this.forgetAfter(await this.inner.setBan(uid, ban));
   remove: CadetStore["remove"] = async (uid) => this.forgetAfter(await this.inner.remove(uid));
 
+  /** Drops the kept list, for a change to a cadet's profile made outside this store (a ticket, by its own feature). */
+  forget(): void {
+    this.everyone.clear();
+  }
+
   /** A change that went through (or may have, partly) makes the kept list stale; a plain failure leaves it as it was. */
   private forgetAfter<T extends { ok: boolean }>(result: T): T {
     if (result.ok) this.everyone.clear();

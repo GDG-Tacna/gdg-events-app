@@ -21,7 +21,7 @@ const STAFF: ServeActor = { uid: "staff-1", role: "staff" };
 const LUNCH: ServeCheckpoint = { id: "lunch-1", kind: "catering", name: "Almuerzo", active: true };
 const ENTRANCE: ServeCheckpoint = { id: "entrance-main", kind: "entrance", name: "Entrada", active: true };
 const STAND: ServeCheckpoint = { id: "stand-cloud", kind: "stand", name: "Stand Cloud", active: true };
-const ANA: AttendeeSummary = { alias: "Nova_7", squadId: "gemini" };
+const ANA: AttendeeSummary = { alias: "Nova_7", squadId: "gemini", ticket: "pro" };
 
 interface Setup {
   allowed?: boolean;
@@ -65,7 +65,7 @@ describe("serveAttendee", () => {
 
     const result = await serve(t);
 
-    expect(result).toEqual(ok({ uid: "u1", kind: "catering", status: "served", firstEntrance: false, alias: "Nova_7", squadId: "gemini", servedCount: 42 }));
+    expect(result).toEqual(ok({ uid: "u1", kind: "catering", status: "served", firstEntrance: false, alias: "Nova_7", squadId: "gemini", ticketType: "pro", servedCount: 42 }));
     expect(t.passes.verify).toHaveBeenCalledWith("devfest:at:pass");
     expect(t.recorder.record).toHaveBeenCalledWith({ uid: "u1", checkpoint: LUNCH, at: NOW });
     expect(t.analytics.track).toHaveBeenCalledWith({
@@ -108,7 +108,7 @@ describe("serveAttendee", () => {
 
     const result = await serve(t);
 
-    expect(result).toEqual(ok({ uid: "u1", kind: "catering", status: "already-served", firstEntrance: false, alias: "Nova_7", squadId: "gemini", servedCount: 42 }));
+    expect(result).toEqual(ok({ uid: "u1", kind: "catering", status: "already-served", firstEntrance: false, alias: "Nova_7", squadId: "gemini", ticketType: "pro", servedCount: 42 }));
     expect(t.analytics.track).not.toHaveBeenCalled();
   });
 
@@ -160,7 +160,7 @@ describe("serveAttendee", () => {
   });
 
   it("refuses an attendee who does not meet the conditions, and records nothing", async () => {
-    const missing = { level: 2, talks: null };
+    const missing = { level: 2, talks: null, ticket: null };
     const t = setup({ gate: ok({ allowed: false, missing }) });
 
     expect(await serve(t)).toEqual(err({ code: "not-eligible", missing }));
@@ -182,9 +182,9 @@ describe("serveAttendee", () => {
   });
 
   it("registers a cadet at the entrance, telling when it is their first one, without asking any food gate", async () => {
-    const t = setup({ found: ok(ENTRANCE), recorded: ok({ kind: "recorded", firstEntrance: true }), gate: ok({ allowed: false, missing: { level: 3, talks: null } }) });
+    const t = setup({ found: ok(ENTRANCE), recorded: ok({ kind: "recorded", firstEntrance: true }), gate: ok({ allowed: false, missing: { level: 3, talks: null, ticket: null } }) });
 
-    expect(await serve(t)).toEqual(ok({ uid: "u1", kind: "entrance", status: "served", firstEntrance: true, alias: "Nova_7", squadId: "gemini", servedCount: 42 }));
+    expect(await serve(t)).toEqual(ok({ uid: "u1", kind: "entrance", status: "served", firstEntrance: true, alias: "Nova_7", squadId: "gemini", ticketType: "pro", servedCount: 42 }));
     expect(t.gate.check).not.toHaveBeenCalled();
     expect(t.recorder.record).toHaveBeenCalledWith({ uid: "u1", checkpoint: ENTRANCE, at: NOW });
     expect(t.analytics.track).toHaveBeenCalledWith(expect.objectContaining({ kind: "entrance", source: "staff" }));
@@ -201,7 +201,7 @@ describe("serveAttendee", () => {
   it("still serves when the counter cannot be read: the ration is recorded and the screen just lacks the number", async () => {
     const t = setup({ count: err({ code: "unknown" }) });
 
-    expect(await serve(t)).toEqual(ok({ uid: "u1", kind: "catering", status: "served", firstEntrance: false, alias: "Nova_7", squadId: "gemini", servedCount: null }));
+    expect(await serve(t)).toEqual(ok({ uid: "u1", kind: "catering", status: "served", firstEntrance: false, alias: "Nova_7", squadId: "gemini", ticketType: "pro", servedCount: null }));
     expect(t.analytics.track).toHaveBeenCalledTimes(1);
   });
 });

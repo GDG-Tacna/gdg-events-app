@@ -1,3 +1,4 @@
+import type { TicketType } from "@/features/tickets";
 import type { Analytics } from "@/shared/lib/analytics/analytics";
 import { err, ok, type Result } from "@/shared/lib/result";
 import type {
@@ -58,6 +59,8 @@ export interface ServeResult {
   firstEntrance: boolean;
   alias: string;
   squadId: string | null;
+  /** The ticket of the cadet (General, Pro or Premium): the staff see it with the verdict. */
+  ticketType: TicketType;
   /** Scans recorded at this checkpoint, or `null` when the count could not be read (the scan still counts). */
   servedCount: number | null;
 }
@@ -138,6 +141,7 @@ export async function serveAttendee(
     firstEntrance: outcome.value.kind === "recorded" && outcome.value.firstEntrance,
     alias: attendee.value.alias,
     squadId: attendee.value.squadId,
+    ticketType: attendee.value.ticket,
     servedCount: counted.ok ? counted.value : null,
   });
 }

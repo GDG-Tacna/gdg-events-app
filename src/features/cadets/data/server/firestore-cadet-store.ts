@@ -21,6 +21,7 @@ import {
   XP_LEDGER_COLLECTION,
   eventCollection,
 } from "@/shared/lib/firebase/collections";
+import { isTicketSource, ticketTypeOf } from "@/features/tickets";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import type { CadetPage, CadetRecord, CadetRemoval, CadetStore, CadetSummary, IndexedCadet } from "../../domain/manage";
@@ -44,6 +45,7 @@ export function toCadet(uid: string, data: Record<string, unknown> | undefined):
     createdAt: toDate(data.createdAt),
     attendedAt: toDate(data.attendedAt),
     banned: data.banned === true,
+    ticket: ticketTypeOf(data.ticketType),
   };
 }
 
@@ -121,6 +123,9 @@ export class FirestoreCadetStore implements CadetStore {
         activity: { checkIns: checkIns.data().count, missions: missions.data().count, badges: badges.data().count, contacts: contacts.data().count },
         bannedAt: toDate(data.bannedAt),
         banReason: typeof data.banReason === "string" ? data.banReason : null,
+        ticketSource: isTicketSource(data.ticketSource) ? data.ticketSource : "default",
+        ticketSetBy: typeof data.ticketSetBy === "string" && data.ticketSetBy.length > 0 ? data.ticketSetBy : null,
+        ticketSetAt: toDate(data.ticketSetAt),
       });
     } catch (cause) {
       logServerError("cadets.store.get", cause);

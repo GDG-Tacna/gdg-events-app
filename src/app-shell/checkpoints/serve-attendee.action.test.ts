@@ -105,16 +105,16 @@ describe("serveAttendeeAction", () => {
   });
 
   it("says what a person lacks for the meal, so the staff can tell them", async () => {
-    checkpointsServer.serveAttendee.mockResolvedValue({ ok: false, error: { code: "not-eligible", missing: { level: 2, talks: 1 } } });
+    checkpointsServer.serveAttendee.mockResolvedValue({ ok: false, error: { code: "not-eligible", missing: { level: 2, talks: 1, ticket: "premium" } } });
 
-    expect(await serveAttendeeAction(input)).toEqual({ ok: false, code: "not-eligible", missing: { level: 2, levelName: "Piloto", talks: 1 } });
-    expect(foodGate.describeShortfall).toHaveBeenCalledWith({ level: 2, talks: 1 });
+    expect(await serveAttendeeAction(input)).toEqual({ ok: false, code: "not-eligible", missing: { level: 2, levelName: "Piloto", talks: 1, ticket: "premium" } });
+    expect(foodGate.describeShortfall).toHaveBeenCalledWith({ level: 2, talks: 1, ticket: "premium" });
   });
 
   it("completes the stand's missions for the scanned cadet and unlocks their achievements", async () => {
     checkpointsServer.serveAttendee.mockResolvedValue({
       ok: true,
-      value: { uid: "cadet-1", kind: "stand", status: "served", firstEntrance: false, alias: "Nova_7", squadId: null, servedCount: 3 },
+      value: { uid: "cadet-1", kind: "stand", status: "served", firstEntrance: false, alias: "Nova_7", squadId: null, ticketType: "general", servedCount: 3 },
     });
     followUps.completeByCheckpoint.mockResolvedValue({ ok: true, value: [{ title: "Visita Cloud", xpEarned: 30, creditsEarned: 5, justCompleted: true }] });
 
