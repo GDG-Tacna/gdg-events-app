@@ -1,7 +1,7 @@
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { claimAfterChange } from "./claim";
-import type { AuditLog, RoleDirectory, TeamRepository } from "./ports";
+import type { AuditLog, CadetProfiles, RoleDirectory, TeamRepository } from "./ports";
 import { normalizeEmail, type ManagedRole, type TeamMember } from "./team";
 import { teamError, type TeamError } from "./team-error";
 
@@ -10,6 +10,8 @@ export interface TeamDeps {
   team: TeamRepository;
   audit: AuditLog;
   now: () => Date;
+  /** Without it, taking the last role away clears the claim (the person registers again on their next visit). */
+  profiles?: CadetProfiles;
 }
 
 /** Who is asking. The server action takes it from the verified session, never from the request. */
@@ -73,7 +75,13 @@ async function changeRole(
 
   const target = await claimAfterChange(deps.team, account.uid, role);
   // The same claim (they keep a stronger role in another edition): their session stays valid, nobody is signed out.
-  const claim = !target.ok ? target : target.value === account.claim ? ok(undefined) : await deps.directory.setRole(account.uid, target.value);
+  // Someone who already is a cadet goes back to playing: with no role left their claim is the cadet's, not nothing.
+  let wanted: Result<ManagedRole | "attendee" | null, TeamError> = target;
+  if (target.ok && target.value === null && deps.profiles) {
+    const profile = await deps.profiles.hasProfile(account.uid);
+    wanted = !profile.ok ? profile : profile.value ? ok("attendee") : target;
+  }
+  const claim = !wanted.ok ? wanted : wanted.value === account.claim ? ok(undefined) : await deps.directory.setRole(account.uid, wanted.value);
   if (!claim.ok) {
     // Put the team record back so the list does not claim a role the account does not have.
     const restored = await deps.team.change(account, changed.value.previous);

@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   FirebaseRoleDirectory,
   FirestoreAuditLog,
+  FirestoreCadetProfiles,
   FirestoreInviteStore,
   FirestoreTeamRepository,
   ResendInviteMailer,
@@ -16,6 +17,7 @@ import { copy } from "@/shared/copy/es";
 const team = new FirestoreTeamRepository();
 const directory = new FirebaseRoleDirectory();
 const audit = new FirestoreAuditLog();
+const profiles = new FirestoreCadetProfiles();
 
 /** Composition root for the admin area: the only place that binds the Firebase adapters of the team. */
 export const teamDeps: TeamDeps = {
@@ -23,6 +25,8 @@ export const teamDeps: TeamDeps = {
   team,
   audit,
   now: () => new Date(),
+  // A cadet whose team role is taken away goes back to playing instead of registering again.
+  profiles,
 };
 
 /**

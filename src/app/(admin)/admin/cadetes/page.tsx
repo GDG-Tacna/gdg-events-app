@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { teamDeps } from "@/app-shell/composition/admin.server";
 import { cadetsDeps } from "@/app-shell/composition/cadets.server";
 import { squadStore } from "@/app-shell/composition/squads.server";
 import { requireRole } from "@/app-shell/guards";
 import { requireSection } from "@/app-shell/permissions.server";
+import { listTeam } from "@/features/admin/server";
 import { CadetsListView } from "@/features/cadets";
 import { CADETS_SEARCH_MAX, listCadets } from "@/features/cadets/server";
 import { ROUTES } from "@/shared/config/routes";
@@ -20,10 +22,16 @@ export default async function AdminCadetsPage({ searchParams }: PageProps<"/admi
   const search = first(params.q).slice(0, CADETS_SEARCH_MAX);
   const after = first(params.despues) || null;
 
-  const [page, squads] = await Promise.all([listCadets(cadetsDeps, { uid: session.uid, role: session.role }, { search, after }), squadStore.list()]);
+  const [page, squads, team] = await Promise.all([
+    listCadets(cadetsDeps, { uid: session.uid, role: session.role }, { search, after }),
+    squadStore.list(),
+    listTeam(teamDeps, { uid: session.uid, role: session.role, adminScope: session.adminScope ?? "edition" }),
+  ]);
   // A failed read goes to the route error boundary instead of showing an empty list that is not real.
   if (!page.ok) throw new Error("Could not read the cadets");
   // The squads' names only label the rows: without them each row says the squad's id.
+  // The team's roles only mark the rows: without them the list simply shows no marks.
+  const teamRoles = new Map(team.ok ? team.value.map((member) => [member.uid, member.role] as const) : []);
   const squadNames = new Map(squads.ok ? squads.value.map((squad) => [squad.id, squad.name] as const) : []);
 
   const nextHref = page.value.next ? `${ROUTES.adminCadets}?${new URLSearchParams({ ...(search ? { q: search } : {}), despues: page.value.next })}` : null;
@@ -42,6 +50,7 @@ export default async function AdminCadetsPage({ searchParams }: PageProps<"/admi
           attended: cadet.attendedAt !== null,
           banned: cadet.banned,
           ticket: cadet.ticket,
+          teamRole: teamRoles.get(cadet.uid) ?? null,
         }))}
         total={page.value.total}
         search={search}

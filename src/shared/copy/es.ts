@@ -1623,6 +1623,33 @@ export const copy = {
       deleteTitle: "Eliminar registro",
       deleteHelp: "Borra a este cadete de la edición: su perfil, su alias y todo lo que hizo (asistencias, misiones, insignias, contactos y votos), junto con el XP y los G-Credits que ganó aquí. Su cuenta se queda, así que puede registrarse de nuevo. No se puede deshacer.",
       /** Placeholder: {alias}. */
+      team: {
+        title: "Rol en el equipo",
+        help: "Una cuenta de cadete puede ayudar en el evento: dale un rol y aparece en Equipo, donde también se le puede quitar. Al quitárselo vuelve a jugar como cadete, con su XP y su avatar intactos.",
+        /** Placeholder: {role}. */
+        current: "Rol actual: {role}",
+        none: "Ninguno: es solo cadete",
+        roleLabel: "Dar el rol",
+        give: "Dar rol",
+        giving: "Dando rol…",
+        take: "Quitar rol y volver a cadete",
+        taking: "Quitando…",
+        /** Placeholders: {alias}, {role}. */
+        confirmGiveTitle: "¿Dar el rol de {role} a {alias}?",
+        confirmGiveAdmin: "Un admin gestiona todo, en todas las ediciones, y el equipo completo. Dalo solo a quien lo necesite.",
+        confirmGive: "Podrá ayudar en el evento con ese rol. Debe volver a iniciar sesión para ver el cambio.",
+        confirmGiveButton: "Sí, dar rol",
+        /** Placeholder: {alias}. */
+        confirmTakeTitle: "¿Quitar el rol a {alias}?",
+        confirmTake: "Deja de ser parte del equipo y vuelve a jugar como cadete, con su XP y su avatar. Debe volver a iniciar sesión.",
+        confirmTakeButton: "Sí, quitar",
+        /** Placeholders: {alias}, {role}. */
+        givenDone: "{alias} ahora es {role}. Debe volver a iniciar sesión para ver el cambio.",
+        /** Placeholder: {alias}. */
+        takenDone: "Se quitó el rol a {alias}: vuelve a jugar como cadete. Debe volver a iniciar sesión.",
+        noEmail: "No pudimos leer el correo de esta cuenta, así que no se le puede dar un rol desde aquí.",
+        ownAccount: "No puedes cambiar tu propio rol. Pídelo a otro admin.",
+      },
       deleteConfirmLabel: "Para confirmar, escribe su alias: {alias}",
       delete: "Eliminar cadete",
       errors: {

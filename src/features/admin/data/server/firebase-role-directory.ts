@@ -31,7 +31,7 @@ export class FirebaseRoleDirectory implements RoleDirectory {
     }
   }
 
-  async setRole(uid: string, role: ManagedRole | null, options: { keepSession?: boolean } = {}): Promise<Result<void, TeamError>> {
+  async setRole(uid: string, role: ManagedRole | "attendee" | null, options: { keepSession?: boolean } = {}): Promise<Result<void, TeamError>> {
     try {
       const auth = this.getAuth();
       const claims = { ...((await auth.getUser(uid)).customClaims ?? {}) };

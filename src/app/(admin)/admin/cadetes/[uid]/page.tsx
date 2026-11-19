@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { grantRoleAction, revokeRoleAction } from "@/app-shell/admin/team.actions";
+import { teamDeps } from "@/app-shell/composition/admin.server";
 import { banCadetAction, changeCadetSquadAction, deleteCadetAction, renameCadetAction, unbanCadetAction } from "@/app-shell/cadets/manage.actions";
 import { cadetsDeps } from "@/app-shell/composition/cadets.server";
 import { squadStore } from "@/app-shell/composition/squads.server";
 import { changeCadetTicketAction } from "@/app-shell/tickets/tickets.actions";
 import { requireRole } from "@/app-shell/guards";
 import { mayEdit, requireSection } from "@/app-shell/permissions.server";
+import { MANAGED_ROLES } from "@/features/admin";
 import { CadetDetailView } from "@/features/cadets";
 import { getCadet } from "@/features/cadets/server";
 import { ROUTES } from "@/shared/config/routes";
@@ -19,7 +22,13 @@ export default async function AdminCadetPage({ params }: PageProps<"/admin/cadet
   await requireSection(session, "cadets");
   const { uid } = await params;
 
-  const [found, squads, canEdit] = await Promise.all([getCadet(cadetsDeps, { uid: session.uid, role: session.role }, { uid }), squadStore.list(), mayEdit(session, "cadets")]);
+  const [found, squads, canEdit, canManageTeam, teamRole] = await Promise.all([
+    getCadet(cadetsDeps, { uid: session.uid, role: session.role }, { uid }),
+    squadStore.list(),
+    mayEdit(session, "cadets"),
+    mayEdit(session, "team"),
+    teamDeps.team.roleOf(uid),
+  ]);
   if (!found.ok) {
     if (found.error.code === "not-found") notFound();
     throw new Error("Could not read the cadet");
@@ -60,6 +69,8 @@ export default async function AdminCadetPage({ params }: PageProps<"/admin/cadet
         ban={banCadetAction}
         unban={unbanCadetAction}
         remove={deleteCadetAction}
+        // Giving a role is the Equipo screen's job (same actions, same rules); it needs the team permission, and a failed read of their role hides it.
+        team={canManageTeam && teamRole.ok ? { role: teamRole.value, assignable: session.adminScope === "global" ? MANAGED_ROLES : (["staff"] as const), give: grantRoleAction, take: revokeRoleAction } : undefined}
         canDelete={session.adminScope === "global"}
         canEdit={canEdit}
         isSelf={cadet.uid === session.uid}
