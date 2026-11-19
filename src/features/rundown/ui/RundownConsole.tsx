@@ -11,12 +11,15 @@ import { openStageChannel, type StageChannel } from "../data/client/stage-channe
 import type { FailureReason } from "../domain/channel";
 import type { RundownErrorCode, StoredCues } from "../domain/manage";
 import { back, cueOf, forget, forward, goToSlide, mediaOnProgram, selectNext, setVolume, showScene, startOf, stop, take, toggleLoop, toggleMute, togglePlay, type DataScene, type PlayoutState } from "../domain/playout";
-import { buildRundown, cueFromPath, googleSlidesCueFromLink, isFileCue, isSeconds, mergeAgenda, moveCue, qrCueId, queueOf, withSeconds, type AgendaPoint, type ExtraPoint, type StoredCue } from "../domain/rundown";
-import type { ProjectTalkRunner, SaveCuesAction, SaveMinutesAction, SavePointsAction, StageRunner } from "./actions";
+import { buildRundown, cueFromPath, googleSlidesCueFromLink, isAudioPath, isFileCue, isMediaPath, isSeconds, mergeAgenda, moveCue, qrCueId, queueOf, withSeconds, type AgendaPoint, type ExtraPoint, type StoredCue } from "../domain/rundown";
+import { cycleRepeat, forgetTrack, INITIAL_MUSIC, nextTrack, playTrack, previousTrack, setFadeSeconds, setMusicVolume, soundingOf, stopMusic, toggleDuck, togglePlayback, trackFromPath, type MusicState, type Track } from "../domain/music";
+import type { ProjectTalkRunner, SaveCuesAction, SaveMinutesAction, SavePlaylistAction, SavePointsAction, StageRunner } from "./actions";
 import { ConsoleIcon } from "./ConsoleIcons";
 import { ConsoleMonitor } from "./ConsoleMonitor";
 import { actionForKey, CONFIRM_WINDOW_MS, DECK_KEYS, isTypingTarget, NEEDS_CONFIRMATION, nextView, slideWindow, type ConsoleAction, type DeckKeyId, type StageViewName } from "./console-model";
 import { FilePickerDialog } from "./FilePickerDialog";
+import { MusicDialog } from "./MusicDialog";
+import { MusicPanel } from "./MusicPanel";
 import { PointDialog, type PointDraft } from "./PointDialog";
 import { RundownPanel } from "./RundownPanel";
 import { SetupDialog } from "./SetupDialog";
@@ -47,6 +50,9 @@ export interface RundownConsoleProps {
   /** Saves the points made in the console and the minutes planned; without them the console cannot add or plan points. */
   savePoints?: SavePointsAction;
   saveMinutes?: SaveMinutesAction;
+  /** The songs of the playlist as saved, and how to save them; without `savePlaylist` the console has no music. */
+  playlist?: readonly Track[];
+  savePlaylist?: SavePlaylistAction;
   runStage: StageRunner;
   projectTalk: ProjectTalkRunner;
   hrefs: { screen: string; settings: string; raffle: string; back: string };
@@ -85,7 +91,7 @@ const newPointId = (title: string) => {
   return `${slug}-${Math.random().toString(36).slice(2, 6)}`;
 };
 
-export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored, frozen: initialFrozen, view: initialView, squadsOn, polls, saveCues, savePoints, saveMinutes, runStage, projectTalk, hrefs, library: injectedLibrary, openChannel = openStageChannel }: RundownConsoleProps) {
+export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored, frozen: initialFrozen, view: initialView, squadsOn, polls, saveCues, savePoints, saveMinutes, playlist: initialPlaylist = [], savePlaylist, runStage, projectTalk, hrefs, library: injectedLibrary, openChannel = openStageChannel }: RundownConsoleProps) {
   const router = useRouter();
   const media = useMediaLibrary(injectedLibrary);
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -104,6 +110,23 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
   const [playout, setPlayout] = useState<PlayoutState>(() => startOf(queueOf(buildRundown(initialAgenda, stored, new Set(qrItems)))));
   const playoutRef = useRef(playout);
   const [openItemId, setOpenItemId] = useState<string | null>(initialAgenda[0]?.id ?? null);
+  // --- the music ---------------------------------------------------------------------------------------------------------------
+  const [tracks, setTracks] = useState<readonly Track[]>(initialPlaylist);
+  const tracksRef = useRef(tracks);
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+  const [music, setMusic] = useState<MusicState>(INITIAL_MUSIC);
+  const [musicProgress, setMusicProgress] = useState<{ trackId: string; time: number; duration: number } | null>(null);
+  const [musicBlocked, setMusicBlocked] = useState(false);
+  const [musicEditing, setMusicEditing] = useState(false);
+  const [musicDialog, setMusicDialog] = useState(false);
+  const [audioFiles, setAudioFiles] = useState<readonly string[]>([]);
+  // What the projector's window was last told, and a counter that makes the console tell it again (it was opened late).
+  const lastMusic = useRef<{ sig: string; volume: number } | null>({ sig: ":false", volume: INITIAL_MUSIC.volume });
+  const [musicResend, setMusicResend] = useState(0);
+  // The songs that have started to play: one that ends without ever doing so could not be read.
+  const heardTracks = useRef(new Set<string>());
   const [pointDialog, setPointDialog] = useState<{ key: number; itemId: string | null } | null>(null);
   const [editing, setEditing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -127,6 +150,10 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
   const [failures, setFailures] = useState<ReadonlyMap<string, FailureReason>>(new Map());
   // Where the video on the air is, as the projector's window last said.
   const [progress, setProgress] = useState<{ cueId: string; time: number; duration: number } | null>(null);
+  const musicRef = useRef(music);
+  useEffect(() => {
+    musicRef.current = music;
+  }, [music]);
   const libraryRef = useRef(media.library);
   useEffect(() => {
     libraryRef.current = media.library;
@@ -204,6 +231,30 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
         setFailures((before) => new Map(before).set(message.cueId, message.reason));
       } else if (message.type === "progress") {
         setProgress({ cueId: message.cueId, time: message.time, duration: message.duration });
+      } else if (message.type === "musicProgress") {
+        heardTracks.current.add(message.trackId);
+        setMusicProgress({ trackId: message.trackId, time: message.time, duration: message.duration });
+      } else if (message.type === "musicBlocked") {
+        setMusicBlocked(message.blocked);
+      } else if (message.type === "musicAlive") {
+        // A window that is new (or was reloaded) has no song loaded: it is told what should be playing.
+        const wanted = musicRef.current.trackId;
+        if (wanted !== null && message.trackId !== wanted) {
+          lastMusic.current = null;
+          setMusicResend((count) => count + 1);
+        }
+      } else if (message.type === "musicEnded") {
+        const current = musicRef.current;
+        if (current.trackId !== message.trackId) return;
+        if (!heardTracks.current.has(message.trackId)) {
+          // It never played: say so, and go on without repeating, so a missing file cannot make the list loop for ever.
+          const missing = tracksRef.current.find((track) => track.id === message.trackId);
+          if (missing) alert(interpolate(t.music.failed, { name: missing.name }));
+          setMusic(nextTrack({ ...current, repeat: "off" }, tracksRef.current, true));
+        } else {
+          heardTracks.current.delete(message.trackId);
+          setMusic(nextTrack(current, tracksRef.current, true));
+        }
       }
     });
     line.post({ type: "ping" });
@@ -214,7 +265,7 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
       line.close();
       channel.current = null;
     };
-  }, [openChannel, announce]);
+  }, [openChannel, announce, alert]);
 
   // --- files that are not where the order says -------------------------------------------------------------------------
   const [missingInFolder, setMissingInFolder] = useState<ReadonlySet<string>>(new Set());
@@ -389,6 +440,40 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
     alert(t.changeFolder.done);
   }
 
+  /** Saves the playlist; if it cannot be saved the list goes back to how it was. */
+  async function saveTracks(next: readonly Track[], before: readonly Track[]): Promise<boolean> {
+    if (!savePlaylist) return false;
+    setTracks(next);
+    const saved = await savePlaylist({ tracks: next });
+    if (!saved.ok) {
+      setTracks(before);
+      alert(t.music.saveFailed);
+    }
+    return saved.ok;
+  }
+
+  async function addTrack(path: string): Promise<string | null> {
+    const track = trackFromPath(path, newCueId());
+    if (!track) return t.music.badPath;
+    return (await saveTracks([...tracksRef.current, track], tracksRef.current)) ? null : t.music.saveFailed;
+  }
+
+  function removeTrack(trackId: string) {
+    const before = tracksRef.current;
+    setMusic((current) => forgetTrack(current, trackId));
+    void saveTracks(before.filter((track) => track.id !== trackId), before);
+  }
+
+  function moveTrack(trackId: string, delta: -1 | 1) {
+    const before = tracksRef.current;
+    void saveTracks(moveCue(before, trackId, delta), before);
+  }
+
+  function openMusicDialog() {
+    setMusicDialog(true);
+    void media.library?.list().then((files) => setAudioFiles(files.filter(isAudioPath)));
+  }
+
   /** Sets how long a piece stays on the air; once that time passes the console takes the next piece by itself. */
   function setCueSeconds(itemId: string, cueId: string, seconds: number | null) {
     const before = cues[itemId] ?? [];
@@ -462,7 +547,7 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
 
   function openPicker() {
     setPickerOpen(true);
-    void media.library?.list().then(setPickerFiles);
+    void media.library?.list().then((files) => setPickerFiles(files.filter(isMediaPath)));
   }
 
   // --- the keyboard -----------------------------------------------------------------------------------------------------------
@@ -491,6 +576,27 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
   const liveTitle = onAirFile ? onAirFile.name : sceneOnAir ? t.program.scenes[sceneOnAir] : qrOnAir ? t.rundown.kinds.qr : t.program.nothing;
   const liveStatus = onAirFile?.kind === "video" ? (playout.playing ? t.program.playing : t.program.paused) : onAirFile?.kind === "gslides" ? t.program.googleSlides : onAirFile?.kind === "slides" && total > 0 ? interpolate(t.program.slide, { n: String(playout.slide), total: String(total) }) : onAirFile ? t.program.loading : sceneOnAir || qrOnAir ? t.program.sceneStatus : undefined;
   const videoPlaying = onAirFile?.kind === "video" && playout.playing;
+
+  // --- the music: tell the projector's window what to play ----------------------------------------------------------------------
+  const sounding = soundingOf(music, videoPlaying);
+  useEffect(() => {
+    const track = tracks.find((entry) => entry.id === music.trackId) ?? null;
+    const sig = `${track?.id ?? ""}:${sounding}`;
+    const before = lastMusic.current;
+    if (before && before.sig === sig && before.volume === music.volume) return;
+    // A song that starts, stops or changes fades; a new volume only moves, at once.
+    const fadeMs = before && before.sig !== sig ? music.fadeSeconds * 1000 : 0;
+    lastMusic.current = { sig, volume: music.volume };
+    void (async () => {
+      let sent: File | undefined;
+      const library = libraryRef.current;
+      if (track && library && library.kind === "folder-input") {
+        const found = await library.resolve(track.path);
+        if (found.ok) sent = found.value;
+      }
+      channel.current?.post({ type: "music", track, playing: sounding, volume: music.volume, fadeMs, ...(sent ? { file: sent } : {}) });
+    })();
+  }, [music.trackId, music.volume, music.fadeSeconds, sounding, tracks, musicResend]);
 
   // --- a piece with seconds takes the next one by itself ----------------------------------------------------------------------------
   const secondsOnAir = onAirFile?.seconds ?? null;
@@ -740,6 +846,30 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
               })}
             </div>
           </section>
+          {savePlaylist ? (
+            <MusicPanel
+              tracks={tracks}
+              music={music}
+              progress={musicProgress}
+              blocked={musicBlocked && sounding}
+              ducked={music.playing && music.duck && videoPlaying}
+              editing={musicEditing}
+              onToggleEditing={() => setMusicEditing((current) => !current)}
+              onAdd={openMusicDialog}
+              onPlay={(trackId) => setMusic((current) => playTrack(current, tracksRef.current, trackId))}
+              onTogglePlayback={() => setMusic((current) => togglePlayback(current, tracksRef.current))}
+              onPrevious={() => setMusic((current) => previousTrack(current, tracksRef.current))}
+              onNext={() => setMusic((current) => nextTrack(current, tracksRef.current))}
+              onStop={() => setMusic(stopMusic)}
+              onSeek={(seconds) => channel.current?.post({ type: "musicSeek", seconds })}
+              onVolume={(volume) => setMusic((current) => setMusicVolume(current, volume))}
+              onRepeat={() => setMusic(cycleRepeat)}
+              onFade={(seconds) => setMusic((current) => setFadeSeconds(current, seconds))}
+              onDuck={() => setMusic(toggleDuck)}
+              onMove={moveTrack}
+              onRemove={removeTrack}
+            />
+          ) : null}
           <p className="type-caption text-text-subtle shrink-0">{t.shortcuts}</p>
         </div>
       </div>
@@ -768,6 +898,15 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
           onSave={savePoint}
         />
       ) : null}
+      <MusicDialog
+        open={musicDialog}
+        onOpenChange={setMusicDialog}
+        files={audioFiles}
+        added={new Set(tracks.map((track) => track.path))}
+        folderReady={media.status === "ready"}
+        onConnect={() => void media.connect().then(() => media.library?.list().then((files) => setAudioFiles(files.filter(isAudioPath))))}
+        onAdd={addTrack}
+      />
       {confirmDialog}
       <SetupDialog
         open={setupManual || (!setupDismissed && media.library !== null && media.status === "none")}

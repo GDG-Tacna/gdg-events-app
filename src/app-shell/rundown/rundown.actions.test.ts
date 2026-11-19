@@ -10,10 +10,10 @@ const permissions = vi.hoisted(() => ({ mayEdit: vi.fn() }));
 vi.mock("@/app-shell/permissions.server", () => permissions);
 const features = vi.hoisted(() => ({ FEATURES: { admin: true } }));
 vi.mock("@/shared/config/features", () => features);
-const server = vi.hoisted(() => ({ saveItemCues: vi.fn(), saveExtraPoints: vi.fn(), saveItemMinutes: vi.fn() }));
+const server = vi.hoisted(() => ({ saveItemCues: vi.fn(), saveExtraPoints: vi.fn(), saveItemMinutes: vi.fn(), saveMusicPlaylist: vi.fn() }));
 vi.mock("@/features/rundown/server", () => server);
 
-const { saveCuesAction, saveMinutesAction, savePointsAction } = await import("./rundown.actions");
+const { saveCuesAction, saveMinutesAction, savePlaylistAction, savePointsAction } = await import("./rundown.actions");
 
 const CUES = [{ id: "cue-0001", kind: "slides", name: "Keynote", path: "apertura/keynote.pdf" }];
 const session = (role: "attendee" | "staff" | "admin" | null) => ({ uid: "a1", role, displayName: null, photoUrl: null });
@@ -125,5 +125,42 @@ describe("savePointsAction and saveMinutesAction", () => {
 
     server.saveExtraPoints.mockResolvedValue({ ok: false, error: { code: "invalid-points" } });
     expect(await savePointsAction({ points: POINTS })).toEqual({ ok: false, code: "invalid-points" });
+  });
+});
+
+describe("savePlaylistAction", () => {
+  const TRACKS = [{ id: "song-0001", name: "Intro", path: "musica/intro.mp3" }];
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    features.FEATURES.admin = true;
+    modules.moduleOn.mockResolvedValue(true);
+    permissions.mayEdit.mockResolvedValue(true);
+    guards.getSession.mockResolvedValue(session("admin"));
+    server.saveMusicPlaylist.mockResolvedValue({ ok: true, value: TRACKS });
+  });
+
+  it("saves the playlist as the admin of the session", async () => {
+    expect(await savePlaylistAction({ tracks: TRACKS })).toEqual({ ok: true, tracks: TRACKS });
+    expect(server.saveMusicPlaylist).toHaveBeenCalledWith({ marker: "rundown" }, { uid: "a1", role: "admin" }, { tracks: TRACKS });
+  });
+
+  it("refuses without a session, without the stage permission, with the module off and with a wrong shape", async () => {
+    guards.getSession.mockResolvedValue(null);
+    expect(await savePlaylistAction({ tracks: TRACKS })).toEqual({ ok: false, code: "unauthenticated" });
+    guards.getSession.mockResolvedValue(session("admin"));
+    permissions.mayEdit.mockResolvedValue(false);
+    expect(await savePlaylistAction({ tracks: TRACKS })).toEqual({ ok: false, code: "forbidden" });
+    permissions.mayEdit.mockResolvedValue(true);
+    modules.moduleOn.mockResolvedValue(false);
+    expect(await savePlaylistAction({ tracks: TRACKS })).toEqual({ ok: false, code: "disabled" });
+    modules.moduleOn.mockResolvedValue(true);
+    expect(await savePlaylistAction({ tracks: "x" } as never)).toEqual({ ok: false, code: "invalid-tracks" });
+    expect(server.saveMusicPlaylist).not.toHaveBeenCalled();
+  });
+
+  it("passes the use case's error code on", async () => {
+    server.saveMusicPlaylist.mockResolvedValue({ ok: false, error: { code: "invalid-tracks" } });
+    expect(await savePlaylistAction({ tracks: TRACKS })).toEqual({ ok: false, code: "invalid-tracks" });
   });
 });
