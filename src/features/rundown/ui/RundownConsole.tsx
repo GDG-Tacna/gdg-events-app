@@ -5,13 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { ButtonLink, Icon } from "@/shared/ui";
+import { ButtonLink, Icon, useConfirm } from "@/shared/ui";
 import type { MediaLibrary } from "../data/client/media-library";
 import { openStageChannel, type StageChannel } from "../data/client/stage-channel";
 import type { FailureReason } from "../domain/channel";
 import type { RundownErrorCode, StoredCues } from "../domain/manage";
 import { back, cueOf, forget, forward, goToSlide, mediaOnProgram, selectNext, showScene, startOf, stop, take, togglePlay, type DataScene, type PlayoutState } from "../domain/playout";
-import { buildRundown, cueFromPath, moveCue, qrCueId, queueOf, type AgendaPoint, type MediaCue } from "../domain/rundown";
+import { buildRundown, cueFromPath, googleSlidesCueFromLink, isFileCue, moveCue, qrCueId, queueOf, type AgendaPoint, type StoredCue } from "../domain/rundown";
 import type { ProjectTalkRunner, SaveCuesAction, StageRunner } from "./actions";
 import { ConsoleIcon } from "./ConsoleIcons";
 import { ConsoleMonitor } from "./ConsoleMonitor";
@@ -63,9 +63,10 @@ const newCueId = () => `c${Date.now().toString(36)}${Math.random().toString(36).
 export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initialFrozen, view: initialView, squadsOn, polls, saveCues, runStage, projectTalk, hrefs, library: injectedLibrary, openChannel = openStageChannel }: RundownConsoleProps) {
   const router = useRouter();
   const media = useMediaLibrary(injectedLibrary);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // --- the order -------------------------------------------------------------------------------------------------------
-  const [cues, setCues] = useState<Readonly<Record<string, readonly MediaCue[]>>>(stored);
+  const [cues, setCues] = useState<Readonly<Record<string, readonly StoredCue[]>>>(stored);
   const items = useMemo(() => buildRundown(agenda, cues, new Set(qrItems)), [agenda, cues, qrItems]);
   const queue = useMemo(() => queueOf(items), [items]);
   const queueRef = useRef(queue);
@@ -109,11 +110,11 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
         let sent: File | undefined;
         const library = libraryRef.current;
         // A browser that cannot remember the folder cannot share it with the other window: the file goes along.
-        if (library && library.kind === "folder-input") {
+        if (isFileCue(file) && library && library.kind === "folder-input") {
           const found = await library.resolve(file.path);
           if (found.ok) sent = found.value;
         }
-        channel.current?.post({ type: "program", cue: { id: file.id, kind: file.kind, name: file.name, path: file.path }, slide: state.slide, playing: state.playing, ...(sent ? { file: sent } : {}) });
+        channel.current?.post({ type: "program", cue: file, slide: state.slide, playing: state.playing, ...(sent ? { file: sent } : {}) });
         return;
       }
       channel.current?.post({ type: "program", cue: null, slide: 1, playing: false });
@@ -190,7 +191,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
     (async () => {
       const found = new Set<string>();
       for (const entry of queue) {
-        if (entry.cue.kind === "qr") continue;
+        if (!isFileCue(entry.cue)) continue;
         const result = await library.resolve(entry.cue.path);
         if (!result.ok && result.error === "missing") found.add(entry.cue.id);
       }
@@ -207,7 +208,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
   const liveCueId = playout.program?.type === "cue" ? playout.program.cueId : null;
   const nextCue = cueOf(queue, playout.next);
   const total = onAirFile?.kind === "slides" ? (slides.get(onAirFile.id) ?? 0) : 0;
-  const programFile = useResolvedFile(media.library, onAirFile && onAirFile.kind !== "video" ? onAirFile : null, null, media.revision);
+  const programFile = useResolvedFile(media.library, onAirFile && isFileCue(onAirFile) && onAirFile.kind !== "video" ? onAirFile : null, null, media.revision);
   const imageUrl = useObjectUrl(onAirFile?.kind === "image" && programFile.status === "ready" ? programFile.file : null);
 
   // --- the operator's moves ------------------------------------------------------------------------------------------------
@@ -281,7 +282,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
 
   // --- editing the order -------------------------------------------------------------------------------------------------------
   const save = useCallback(
-    async (itemId: string, next: readonly MediaCue[], before: readonly MediaCue[]) => {
+    async (itemId: string, next: readonly StoredCue[], before: readonly StoredCue[]) => {
       setCues((current) => ({ ...current, [itemId]: next }));
       const result = await saveCues({ itemId, cues: next });
       if (!result.ok) {
@@ -301,6 +302,44 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
     if (!cue) return copy.stageConsole.picker.badPath;
     const before = cues[itemId] ?? [];
     return (await save(itemId, [...before, cue], before)) ? null : t.alerts.saveFailed;
+  }
+
+  async function addGoogleSlides(link: string, name: string): Promise<string | null> {
+    const itemId = openItemId ?? agenda[0]?.id;
+    if (!itemId) return t.alerts.saveFailed;
+    const cue = googleSlidesCueFromLink(link, newCueId(), name);
+    if (!cue) return t.picker.gslides.bad;
+    const before = cues[itemId] ?? [];
+    return (await save(itemId, [...before, cue], before)) ? null : t.alerts.saveFailed;
+  }
+
+  /**
+   * «Cambiar carpeta»: the paths of the files belong to the folder they were added from, so a new folder takes them out
+   * of the agenda (Google Slides decks, QR and scenes stay). The person is told first; nothing is removed unless the new
+   * folder is really connected (closing the picker changes nothing).
+   */
+  async function changeFolder() {
+    const fileCount = Object.values(cues).reduce((sum, list) => sum + list.filter(isFileCue).length, 0);
+    const yes = await confirm({
+      title: t.changeFolder.title,
+      description: fileCount > 0 ? interpolate(t.changeFolder.description, { n: String(fileCount) }) : t.changeFolder.descriptionNone,
+      confirmLabel: t.changeFolder.confirm,
+      tone: fileCount > 0 ? "danger" : "default",
+    });
+    if (!yes || !(await media.connect())) return;
+    if (fileCount === 0) return;
+
+    // What was on the air from the old folder goes off, and what was read about it is forgotten.
+    const onAir = mediaOnProgram(playoutRef.current, queueRef.current);
+    if (onAir && isFileCue(onAir)) commit(stop(playoutRef.current));
+    setSlides(new Map());
+    setFailures(new Map());
+    setMissingInFolder(new Set());
+    for (const [itemId, list] of Object.entries(cues)) {
+      const kept = list.filter((cue) => !isFileCue(cue));
+      if (kept.length !== list.length) await save(itemId, kept, list);
+    }
+    alert(t.changeFolder.done);
   }
 
   function removeCue(itemId: string, cueId: string) {
@@ -343,7 +382,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
   const sceneOnAir = playout.program?.type === "scene" ? playout.program.scene : null;
   const qrOnAir = liveCueId !== null && cueOf(queue, liveCueId)?.kind === "qr";
   const liveTitle = onAirFile ? onAirFile.name : sceneOnAir ? t.program.scenes[sceneOnAir] : qrOnAir ? t.rundown.kinds.qr : t.program.nothing;
-  const liveStatus = onAirFile?.kind === "video" ? (playout.playing ? t.program.playing : t.program.paused) : onAirFile?.kind === "slides" && total > 0 ? interpolate(t.program.slide, { n: String(playout.slide), total: String(total) }) : onAirFile ? t.program.loading : sceneOnAir || qrOnAir ? t.program.sceneStatus : undefined;
+  const liveStatus = onAirFile?.kind === "video" ? (playout.playing ? t.program.playing : t.program.paused) : onAirFile?.kind === "gslides" ? t.program.googleSlides : onAirFile?.kind === "slides" && total > 0 ? interpolate(t.program.slide, { n: String(playout.slide), total: String(total) }) : onAirFile ? t.program.loading : sceneOnAir || qrOnAir ? t.program.sceneStatus : undefined;
   const videoPlaying = onAirFile?.kind === "video" && playout.playing;
   const failedOnAir = onAirFile && failures.has(onAirFile.id);
 
@@ -371,7 +410,16 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
         <span className="border-line-strong type-caption inline-flex h-9 items-center gap-2 rounded-full border-2 px-3.5 font-medium">
           <span aria-hidden="true" className={cn("size-2.5 rounded-full", media.status === "ready" ? "bg-lime" : "bg-danger")} />
           {t.folder}
-          {media.status === "ready" && media.folder ? <span className="text-muted-foreground font-mono text-xs">{media.folder}</span> : <button type="button" onClick={() => setSetupManual(true)} className="underline">{t.folderConnect}</button>}
+          {media.status !== "none" && media.folder ? <span className="text-muted-foreground font-mono text-xs">{media.folder}</span> : null}
+          {media.status === "none" || !media.folder ? (
+            <button type="button" onClick={() => setSetupManual(true)} className="underline">
+              {t.folderConnect}
+            </button>
+          ) : (
+            <button type="button" onClick={() => void changeFolder()} className="focus-visible:ring-ring rounded-sm underline focus-visible:ring-[3px] focus-visible:outline-none">
+              {t.folderChange}
+            </button>
+          )}
         </span>
         <ButtonLink href={hrefs.settings} variant="ghost" size="sm">
           {t.settings}
@@ -545,7 +593,9 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
         folderReady={media.status === "ready"}
         onConnect={() => void media.connect().then(() => media.library?.list().then(setPickerFiles))}
         onAdd={addFile}
+        onAddGoogleSlides={addGoogleSlides}
       />
+      {confirmDialog}
       <SetupDialog
         open={setupManual || (!setupDismissed && media.library !== null && media.status === "none")}
         onOpenChange={() => {

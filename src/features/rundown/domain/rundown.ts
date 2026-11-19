@@ -26,6 +26,23 @@ export interface MediaCue {
   path: string;
 }
 
+/**
+ * A presentation of Google Slides, shown on the screen through Google's own embed. It has no file: it keeps the
+ * presentation's id (and whether it was published to the web). The slides are passed in the projector's window, because
+ * the console cannot reach inside Google's page; for full control from the console, export the deck to PDF and add that.
+ */
+export interface GoogleSlidesCue {
+  id: string;
+  kind: "gslides";
+  name: string;
+  deckId: string;
+  /** True for a deck published to the web (its link is `/d/e/...`); false for one shared by link. */
+  published: boolean;
+}
+
+/** A piece of the order that is saved: a file or a Google Slides link. */
+export type StoredCue = MediaCue | GoogleSlidesCue;
+
 /** The talk's attendance QR as a piece: it is made on the spot, so it has no file. */
 export interface QrCue {
   id: string;
@@ -33,7 +50,7 @@ export interface QrCue {
   name: string;
 }
 
-export type RundownCue = MediaCue | QrCue;
+export type RundownCue = StoredCue | QrCue;
 
 /** One point of the agenda with its pieces in order. */
 export interface RundownItem {
@@ -95,11 +112,51 @@ export function cueFromPath(path: string, id: string): MediaCue | null {
   return { id, kind, name: nameFromPath(path), path };
 }
 
+const GOOGLE_SLIDES_LINK = /^https:\/\/docs\.google\.com\/presentation\/d\/(e\/)?([A-Za-z0-9_-]{15,200})(?:[/?#].*)?$/;
+const DECK_ID = /^[A-Za-z0-9_-]{15,200}$/;
+
+/** The presentation a Google Slides link points to (any of its forms: edit, view, preview, publish), or `null`. */
+export function parseGoogleSlidesLink(text: unknown): { deckId: string; published: boolean } | null {
+  if (typeof text !== "string") return null;
+  const match = GOOGLE_SLIDES_LINK.exec(text.trim());
+  return match ? { deckId: match[2], published: match[1] !== undefined } : null;
+}
+
+export const GOOGLE_SLIDES_DEFAULT_NAME = "Presentación de Google Slides";
+
+/** A new Google Slides piece from the link the admin pasted; `null` when it is not a Google Slides link. */
+export function googleSlidesCueFromLink(link: string, id: string, name?: string): GoogleSlidesCue | null {
+  const deck = parseGoogleSlidesLink(link);
+  const trimmed = (name ?? "").trim().slice(0, NAME_MAX);
+  if (!deck || !CUE_ID.test(id)) return null;
+  return { id, kind: "gslides", name: trimmed || GOOGLE_SLIDES_DEFAULT_NAME, ...deck };
+}
+
+/**
+ * The address Google serves a presentation to be embedded in a page. A deck published to the web has its embed (clean,
+ * no toolbar); one only shared by link has the preview. Either way the viewer needs permission to see it.
+ */
+export function googleSlidesEmbedUrl(cue: Pick<GoogleSlidesCue, "deckId" | "published">): string {
+  return cue.published
+    ? `https://docs.google.com/presentation/d/e/${cue.deckId}/embed?start=false&loop=false&delayms=3000&rm=minimal`
+    : `https://docs.google.com/presentation/d/${cue.deckId}/preview`;
+}
+
+/** The address that downloads the deck as a PDF (for full control from the console): the person must be able to open it. */
+export const googleSlidesPdfUrl = (cue: Pick<GoogleSlidesCue, "deckId" | "published">): string =>
+  cue.published ? `https://docs.google.com/presentation/d/e/${cue.deckId}/pub` : `https://docs.google.com/presentation/d/${cue.deckId}/export/pdf`;
+
 /** A piece from stored or submitted data, or `null` when any field breaks the rules. */
-export function parseCue(input: unknown): MediaCue | null {
+export function parseCue(input: unknown): StoredCue | null {
   if (typeof input !== "object" || input === null) return null;
   const data = input as Record<string, unknown>;
   if (typeof data.id !== "string" || !CUE_ID.test(data.id)) return null;
+  if (data.kind === "gslides") {
+    if (typeof data.deckId !== "string" || !DECK_ID.test(data.deckId) || typeof data.published !== "boolean" || typeof data.name !== "string") return null;
+    const label = data.name.trim();
+    if (label.length === 0 || label.length > NAME_MAX) return null;
+    return { id: data.id, kind: "gslides", name: label, deckId: data.deckId, published: data.published };
+  }
   if (!isMediaPath(data.path) || typeof data.name !== "string") return null;
   const name = data.name.trim();
   if (name.length === 0 || name.length > NAME_MAX) return null;
@@ -110,9 +167,9 @@ export function parseCue(input: unknown): MediaCue | null {
 }
 
 /** A list of pieces, or `null` when it is too long, repeats an id or holds anything invalid. */
-export function parseCues(input: unknown): MediaCue[] | null {
+export function parseCues(input: unknown): StoredCue[] | null {
   if (!Array.isArray(input) || input.length > CUES_PER_ITEM_MAX) return null;
-  const cues: MediaCue[] = [];
+  const cues: StoredCue[] = [];
   for (const entry of input) {
     const cue = parseCue(entry);
     if (!cue || cues.some((other) => other.id === cue.id)) return null;
@@ -131,6 +188,9 @@ export function moveCue<T extends { id: string }>(cues: readonly T[], id: string
   return moved;
 }
 
+/** Whether a piece is a file of the connected folder (a video, a deck of slides or a picture). */
+export const isFileCue = (cue: RundownCue): cue is MediaCue => cue.kind !== "qr" && cue.kind !== "gslides";
+
 /** The id of a talk's QR piece: one per point of the agenda, never stored. */
 export const qrCueId = (itemId: string) => `${itemId}:qr`;
 
@@ -138,7 +198,7 @@ export const qrCueId = (itemId: string) => `${itemId}:qr`;
  * The order for the console: every point of the agenda in its order, with its stored pieces and, last, its QR. Breaks
  * have a QR piece too (the console shows it only for the points that can check people in).
  */
-export function buildRundown(agenda: readonly AgendaPoint[], stored: Readonly<Record<string, readonly MediaCue[]>>, withQr: ReadonlySet<string> = new Set(agenda.map((point) => point.id))): RundownItem[] {
+export function buildRundown(agenda: readonly AgendaPoint[], stored: Readonly<Record<string, readonly StoredCue[]>>, withQr: ReadonlySet<string> = new Set(agenda.map((point) => point.id))): RundownItem[] {
   return agenda.map((point) => ({
     ...point,
     cues: [...(stored[point.id] ?? []), ...(withQr.has(point.id) ? [{ id: qrCueId(point.id), kind: "qr" as const, name: "QR de la charla" }] : [])],

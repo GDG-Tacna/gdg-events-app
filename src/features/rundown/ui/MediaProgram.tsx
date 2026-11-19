@@ -6,6 +6,7 @@ import { interpolate } from "@/shared/lib/format";
 import type { MediaLibrary, ResolveError } from "../data/client/media-library";
 import { openStageChannel, type StageChannel } from "../data/client/stage-channel";
 import type { FailureReason, ProgramCue } from "../domain/channel";
+import { googleSlidesEmbedUrl } from "../domain/rundown";
 import { SlideCanvas } from "./SlideCanvas";
 import { useMediaLibrary } from "./use-library";
 import { useObjectUrl, useResolvedFile } from "./use-media";
@@ -70,7 +71,8 @@ export function MediaProgram({ library: injected, openChannel = openStageChannel
   }, [openChannel]);
 
   const cue = onAir?.cue ?? null;
-  const resolved = useResolvedFile(library, cue, onAir?.file ?? null, revision);
+  // A Google Slides deck has no file to read: Google serves it in its own frame.
+  const resolved = useResolvedFile(library, cue && cue.kind !== "gslides" ? cue : null, onAir?.file ?? null, revision);
   const file = resolved.status === "ready" ? resolved.file : null;
   const url = useObjectUrl(cue?.kind === "slides" ? null : file);
 
@@ -99,6 +101,23 @@ export function MediaProgram({ library: injected, openChannel = openStageChannel
   return (
     // A click anywhere lets the browser play sound: it refuses it until the page was used once.
     <div className="fixed inset-0 z-[200] bg-black text-white" onClick={() => setUnlocked(true)} role="presentation" aria-label={interpolate(copy.stageConsole.screen.label, { name: cue.name })}>
+      {cue.kind === "gslides" ? (
+        <iframe
+          title={cue.name}
+          src={googleSlidesEmbedUrl(cue)}
+          className="size-full border-0"
+          allow="autoplay; fullscreen"
+          allowFullScreen
+          referrerPolicy="no-referrer"
+          // Google's page runs on its own; it cannot reach this app.
+          sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+          // The keys that change slide go to the frame once it has the focus.
+          onLoad={(event) => {
+            event.currentTarget.focus();
+            report.current?.post({ type: "loaded", cueId: cue.id, slides: null });
+          }}
+        />
+      ) : null}
       {cue.kind === "slides" ? (
         <SlideCanvas
           file={file}

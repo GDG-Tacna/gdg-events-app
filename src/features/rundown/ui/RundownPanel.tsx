@@ -4,7 +4,7 @@ import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
 import { Icon } from "@/shared/ui";
-import type { RundownCue, RundownItem } from "../domain/rundown";
+import { isFileCue, type RundownCue, type RundownItem } from "../domain/rundown";
 import { ConsoleIcon } from "./ConsoleIcons";
 
 const t = copy.stageConsole.rundown;
@@ -28,17 +28,18 @@ export interface RundownPanelProps {
   onRemove: (itemId: string, cueId: string) => void;
 }
 
-const TINT: Record<RundownCue["kind"], string> = { video: "text-magenta-ink", slides: "text-cyan-ink", image: "text-cyan-ink", qr: "text-lime-ink" };
+const TINT: Record<RundownCue["kind"], string> = { video: "text-magenta-ink", slides: "text-cyan-ink", gslides: "text-cyan-ink", image: "text-cyan-ink", qr: "text-lime-ink" };
 
 function KindIcon({ kind }: { kind: RundownCue["kind"] }) {
   if (kind === "video") return <ConsoleIcon name="video" />;
-  if (kind === "slides") return <ConsoleIcon name="slides" />;
+  if (kind === "slides" || kind === "gslides") return <ConsoleIcon name="slides" />;
   if (kind === "image") return <Icon name="image" size={20} />;
   return <Icon name="qr" size={20} />;
 }
 
 function metaOf(cue: RundownCue, slides: ReadonlyMap<string, number>): string {
   if (cue.kind === "qr") return t.qrMeta;
+  if (cue.kind === "gslides") return t.gslidesMeta;
   const known = cue.kind === "slides" ? slides.get(cue.id) : undefined;
   return known ? `${t.kinds.slides} · ${interpolate(t.slidesCount, { total: String(known) })}` : t.kinds[cue.kind];
 }
@@ -98,7 +99,8 @@ export function RundownPanel({ items, openItemId, onToggleItem, liveCueId, nextC
                           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                             <span className="type-label text-foreground leading-tight">{cue.name}</span>
                             <span className="type-caption text-text-subtle">{metaOf(cue, slides)}</span>
-                            {media ? <span className="text-muted-foreground truncate font-mono text-[10.5px]">{(cue as { path: string }).path}</span> : null}
+                            {isFileCue(cue) ? <span className="text-muted-foreground truncate font-mono text-[10.5px]">{cue.path}</span> : null}
+                            {cue.kind === "gslides" ? <span className="text-muted-foreground truncate font-mono text-[10.5px]">docs.google.com/…/{cue.deckId.slice(0, 10)}…</span> : null}
                           </span>
                           <span className="flex shrink-0 flex-col items-end gap-1">
                             {isLive ? <span className="bg-danger text-on-accent inline-flex h-5 items-center rounded-full px-2 text-[10.5px] font-bold tracking-wide">{t.live}</span> : null}
