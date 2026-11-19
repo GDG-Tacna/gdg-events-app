@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { back, cueOf, followingOf, forget, forward, goToSlide, INITIAL_PLAYOUT, mediaOnProgram, selectNext, showScene, startOf, stop, take, togglePlay, type PlayoutState } from "./playout";
+import { back, cueOf, followingOf, forget, forward, goToSlide, INITIAL_PLAYOUT, mediaOnProgram, selectNext, setVolume, showScene, startOf, stop, take, toggleLoop, toggleMute, togglePlay, type PlayoutState } from "./playout";
 import { buildRundown, queueOf, type MediaCue } from "./rundown";
 
 const deck: MediaCue = { id: "deck-1", kind: "slides", name: "Keynote", path: "a/keynote.pdf" };
@@ -12,16 +12,41 @@ const taken = (state: PlayoutState, count: number) => Array.from({ length: count
 
 describe("playout", () => {
   it("starts with the first piece waiting and nothing on the air", () => {
-    expect(startOf(queue)).toEqual({ program: null, next: "deck-1", slide: 1, playing: false });
+    expect(startOf(queue)).toEqual({ program: null, next: "deck-1", slide: 1, playing: false, loop: false, volume: 1, muted: false });
     expect(startOf([])).toEqual(INITIAL_PLAYOUT);
   });
 
   it("takes the waiting piece onto the air from its start, and the one after it waits", () => {
     const first = take(startOf(queue), queue);
 
-    expect(first).toEqual({ program: { type: "cue", cueId: "deck-1" }, next: "clip-1", slide: 1, playing: false });
+    expect(first).toEqual({ program: { type: "cue", cueId: "deck-1" }, next: "clip-1", slide: 1, playing: false, loop: false, volume: 1, muted: false });
     // A video starts playing when it is taken.
-    expect(take(first, queue)).toEqual({ program: { type: "cue", cueId: "clip-1" }, next: "keynote:qr", slide: 1, playing: true });
+    expect(take(first, queue)).toEqual({ program: { type: "cue", cueId: "clip-1" }, next: "keynote:qr", slide: 1, playing: true, loop: false, volume: 1, muted: false });
+  });
+
+  it("repeats only a video, and every piece that is taken starts without repetition", () => {
+    const onDeck = take(startOf(queue), queue);
+    expect(toggleLoop(onDeck, queue)).toBe(onDeck);
+
+    const onClip = take(onDeck, queue);
+    const looping = toggleLoop(onClip, queue);
+    expect(looping.loop).toBe(true);
+    expect(toggleLoop(looping, queue).loop).toBe(false);
+    expect(take(looping, queue).loop).toBe(false);
+  });
+
+  it("keeps the sound between pieces: the volume is held in steps of a hundredth and raising it lifts the mute", () => {
+    const quiet = setVolume(startOf(queue), 0.456);
+    expect(quiet.volume).toBe(0.46);
+    expect(setVolume(quiet, 3).volume).toBe(1);
+    expect(setVolume(quiet, -1).volume).toBe(0);
+    expect(setVolume(quiet, Number.NaN)).toBe(quiet);
+
+    const muted = toggleMute(quiet);
+    expect(muted.muted).toBe(true);
+    expect(setVolume(muted, 0).muted).toBe(true);
+    expect(setVolume(muted, 0.5).muted).toBe(false);
+    expect(take(muted, queue)).toMatchObject({ volume: 0.46, muted: true });
   });
 
   it("does nothing when nothing waits, at the end of the order or with a piece that is not in it", () => {

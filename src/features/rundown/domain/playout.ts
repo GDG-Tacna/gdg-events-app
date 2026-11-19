@@ -18,9 +18,14 @@ export interface PlayoutState {
   slide: number;
   /** Whether a video is playing. */
   playing: boolean;
+  /** Whether the video on the air starts again when it ends. It is off for every piece that is taken. */
+  loop: boolean;
+  /** The sound of the screen, from 0 to 1, and whether it is muted. They stay when the piece changes. */
+  volume: number;
+  muted: boolean;
 }
 
-export const INITIAL_PLAYOUT: PlayoutState = { program: null, next: null, slide: 1, playing: false };
+export const INITIAL_PLAYOUT: PlayoutState = { program: null, next: null, slide: 1, playing: false, loop: false, volume: 1, muted: false };
 
 const indexOfCue = (queue: readonly QueueEntry[], cueId: string | null) => (cueId === null ? -1 : queue.findIndex((entry) => entry.cue.id === cueId));
 
@@ -57,7 +62,7 @@ export function take(state: PlayoutState, queue: readonly QueueEntry[]): Playout
   const taken = state.next;
   if (taken === null || indexOfCue(queue, taken) < 0) return state;
   const cue = cueOf(queue, taken);
-  return { program: { type: "cue", cueId: taken }, next: followingOf(queue, taken), slide: 1, playing: cue?.kind === "video" };
+  return { ...state, program: { type: "cue", cueId: taken }, next: followingOf(queue, taken), slide: 1, playing: cue?.kind === "video", loop: false };
 }
 
 /** A data scene (the ranking, a poll, the winners, the waiting screen) goes on the air; what was waiting keeps waiting. */
@@ -72,6 +77,20 @@ export const stop = (state: PlayoutState): PlayoutState => showScene(state, "wai
 export function togglePlay(state: PlayoutState, queue: readonly QueueEntry[]): PlayoutState {
   return mediaOnProgram(state, queue)?.kind === "video" ? { ...state, playing: !state.playing } : state;
 }
+
+/** Turns the repetition of the video on the air on or off; for anything else it changes nothing. */
+export function toggleLoop(state: PlayoutState, queue: readonly QueueEntry[]): PlayoutState {
+  return mediaOnProgram(state, queue)?.kind === "video" ? { ...state, loop: !state.loop } : state;
+}
+
+/** Sets the volume (kept between 0 and 1, in steps of a hundredth); raising it from silence also lifts the mute. */
+export function setVolume(state: PlayoutState, volume: number): PlayoutState {
+  if (!Number.isFinite(volume)) return state;
+  const level = Math.round(Math.min(1, Math.max(0, volume)) * 100) / 100;
+  return { ...state, volume: level, muted: level === 0 ? state.muted : false };
+}
+
+export const toggleMute = (state: PlayoutState): PlayoutState => ({ ...state, muted: !state.muted });
 
 /**
  * «Siguiente»: inside a deck it moves to the next slide; on the last slide, or on anything else, it takes the waiting

@@ -2637,6 +2637,17 @@ export const copy = {
       ready: "Siguiente pieza lista:",
       nothing: "Nada en espera",
     },
+    video: {
+      label: "Controles del video",
+      restart: "Reiniciar",
+      loop: "Repetir",
+      mute: "Silenciar",
+      unmute: "Activar sonido",
+      volume: "Volumen",
+      position: "Posición del video",
+      /** Placeholders: {time}, {total}. */
+      timeOf: "{time} de {total}",
+    },
     strip: { label: "Láminas", /** Placeholder: {n}. */ go: "Ir a la lámina {n}" },
     deck: {
       title: "Escenas rápidas",

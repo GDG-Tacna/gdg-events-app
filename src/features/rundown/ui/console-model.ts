@@ -17,7 +17,13 @@ export type ConsoleAction =
   | { type: "pickPrevious" }
   | { type: "pickNext" }
   | { type: "deck"; key: DeckKeyId }
-  | { type: "slide"; slide: number };
+  | { type: "slide"; slide: number }
+  | { type: "toggleLoop" }
+  | { type: "mute" }
+  | { type: "volume"; volume: number }
+  /** Back to the start of the video on the air. */
+  | { type: "restart" }
+  | { type: "seek"; seconds: number };
 
 /** What a key does on the console, or `null` for a key it does not use. */
 export function actionForKey(key: string): ConsoleAction | null {

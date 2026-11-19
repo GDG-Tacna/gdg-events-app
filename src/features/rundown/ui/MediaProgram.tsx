@@ -18,6 +18,9 @@ interface OnAir {
   cue: ProgramCue;
   slide: number;
   playing: boolean;
+  loop: boolean;
+  volume: number;
+  muted: boolean;
   /** A file the console sent along (a browser that cannot remember the folder). */
   file: File | null;
 }
@@ -78,12 +81,14 @@ export function MediaProgram({ preview = false, library: injected, openChannel =
     if (!line) return;
     const announce = () => line.post({ type: "alive", showing: showing.current });
     const stop = line.subscribe((message) => {
-      if (preview && message.type !== "program" && message.type !== "transport") return;
+      if (preview && message.type !== "program" && message.type !== "transport" && message.type !== "seek") return;
       if (message.type === "program") {
         setUnreadable(null);
-        setOnAir(message.cue ? { cue: message.cue, slide: message.slide, playing: message.playing, file: message.file ?? null } : null);
+        setOnAir(message.cue ? { cue: message.cue, slide: message.slide, playing: message.playing, loop: message.loop ?? false, volume: message.volume ?? 1, muted: message.muted ?? false, file: message.file ?? null } : null);
       } else if (message.type === "transport") {
-        setOnAir((before) => (before ? { ...before, slide: message.slide, playing: message.playing } : before));
+        setOnAir((before) => (before ? { ...before, slide: message.slide, playing: message.playing, loop: message.loop ?? before.loop, volume: message.volume ?? before.volume, muted: message.muted ?? before.muted } : before));
+      } else if (message.type === "seek") {
+        if (video.current) video.current.currentTime = message.seconds;
       } else if (message.type === "ping") {
         announce();
       }
@@ -117,6 +122,12 @@ export function MediaProgram({ preview = false, library: injected, openChannel =
 
   const video = useRef<HTMLVideoElement>(null);
   const playing = onAir?.playing ?? false;
+  const volume = onAir?.volume ?? 1;
+  useEffect(() => {
+    // The volume is a property of the element, not an attribute.
+    const element = video.current;
+    if (element) element.volume = volume;
+  }, [volume, url]);
   useEffect(() => {
     const element = video.current;
     if (!element || !url) return;
@@ -167,7 +178,12 @@ export function MediaProgram({ preview = false, library: injected, openChannel =
           key={cue.id}
           src={url}
           className="size-full object-contain"
-          muted={preview || !unlocked}
+          muted={preview || !unlocked || onAir.muted}
+          loop={onAir.loop}
+          onTimeUpdate={(event) => {
+            const element = event.currentTarget;
+            if (Number.isFinite(element.duration)) report.current?.post({ type: "progress", cueId: cue.id, time: element.currentTime, duration: element.duration });
+          }}
           playsInline
           autoPlay={playing}
           onLoadedMetadata={() => report.current?.post({ type: "loaded", cueId: cue.id, slides: null })}

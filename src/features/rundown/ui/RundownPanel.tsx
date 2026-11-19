@@ -52,7 +52,7 @@ function metaOf(cue: RundownCue, slides: ReadonlyMap<string, number>): string {
 export function RundownPanel({ items, openItemId, onToggleItem, liveCueId, nextCueId, missing, slides, editing, onToggleEditing, onAdd, onPick, onMove, onRemove }: RundownPanelProps) {
   const files = items.reduce((sum, item) => sum + item.cues.filter((cue) => cue.kind !== "qr").length, 0);
   return (
-    <section aria-label={t.title} className="bg-surface border-ink flex min-h-0 w-[420px] shrink-0 flex-col overflow-hidden rounded-lg border-2">
+    <section aria-label={t.title} className="bg-surface border-ink flex max-h-[60vh] min-h-0 w-full shrink-0 flex-col overflow-hidden lg:max-h-none lg:w-[420px] rounded-lg border-2">
       <div className="gap-space-3 border-line px-space-4 flex items-center border-b-2 py-3">
         <div className="min-w-0 flex-1">
           <h2 className="type-title text-foreground">{t.title}</h2>

@@ -10,7 +10,7 @@ import type { MediaLibrary } from "../data/client/media-library";
 import { openStageChannel, type StageChannel } from "../data/client/stage-channel";
 import type { FailureReason } from "../domain/channel";
 import type { RundownErrorCode, StoredCues } from "../domain/manage";
-import { back, cueOf, forget, forward, goToSlide, mediaOnProgram, selectNext, showScene, startOf, stop, take, togglePlay, type DataScene, type PlayoutState } from "../domain/playout";
+import { back, cueOf, forget, forward, goToSlide, mediaOnProgram, selectNext, setVolume, showScene, startOf, stop, take, toggleLoop, toggleMute, togglePlay, type DataScene, type PlayoutState } from "../domain/playout";
 import { buildRundown, cueFromPath, googleSlidesCueFromLink, isFileCue, moveCue, qrCueId, queueOf, type AgendaPoint, type StoredCue } from "../domain/rundown";
 import type { ProjectTalkRunner, SaveCuesAction, StageRunner } from "./actions";
 import { ConsoleIcon } from "./ConsoleIcons";
@@ -21,6 +21,7 @@ import { RundownPanel } from "./RundownPanel";
 import { SetupDialog } from "./SetupDialog";
 import { SlideCanvas } from "./SlideCanvas";
 import { StageThumbnail } from "./StageThumbnail";
+import { VideoControls } from "./VideoControls";
 import { useMediaLibrary } from "./use-library";
 import { useObjectUrl, useResolvedFile } from "./use-media";
 
@@ -98,6 +99,8 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
   const lastAlive = useRef(0);
   const [slides, setSlides] = useState<ReadonlyMap<string, number>>(new Map());
   const [failures, setFailures] = useState<ReadonlyMap<string, FailureReason>>(new Map());
+  // Where the video on the air is, as the projector's window last said.
+  const [progress, setProgress] = useState<{ cueId: string; time: number; duration: number } | null>(null);
   const libraryRef = useRef(media.library);
   useEffect(() => {
     libraryRef.current = media.library;
@@ -115,7 +118,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
           const found = await library.resolve(file.path);
           if (found.ok) sent = found.value;
         }
-        channel.current?.post({ type: "program", cue: file, slide: state.slide, playing: state.playing, ...(sent ? { file: sent } : {}) });
+        channel.current?.post({ type: "program", cue: file, slide: state.slide, playing: state.playing, loop: state.loop, volume: state.volume, muted: state.muted, ...(sent ? { file: sent } : {}) });
         return;
       }
       channel.current?.post({ type: "program", cue: null, slide: 1, playing: false });
@@ -146,7 +149,9 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
       playoutRef.current = next;
       setPlayout(next);
       if (JSON.stringify(before.program) !== JSON.stringify(next.program)) void announce(next);
-      else if (before.slide !== next.slide || before.playing !== next.playing) channel.current?.post({ type: "transport", slide: next.slide, playing: next.playing });
+      else if (before.slide !== next.slide || before.playing !== next.playing || before.loop !== next.loop || before.volume !== next.volume || before.muted !== next.muted) {
+        channel.current?.post({ type: "transport", slide: next.slide, playing: next.playing, loop: next.loop, volume: next.volume, muted: next.muted });
+      }
       const onAir = next.program?.type === "cue" ? queueRef.current.find((entry) => entry.cue.id === (next.program as { cueId: string }).cueId) : null;
       if (onAir) setOpenItemId(onAir.itemId);
     },
@@ -171,6 +176,8 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
         setSlides((before) => new Map(before).set(message.cueId, message.slides as number));
       } else if (message.type === "failed") {
         setFailures((before) => new Map(before).set(message.cueId, message.reason));
+      } else if (message.type === "progress") {
+        setProgress({ cueId: message.cueId, time: message.time, duration: message.duration });
       }
     });
     line.post({ type: "ping" });
@@ -279,6 +286,16 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
         }
         case "deck":
           return pressKey(action.key);
+        case "toggleLoop":
+          return commit(toggleLoop(state, q));
+        case "mute":
+          return commit(toggleMute(state));
+        case "volume":
+          return commit(setVolume(state, action.volume));
+        case "restart":
+          return channel.current?.post({ type: "seek", seconds: 0 });
+        case "seek":
+          return channel.current?.post({ type: "seek", seconds: action.seconds });
       }
     },
     [commit, onAirFile, pressKey, total],
@@ -470,7 +487,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 gap-5 p-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5 lg:flex-row lg:overflow-hidden">
         <RundownPanel
           items={items}
           openItemId={openItemId}
@@ -487,15 +504,15 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
           onRemove={removeCue}
         />
 
-        <div className="gap-space-4 flex min-w-0 flex-1 flex-col">
-          <div className="gap-space-4 flex">
+        <div className="gap-space-4 flex min-w-0 flex-1 flex-col lg:overflow-y-auto">
+          <div className="gap-space-4 flex flex-col md:flex-row">
             <ConsoleMonitor
               tone="live"
               tag={t.rundown.live}
               label={t.program.label}
               title={failedOnAir ? t.program.failed : liveTitle}
               status={liveStatus}
-              className="flex-[1.5]"
+              className="md:flex-[1.5]"
               icon={sceneOnAir || qrOnAir || !onAirFile ? <Icon name={qrOnAir ? "qr" : "stage"} size={44} /> : onAirFile.kind === "video" ? <ConsoleIcon name="video" size={44} /> : <ConsoleIcon name="slides" size={44} />}
               preview={
                 onAirFile?.kind === "slides" && programFile.status === "ready" ? (
@@ -514,7 +531,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
               tag={t.rundown.next}
               label={t.program.next}
               title={nextCue ? nextCue.name : t.program.nothingNext}
-              className="flex-1 self-start"
+              className="md:flex-1 md:self-start"
               preview={
                 nextCue && isFileCue(nextCue) && nextCue.kind === "slides" && nextFile.status === "ready" ? (
                   <SlideCanvas file={nextFile.file} page={1} label={t.program.nextPreview} />
@@ -530,7 +547,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
             />
           </div>
 
-          <div className="bg-surface border-ink gap-space-3 flex shrink-0 items-center rounded-lg border-2 px-3.5 py-2.5">
+          <div className="bg-surface border-ink gap-space-3 flex shrink-0 flex-wrap items-center rounded-lg border-2 px-3.5 py-2.5">
             <button type="button" onClick={() => run({ type: "back" })} className="border-ink focus-visible:ring-ring inline-flex h-12 items-center gap-2 rounded-full border-2 px-4 text-sm font-semibold focus-visible:ring-[3px] focus-visible:outline-none">
               <ConsoleIcon name="previous" />
               {t.transport.back}
@@ -555,6 +572,20 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
             </button>
           </div>
 
+          {onAirFile?.kind === "video" ? (
+            <VideoControls
+              loop={playout.loop}
+              muted={playout.muted}
+              volume={playout.volume}
+              progress={progress && progress.cueId === onAirFile.id ? progress : null}
+              onRestart={() => run({ type: "restart" })}
+              onToggleLoop={() => run({ type: "toggleLoop" })}
+              onToggleMute={() => run({ type: "mute" })}
+              onVolume={(volume) => run({ type: "volume", volume })}
+              onSeek={(seconds) => run({ type: "seek", seconds })}
+            />
+          ) : null}
+
           {firstSlides.length > 0 ? (
             <div className="bg-surface border-ink gap-space-2 flex shrink-0 items-center rounded-lg border-2 px-3.5 py-2">
               <span className="type-pixel-heading text-text-subtle shrink-0">{t.strip.label}</span>
@@ -566,12 +597,12 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
             </div>
           ) : null}
 
-          <section aria-label={t.deck.title} className="gap-space-2 flex min-h-0 flex-1 flex-col">
+          <section aria-label={t.deck.title} className="gap-space-2 flex min-h-[13rem] flex-1 flex-col">
             <div className="flex items-baseline gap-3">
               <h2 className="type-pixel-heading text-text-subtle">{t.deck.title}</h2>
               <p className="type-caption text-text-subtle">{t.deck.hint}</p>
             </div>
-            <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-2 gap-3">
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] auto-rows-[minmax(5.5rem,1fr)] gap-3">
               {DECK_KEYS.map((key, index) => {
                 const copyKey = key === "freeze" && frozen ? "unfreeze" : key;
                 const label = t.deck.keys[copyKey];
@@ -583,7 +614,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
                 const disabled = noPoll || noQr || noView;
                 const sub = isArmed ? t.deck.confirm : noPoll ? t.deck.keys.poll.none : noQr ? t.deck.keys.qr.none : noView ? t.deck.keys.view.none : key === "view" ? t.deck.views[view] : isLive && key !== "freeze" ? t.deck.onAir : label.sub;
                 return (
-                  <button key={key} type="button" disabled={disabled} onClick={() => run({ type: "deck", key })} aria-pressed={isLive || isArmed} className={cn("bg-surface focus-visible:ring-ring flex min-h-0 flex-col justify-between rounded-lg border-2 p-3 text-left focus-visible:ring-[3px] focus-visible:outline-none", isLive ? "border-danger ring-danger ring-2" : isArmed ? "border-gold" : "border-ink", disabled && "opacity-55")}>
+                  <button key={key} type="button" disabled={disabled} onClick={() => run({ type: "deck", key })} aria-pressed={isLive || isArmed} className={cn("bg-surface focus-visible:ring-ring flex min-h-[5.5rem] flex-col justify-between gap-2 rounded-lg border-2 p-3 text-left focus-visible:ring-[3px] focus-visible:outline-none", isLive ? "border-danger ring-danger ring-2" : isArmed ? "border-gold" : "border-ink", disabled && "opacity-55")}>
                     <span className="flex items-center justify-between">
                       <span aria-hidden="true" className="bg-surface-raised text-cyan-ink grid size-10 place-items-center rounded-md">
                         {deckIcon(key)}
