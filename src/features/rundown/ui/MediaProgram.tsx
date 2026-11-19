@@ -24,6 +24,25 @@ interface OnAir {
 
 const REASON: Record<ResolveError, FailureReason> = { missing: "missing", denied: "denied", "no-library": "denied", "unsupported-path": "unsupported" };
 
+/**
+ * The two badges over the piece on the air: «En vivo» and, for slides, the slide's number. They show when the piece or
+ * its slide changes and fade out on their own (a CSS animation, mounted again by its key), so they never stay over the
+ * speaker's slides.
+ */
+function Badges({ slide, total }: { slide: number | null; total: number | null }) {
+  return (
+    <div aria-hidden="true" className="stage-badges pointer-events-none">
+      <span className="absolute top-6 right-6 rounded-full bg-[#fbbc04] px-4 py-1.5 text-base font-extrabold tracking-wider text-[#1e1e1e] uppercase">{copy.stageConsole.screen.live}</span>
+      {slide !== null && total !== null && total > 0 ? (
+        <span className="absolute bottom-6 left-6 flex items-center gap-3 rounded-full bg-[#1e1e1e] px-5 py-2.5 text-lg font-bold text-[#f0f0f0]">
+          <span className="size-2.5 rounded-full bg-[#5cdb6d]" />
+          {interpolate(copy.stageConsole.screen.slideOf, { n: String(slide), total: String(total) })}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export interface MediaProgramProps {
   /** For tests: a library and a way to open the channel instead of the browser's own. */
   library?: MediaLibrary;
@@ -42,6 +61,8 @@ export function MediaProgram({ library: injected, openChannel = openStageChannel
   const [onAir, setOnAir] = useState<OnAir | null>(null);
   const [unreadable, setUnreadable] = useState<string | null>(null);
   const [unlocked, setUnlocked] = useState(false);
+  // How many slides the deck on the air has, once it is read.
+  const [deck, setDeck] = useState<{ id: string; pages: number } | null>(null);
   const channel = useRef<StageChannel | null>(null);
   const showing = useRef<string | null>(null);
 
@@ -123,7 +144,10 @@ export function MediaProgram({ library: injected, openChannel = openStageChannel
           file={file}
           page={onAir.slide}
           label={cue.name}
-          onLoaded={(pages) => report.current?.post({ type: "loaded", cueId: cue.id, slides: pages })}
+          onLoaded={(pages) => {
+            setDeck({ id: cue.id, pages });
+            report.current?.post({ type: "loaded", cueId: cue.id, slides: pages });
+          }}
           onFailed={() => {
             setUnreadable(cue.id);
             report.current?.post({ type: "failed", cueId: cue.id, reason: "unreadable" });
@@ -159,6 +183,7 @@ export function MediaProgram({ library: injected, openChannel = openStageChannel
           }}
         />
       ) : null}
+      <Badges key={`${cue.id}:${onAir.slide}`} slide={cue.kind === "slides" ? onAir.slide : null} total={deck && deck.id === cue.id ? deck.pages : null} />
       {cue.kind === "video" && !unlocked ? <p className="type-caption absolute bottom-4 left-4 rounded-full bg-black/70 px-4 py-2">{copy.stageConsole.screen.soundHint}</p> : null}
     </div>
   );

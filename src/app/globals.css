@@ -77,6 +77,20 @@
 /* Tailwind's dark: variant follows the .dark class (next-themes), not only the media query. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* The badges over a piece on the air stay a few seconds and then leave, so they never cover the speaker's slides. */
+@keyframes stage-badge-fade {
+  0%,
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.stage-badges {
+  animation: stage-badge-fade 5s forwards;
+}
+
 @theme inline {
   /* Semantic colors (shadcn names mapped to the Design System) */
   --color-background: var(--bg);

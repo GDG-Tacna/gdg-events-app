@@ -16,6 +16,8 @@ export type StageView = (typeof STAGE_VIEWS)[number];
 export interface StageChampions {
   cadet: BoardCadet | null;
   squad: SquadStanding | null;
+  /** The cadets in second and third place, for the podium (older stored reveals have none). */
+  runnersUp?: readonly BoardCadet[];
 }
 
 /** A raffle draw on the stage: the prize, the winner, and the names to spin through before landing on them. */
@@ -115,10 +117,11 @@ export function parseStageCommand(input: unknown): StageCommand | null {
   }
 }
 
-/** The champions of a board: the first cadet and the first squad (none when nobody has XP yet). */
+/** The champions of a board: the first cadet and the first squad (none when nobody has XP yet), and the next two cadets for the podium. */
 export const championsOf = (board: FleetBoard): StageChampions => ({
   cadet: board.cadets[0] ?? null,
   squad: board.squads.find((squad) => squad.xp > 0) ?? null,
+  runnersUp: board.cadets.slice(1, 3),
 });
 
 /** The stage as the edition left it, or as it starts (the live ranking, both views). */
@@ -241,7 +244,9 @@ export function parseStageState(input: unknown): StageState | null {
     const cadet = input.champions.cadet === null ? null : parseCadet(input.champions.cadet);
     const squad = input.champions.squad === null ? null : parseSquad(input.champions.squad);
     if ((input.champions.cadet !== null && !cadet) || (input.champions.squad !== null && !squad)) return null;
-    champions = { cadet, squad };
+    const runnersUp = input.champions.runnersUp === undefined ? undefined : parseAll(input.champions.runnersUp, parseCadet);
+    if (runnersUp === null) return null;
+    champions = runnersUp ? { cadet, squad, runnersUp } : { cadet, squad };
   }
   let raffle: StageRaffle | null = null;
   if (input.raffle !== null && input.raffle !== undefined) {

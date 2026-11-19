@@ -116,8 +116,19 @@ describe("stage commands", () => {
 
 describe("championsOf", () => {
   it("takes the first cadet and the first squad with XP, or none", () => {
-    expect(championsOf(BOARD)).toEqual({ cadet: BOARD.cadets[0], squad: BOARD.squads[0] });
-    expect(championsOf({ cadets: [], squads: [{ ...BOARD.squads[0], xp: 0 }] })).toEqual({ cadet: null, squad: null });
+    expect(championsOf(BOARD)).toEqual({ cadet: BOARD.cadets[0], squad: BOARD.squads[0], runnersUp: [BOARD.cadets[1]] });
+    expect(championsOf({ cadets: [], squads: [{ ...BOARD.squads[0], xp: 0 }] })).toEqual({ cadet: null, squad: null, runnersUp: [] });
+  });
+
+  it("keeps the next two cadets for the podium, and reads them back (a reveal saved before had none)", () => {
+    const cadets = [1, 2, 3, 4].map((position) => ({ position, alias: `Alias-${position}`, squad: null, xp: 500 - position }));
+    const champions = championsOf({ cadets, squads: [] });
+
+    expect(champions.runnersUp).toEqual([cadets[1], cadets[2]]);
+    const stored = { display: "reveal", view: "both", frozen: null, champions };
+    expect(parseStageState(stored)).toMatchObject({ champions: { runnersUp: [cadets[1], cadets[2]] } });
+    expect(parseStageState({ ...stored, champions: { cadet: cadets[0], squad: null } })?.champions).toEqual({ cadet: cadets[0], squad: null });
+    expect(parseStageState({ ...stored, champions: { ...champions, runnersUp: [{ alias: 3 }] } })).toBeNull();
   });
 });
 
