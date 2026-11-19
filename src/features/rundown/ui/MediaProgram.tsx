@@ -44,6 +44,11 @@ function Badges({ slide, total }: { slide: number | null; total: number | null }
 }
 
 export interface MediaProgramProps {
+  /**
+   * A small copy of the screen inside the console: it shows what the console puts on the air, always muted, and does not
+   * say it is alive or report anything, so the console never mistakes it for the real projector window.
+   */
+  preview?: boolean;
   /** For tests: a library and a way to open the channel instead of the browser's own. */
   library?: MediaLibrary;
   openChannel?: () => StageChannel | null;
@@ -56,7 +61,7 @@ export interface MediaProgramProps {
  * when a piece is ready or cannot be read. A piece that cannot be read is simply not shown: the screen keeps its own
  * scene instead of going black in front of the audience.
  */
-export function MediaProgram({ library: injected, openChannel = openStageChannel }: MediaProgramProps) {
+export function MediaProgram({ preview = false, library: injected, openChannel = openStageChannel }: MediaProgramProps) {
   const { library, revision } = useMediaLibrary(injected);
   const [onAir, setOnAir] = useState<OnAir | null>(null);
   const [unreadable, setUnreadable] = useState<string | null>(null);
@@ -68,10 +73,12 @@ export function MediaProgram({ library: injected, openChannel = openStageChannel
 
   useEffect(() => {
     const line = openChannel();
-    channel.current = line;
+    // A copy for the console listens only: with no channel to post on, nothing it does is reported.
+    channel.current = preview ? null : line;
     if (!line) return;
     const announce = () => line.post({ type: "alive", showing: showing.current });
     const stop = line.subscribe((message) => {
+      if (preview && message.type !== "program" && message.type !== "transport") return;
       if (message.type === "program") {
         setUnreadable(null);
         setOnAir(message.cue ? { cue: message.cue, slide: message.slide, playing: message.playing, file: message.file ?? null } : null);
@@ -81,15 +88,15 @@ export function MediaProgram({ library: injected, openChannel = openStageChannel
         announce();
       }
     });
-    announce();
-    const timer = window.setInterval(announce, ALIVE_EVERY_MS);
+    if (!preview) announce();
+    const timer = preview ? null : window.setInterval(announce, ALIVE_EVERY_MS);
     return () => {
-      window.clearInterval(timer);
+      if (timer !== null) window.clearInterval(timer);
       stop();
       line.close();
       channel.current = null;
     };
-  }, [openChannel]);
+  }, [openChannel, preview]);
 
   const cue = onAir?.cue ?? null;
   // A Google Slides deck has no file to read: Google serves it in its own frame.
@@ -160,7 +167,7 @@ export function MediaProgram({ library: injected, openChannel = openStageChannel
           key={cue.id}
           src={url}
           className="size-full object-contain"
-          muted={!unlocked}
+          muted={preview || !unlocked}
           playsInline
           autoPlay={playing}
           onLoadedMetadata={() => report.current?.post({ type: "loaded", cueId: cue.id, slides: null })}
@@ -184,7 +191,7 @@ export function MediaProgram({ library: injected, openChannel = openStageChannel
         />
       ) : null}
       <Badges key={`${cue.id}:${onAir.slide}`} slide={cue.kind === "slides" ? onAir.slide : null} total={deck && deck.id === cue.id ? deck.pages : null} />
-      {cue.kind === "video" && !unlocked ? <p className="type-caption absolute bottom-4 left-4 rounded-full bg-black/70 px-4 py-2">{copy.stageConsole.screen.soundHint}</p> : null}
+      {cue.kind === "video" && !unlocked && !preview ? <p className="type-caption absolute bottom-4 left-4 rounded-full bg-black/70 px-4 py-2">{copy.stageConsole.screen.soundHint}</p> : null}
     </div>
   );
 }

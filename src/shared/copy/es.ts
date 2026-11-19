@@ -2613,6 +2613,10 @@ export const copy = {
       next: "Siguiente",
       nothing: "Nada todavía",
       nothingNext: "Fin del orden",
+      /** The small copy of the projector's screen inside the «En pantalla» monitor. */
+      mirror: "Copia de lo que muestra la pantalla grande",
+      /** The first frame or page of the piece that comes next. */
+      nextPreview: "Vista previa de lo siguiente",
       scenes: { ranking: "Ranking en vivo", poll: "Resultados de la encuesta", reveal: "Campeones del evento", waiting: "Pantalla de espera" },
       playing: "Reproduciendo",
       paused: "En pausa",

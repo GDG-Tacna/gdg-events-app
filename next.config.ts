@@ -26,6 +26,12 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // The stage screen alone may be framed, and only by this same site: the console shows a small copy of it. It
+        // comes after the rule above, and the last rule for a header wins.
+        source: "/escenario",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
+      {
         // The service worker must never be cached, or users would not get new versions.
         source: "/sw.js",
         headers: [

@@ -20,6 +20,7 @@ import { FilePickerDialog } from "./FilePickerDialog";
 import { RundownPanel } from "./RundownPanel";
 import { SetupDialog } from "./SetupDialog";
 import { SlideCanvas } from "./SlideCanvas";
+import { StageThumbnail } from "./StageThumbnail";
 import { useMediaLibrary } from "./use-library";
 import { useObjectUrl, useResolvedFile } from "./use-media";
 
@@ -210,6 +211,9 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
   const total = onAirFile?.kind === "slides" ? (slides.get(onAirFile.id) ?? 0) : 0;
   const programFile = useResolvedFile(media.library, onAirFile && isFileCue(onAirFile) && onAirFile.kind !== "video" ? onAirFile : null, null, media.revision);
   const imageUrl = useObjectUrl(onAirFile?.kind === "image" && programFile.status === "ready" ? programFile.file : null);
+  // The first page, picture or frame of the piece that comes next, for its monitor.
+  const nextFile = useResolvedFile(media.library, nextCue && isFileCue(nextCue) ? nextCue : null, null, media.revision);
+  const nextUrl = useObjectUrl(nextCue && isFileCue(nextCue) && nextCue.kind !== "slides" && nextFile.status === "ready" ? nextFile.file : null);
 
   // --- the operator's moves ------------------------------------------------------------------------------------------------
   const pressKey = useCallback(
@@ -499,7 +503,10 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
                 ) : onAirFile?.kind === "image" && imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={imageUrl} alt={onAirFile.name} className="size-full object-contain" />
-                ) : undefined
+                ) : (
+                  // Anything else (a video, a Google Slides deck, the ranking, the QR, the waiting screen) is the screen's own page.
+                  <StageThumbnail src={`${hrefs.screen}?vista=previa`} label={t.program.mirror} />
+                )
               }
             />
             <ConsoleMonitor
@@ -508,6 +515,17 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
               label={t.program.next}
               title={nextCue ? nextCue.name : t.program.nothingNext}
               className="flex-1 self-start"
+              preview={
+                nextCue && isFileCue(nextCue) && nextCue.kind === "slides" && nextFile.status === "ready" ? (
+                  <SlideCanvas file={nextFile.file} page={1} label={t.program.nextPreview} />
+                ) : nextCue && isFileCue(nextCue) && nextCue.kind === "image" && nextUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={nextUrl} alt={nextCue.name} className="size-full object-contain" />
+                ) : nextCue && isFileCue(nextCue) && nextCue.kind === "video" && nextUrl ? (
+                  // The first frame: the video is not played, only its beginning is loaded.
+                  <video src={`${nextUrl}#t=0.1`} aria-label={nextCue.name} muted playsInline preload="metadata" className="size-full object-contain" />
+                ) : undefined
+              }
               icon={nextCue?.kind === "video" ? <ConsoleIcon name="video" size={36} /> : nextCue?.kind === "slides" ? <ConsoleIcon name="slides" size={36} /> : nextCue?.kind === "image" ? <Icon name="image" size={36} /> : <Icon name="qr" size={36} />}
             />
           </div>
