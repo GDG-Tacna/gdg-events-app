@@ -11,6 +11,8 @@ vi.mock("next/navigation", () => ({
     throw new Error("not-found");
   },
 }));
+const agenda = { loadConsoleAgenda: vi.fn() };
+vi.mock("@/app-shell/rundown/agenda.server", () => agenda);
 const guards = { requireRole: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 const server = { getStage: vi.fn(), getFleetBoard: vi.fn(), currentEditionId: async () => "devfest-2026" };
@@ -44,6 +46,7 @@ describe("stage page", () => {
     vi.resetAllMocks();
     features.FEATURES.leaderboard = true;
     guards.requireRole.mockResolvedValue({ uid: "a1", role: "admin", displayName: null, photoUrl: null });
+    agenda.loadConsoleAgenda.mockResolvedValue([{ id: "keynote", time: "09:00", title: "Keynote", who: "Equipo GDG" }]);
     server.getStage.mockResolvedValue({ ok: true, value: DEFAULT_STAGE });
     server.getFleetBoard.mockResolvedValue({ ok: true, value: BOARD });
     catalog.list.mockResolvedValue({ ok: true, value: [{ id: "firebase", name: "Escuadrón Firebase", tagline: "t", sprite: SPRITE, active: true }] });
@@ -69,7 +72,17 @@ describe("stage page", () => {
       initialStage: DEFAULT_STAGE,
       initialBoard: BOARD,
       pollsOn: false,
+      agenda: [{ id: "keynote", time: "09:00", title: "Keynote", who: "Equipo GDG" }],
     });
+    expect(agenda.loadConsoleAgenda).toHaveBeenCalledWith({ uid: "a1", role: "admin" });
+  });
+
+  it("opens without the agenda when it cannot be read (the waiting screen then shows the event's name)", async () => {
+    agenda.loadConsoleAgenda.mockResolvedValue(null);
+    expect(findElement(await StagePage(), StageScreenBound)?.props.agenda).toEqual([]);
+
+    agenda.loadConsoleAgenda.mockRejectedValue(new Error("down"));
+    expect(findElement(await StagePage(), StageScreenBound)?.props.agenda).toEqual([]);
   });
 
   it("still opens without squads or a first ranking, and surfaces a failed stage read", async () => {

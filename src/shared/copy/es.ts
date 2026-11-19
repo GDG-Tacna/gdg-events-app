@@ -412,6 +412,15 @@ export const copy = {
     event: "DevFest Tacna 2026",
     cadetsTitle: "Top cadetes",
     squadsTitle: "Escuadrones",
+    cadetsHeading: "Ranking de cadetes",
+    squadsHeading: "Ranking de escuadrones",
+    /** The line under the heading: how the ranking is counted. */
+    cadetsSubtitle: "Top 10 · XP Estelar",
+    squadsSubtitle: "XP de todos sus cadetes",
+    /** The list of the places after the first five. */
+    restTitle: "Del 6 al 10",
+    /** The line at the foot: what is showing, and what comes next when both rankings take turns. */
+    showing: { cadets: "Mostrando cadetes", squads: "Mostrando escuadrones", cadetsThen: "Mostrando cadetes · luego escuadrones", squadsThen: "Mostrando escuadrones · luego cadetes" },
     /** Placeholder: {n}. */
     xp: "{n} XP",
     /** Placeholder: {n}. */
@@ -421,7 +430,18 @@ export const copy = {
     empty: "Nadie ha ganado XP todavía. ¡Escanea tu primer QR!",
     frozen: "Ranking final",
     status: { connecting: "Conectando…", live: "En vivo", reconnecting: "Reconectando…" },
-    waiting: { title: "Odisea de Código", body: "El ranking de la flota vuelve en un momento." },
+    waiting: {
+      title: "Odisea de Código",
+      body: "El ranking de la flota vuelve en un momento.",
+      next: "A continuación",
+      startsAt: "Empieza a las",
+      hint: "Abre el app de DevFest Tacna y escanea el QR cuando aparezca en pantalla.",
+    },
+    talkQr: {
+      eyebrow: "Misión de la charla",
+      stepsLabel: "Cómo registrar tu asistencia",
+      steps: ["Abre el app y toca «Escanear QR»", "Apunta la cámara a este código", "Recibe tu XP"],
+    },
     poll: {
       label: "Resultados de la encuesta",
       live: "Encuesta en vivo · Vota desde la app",
@@ -432,6 +452,10 @@ export const copy = {
     },
     raffle: {
       title: "Sorteo final",
+      prize: "Premio",
+      /** Placeholder: {n}. */
+      inPlay: "{n} boletos en juego",
+      rule: "Cada G-Crédito es un boleto",
       spinning: "Sorteando…",
       winner: "¡Ganador!",
       /** Placeholders: {n}, {total}. */
@@ -439,6 +463,9 @@ export const copy = {
     },
     reveal: {
       title: "Campeones de la flota",
+      congrats: "¡Felicitaciones!",
+      second: "Segundo lugar",
+      third: "Tercer lugar",
       cadet: "Cadete campeón",
       squad: "Escuadrón campeón",
       none: "Sin campeón todavía",
@@ -2668,6 +2695,9 @@ export const copy = {
       soundHint: "Haz clic en la pantalla para activar el sonido",
       /** Placeholder: {name}. */
       label: "Presentando {name}",
+      live: "En vivo",
+      /** Placeholders: {n}, {total}. */
+      slideOf: "Lámina {n} de {total}",
     },
   },
   avatar: {

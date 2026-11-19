@@ -46,6 +46,30 @@ afterEach(() => {
 });
 
 describe("MediaProgram", () => {
+  it("badges the piece on the air as live, and a deck with the number of its slide, which leave on their own", async () => {
+    const { say, view } = setup();
+    await say({ type: "program", cue: SLIDES, slide: 4, playing: false });
+    fireEvent.click(screen.getByTestId("deck"));
+
+    const badges = () => view.container.querySelector(".stage-badges");
+    expect(badges()).toHaveTextContent("En vivo");
+    expect(badges()).toHaveTextContent("Lámina 4 de 12");
+
+    // A new slide shows them again: they mount anew with it.
+    const before = badges();
+    await say({ type: "transport", slide: 5, playing: false });
+    expect(badges()).toHaveTextContent("Lámina 5 de 12");
+    expect(badges()).not.toBe(before);
+  });
+
+  it("badges a video as live, with no slide number", async () => {
+    const { say, view } = setup();
+    await say({ type: "program", cue: VIDEO, slide: 1, playing: true });
+
+    expect(view.container.querySelector(".stage-badges")).toHaveTextContent("En vivo");
+    expect(view.container.querySelector(".stage-badges")).not.toHaveTextContent("Lámina");
+  });
+
   it("shows nothing until the console puts a file on the air, and says it is there", async () => {
     const { heard, view } = setup();
     await act(async () => {});

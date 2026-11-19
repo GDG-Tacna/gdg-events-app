@@ -35,7 +35,7 @@ export function StageScreenBound({
           ? (pollId) => <LivePollStage pollId={pollId} load={stagePollAction} />
           : undefined
       }
-      renderTalkQr={talkQrOn ? ({ talkId, name }) => <StageQr checkpointId={talkId} name={name} issue={issueQrAction} /> : undefined}
+      renderTalkQr={talkQrOn ? ({ talkId, name, speaker }) => <StageQr checkpointId={talkId} name={name} speaker={speaker} issue={issueQrAction} /> : undefined}
       />
     </>
   );

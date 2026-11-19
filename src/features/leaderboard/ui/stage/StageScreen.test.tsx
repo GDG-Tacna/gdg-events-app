@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
 import type { RankingEntry } from "../../domain/ranking";
 import { DEFAULT_STAGE, type StageState } from "../../domain/stage";
 import type { StageFeed, StageFeedHandlers } from "../../domain/stage-feed";
-import { StageScreen } from "./StageScreen";
+import { StageScreen, type StageScreenProps } from "./StageScreen";
 
 // Without motion the tests see each frame at once (and the screen honours reduced motion the same way).
 vi.mock("framer-motion", async (original) => ({ ...(await original<typeof import("framer-motion")>()), useReducedMotion: () => true }));
@@ -33,14 +33,14 @@ function fakeFeed() {
   return { feed, push, stop };
 }
 
-function renderScreen(initialStage: StageState = DEFAULT_STAGE, alternateMs = 15_000) {
+function renderScreen(initialStage: StageState = DEFAULT_STAGE, alternateMs = 15_000, agenda: StageScreenProps["agenda"] = []) {
   const fake = fakeFeed();
-  const view = render(<StageScreen eventId="e1" feed={fake.feed} squads={SQUADS} sprites={SPRITES} initialStage={initialStage} initialBoard={INITIAL_BOARD} alternateMs={alternateMs} />);
+  const view = render(<StageScreen eventId="e1" feed={fake.feed} squads={SQUADS} sprites={SPRITES} initialStage={initialStage} initialBoard={INITIAL_BOARD} alternateMs={alternateMs} agenda={agenda} />);
   return { ...view, ...fake };
 }
 
 describe("StageScreen", () => {
-  beforeEach(() => vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout"] }));
+  beforeEach(() => vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout", "Date"] }));
   afterEach(() => vi.useRealTimers());
 
   it("starts from the server's ranking, then follows the live participants", async () => {
@@ -77,9 +77,75 @@ describe("StageScreen", () => {
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
 
     await push((h) => h.stage({ ...DEFAULT_STAGE, display: "reveal", champions: { cadet: { position: 1, alias: "Nova", squad: "Escuadrón Firebase", xp: 300 }, squad: null } }));
-    expect(screen.getByRole("heading", { name: t.reveal.title })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: t.reveal.congrats })).toBeInTheDocument();
+    expect(screen.getByText(t.reveal.title)).toBeInTheDocument();
     expect(screen.getByRole("region", { name: t.reveal.cadet })).toHaveTextContent("Nova");
     expect(screen.getByRole("region", { name: t.reveal.squad })).toHaveTextContent(t.reveal.none);
+  });
+
+  it("puts the next cadets on the podium of the reveal, second on the left and third on the right", async () => {
+    const { push } = renderScreen();
+    const cadet = (position: number, alias: string, xp: number) => ({ position, alias, squad: null, xp });
+    await push((h) => h.stage({ ...DEFAULT_STAGE, display: "reveal", champions: { cadet: cadet(1, "Nova", 300), squad: null, runnersUp: [cadet(2, "Orion", 200), cadet(3, "Vega", 100)] } }));
+
+    expect(screen.getByRole("group", { name: t.reveal.second })).toHaveTextContent("Orion");
+    expect(screen.getByRole("group", { name: t.reveal.third })).toHaveTextContent("Vega");
+    expect(screen.getByRole("region", { name: t.reveal.cadet })).toHaveTextContent("Nova");
+  });
+
+  it("splits the top ten into the first five and a panel with the rest", async () => {
+    const { push } = renderScreen({ ...DEFAULT_STAGE, view: "cadets" });
+    await push((h) => h.participants(Array.from({ length: 8 }, (_, index) => entry(`Cadete${index + 1}`, 800 - index * 10, null, index))));
+
+    expect(within(screen.getByRole("list", { name: t.cadetsTitle })).getAllByRole("listitem")).toHaveLength(5);
+    const rest = within(screen.getByRole("list", { name: t.restTitle })).getAllByRole("listitem");
+    expect(rest.map((row) => row.textContent)).toEqual(["6Cadete6Sin escuadrón750 XP", "7Cadete7Sin escuadrón740 XP", "8Cadete8Sin escuadrón730 XP"]);
+  });
+
+  it("says what is showing, and that the squads come next when both rankings take turns", async () => {
+    renderScreen({ ...DEFAULT_STAGE, view: "both" });
+    expect(screen.getByText(t.showing.cadetsThen)).toBeInTheDocument();
+
+    cleanup();
+    renderScreen({ ...DEFAULT_STAGE, view: "cadets" });
+    expect(screen.getByText(t.showing.cadets)).toBeInTheDocument();
+  });
+
+  it("announces the next talk on the waiting screen, and the event's name when none is left", async () => {
+    vi.setSystemTime(new Date(2026, 10, 19, 9, 5));
+    const agenda = [
+      { id: "keynote", time: "09:00", title: "Keynote de apertura", who: "Equipo GDG" },
+      { id: "genkit", time: "09:15", title: "Agente de IA con Genkit", who: "Luis Eduardo" },
+    ];
+    const first = renderScreen({ ...DEFAULT_STAGE, display: "waiting" }, 15_000, agenda);
+    expect(screen.getByText(t.waiting.next)).toBeInTheDocument();
+    expect(screen.getByText("Agente de IA con Genkit")).toBeInTheDocument();
+    expect(screen.getByText("Luis Eduardo")).toBeInTheDocument();
+    expect(screen.getByText("09:15")).toBeInTheDocument();
+    expect(screen.queryByText("Keynote de apertura")).not.toBeInTheDocument();
+    first.unmount();
+
+    vi.setSystemTime(new Date(2026, 10, 19, 18, 0));
+    renderScreen({ ...DEFAULT_STAGE, display: "waiting" }, 15_000, agenda);
+    expect(screen.queryByText(t.waiting.next)).not.toBeInTheDocument();
+    expect(screen.getByText(t.waiting.body)).toBeInTheDocument();
+  });
+
+  it("names the speaker under a talk's QR from the agenda", async () => {
+    const fake = fakeFeed();
+    render(
+      <StageScreen
+        eventId="e1"
+        feed={fake.feed}
+        squads={SQUADS}
+        sprites={SPRITES}
+        initialStage={{ ...DEFAULT_STAGE, display: "talk-qr", talk: { talkId: "genkit", name: "Agente de IA con Genkit" } }}
+        initialBoard={INITIAL_BOARD}
+        agenda={[{ id: "genkit", time: "09:15", title: "Agente de IA con Genkit", who: "Luis Eduardo" }]}
+        renderTalkQr={({ name, speaker }) => <p>{`QR ${name} · ${speaker}`}</p>}
+      />,
+    );
+    expect(screen.getByText("QR Agente de IA con Genkit · Luis Eduardo")).toBeInTheDocument();
   });
 
   it("flashes a cadet who moves up, for a moment", async () => {
