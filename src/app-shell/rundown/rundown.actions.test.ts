@@ -10,10 +10,10 @@ const permissions = vi.hoisted(() => ({ mayEdit: vi.fn() }));
 vi.mock("@/app-shell/permissions.server", () => permissions);
 const features = vi.hoisted(() => ({ FEATURES: { admin: true } }));
 vi.mock("@/shared/config/features", () => features);
-const server = vi.hoisted(() => ({ saveItemCues: vi.fn(), saveExtraPoints: vi.fn(), saveItemMinutes: vi.fn(), saveMusicPlaylist: vi.fn() }));
+const server = vi.hoisted(() => ({ saveItemCues: vi.fn(), saveExtraPoints: vi.fn(), saveItemMinutes: vi.fn(), saveMusicPlaylist: vi.fn(), saveLayerCards: vi.fn() }));
 vi.mock("@/features/rundown/server", () => server);
 
-const { saveCuesAction, saveMinutesAction, savePlaylistAction, savePointsAction } = await import("./rundown.actions");
+const { saveCardsAction, saveCuesAction, saveMinutesAction, savePlaylistAction, savePointsAction } = await import("./rundown.actions");
 
 const CUES = [{ id: "cue-0001", kind: "slides", name: "Keynote", path: "apertura/keynote.pdf" }];
 const session = (role: "attendee" | "staff" | "admin" | null) => ({ uid: "a1", role, displayName: null, photoUrl: null });
@@ -162,5 +162,42 @@ describe("savePlaylistAction", () => {
   it("passes the use case's error code on", async () => {
     server.saveMusicPlaylist.mockResolvedValue({ ok: false, error: { code: "invalid-tracks" } });
     expect(await savePlaylistAction({ tracks: TRACKS })).toEqual({ ok: false, code: "invalid-tracks" });
+  });
+});
+
+describe("saveCardsAction", () => {
+  const CARDS = [{ id: "card-0001", kind: "speaker" as const, title: "Luis Eduardo", text: "Genkit", link: "", x: 4, y: 90, hideAfter: null }];
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    features.FEATURES.admin = true;
+    modules.moduleOn.mockResolvedValue(true);
+    permissions.mayEdit.mockResolvedValue(true);
+    guards.getSession.mockResolvedValue(session("admin"));
+    server.saveLayerCards.mockResolvedValue({ ok: true, value: CARDS });
+  });
+
+  it("saves the cards as the admin of the session", async () => {
+    expect(await saveCardsAction({ cards: CARDS })).toEqual({ ok: true, cards: CARDS });
+    expect(server.saveLayerCards).toHaveBeenCalledWith({ marker: "rundown" }, { uid: "a1", role: "admin" }, { cards: CARDS });
+  });
+
+  it("refuses without a session, without the stage permission, with the module off and with a wrong shape", async () => {
+    guards.getSession.mockResolvedValue(null);
+    expect(await saveCardsAction({ cards: CARDS })).toEqual({ ok: false, code: "unauthenticated" });
+    guards.getSession.mockResolvedValue(session("admin"));
+    permissions.mayEdit.mockResolvedValue(false);
+    expect(await saveCardsAction({ cards: CARDS })).toEqual({ ok: false, code: "forbidden" });
+    permissions.mayEdit.mockResolvedValue(true);
+    modules.moduleOn.mockResolvedValue(false);
+    expect(await saveCardsAction({ cards: CARDS })).toEqual({ ok: false, code: "disabled" });
+    modules.moduleOn.mockResolvedValue(true);
+    expect(await saveCardsAction({ cards: [{ ...CARDS[0], x: "left" }] } as never)).toEqual({ ok: false, code: "invalid-cards" });
+    expect(server.saveLayerCards).not.toHaveBeenCalled();
+  });
+
+  it("passes the use case's error code on", async () => {
+    server.saveLayerCards.mockResolvedValue({ ok: false, error: { code: "invalid-cards" } });
+    expect(await saveCardsAction({ cards: CARDS })).toEqual({ ok: false, code: "invalid-cards" });
   });
 });

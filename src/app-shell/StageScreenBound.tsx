@@ -8,7 +8,7 @@ import {
 } from "@/features/leaderboard";
 import { StageQr } from "@/features/ephemeral-qr";
 import { LivePollStage } from "@/features/polls";
-import { MediaProgram } from "@/features/rundown";
+import { LayersProgram, MediaProgram } from "@/features/rundown";
 import { issueQrAction } from "./ephemeral-qr/issue-qr.action";
 import { stagePollAction } from "./polls/stage.action";
 
@@ -28,6 +28,8 @@ export function StageScreenBound({
     <>
       {/* The console's videos, slides and pictures cover the stage's own scenes while they are on the air. */}
       <MediaProgram preview={props.preview} />
+      {/* The counter and the cards of the console, over everything else on the screen. */}
+      <LayersProgram />
       <StageScreen
       {...props}
       feed={feed}

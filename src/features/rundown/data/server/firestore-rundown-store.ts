@@ -6,6 +6,7 @@ import { EVENT_CONFIG_COLLECTION, eventCollection } from "@/shared/lib/firebase/
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 import type { RundownPlan, RundownStore, StoredCues } from "../../domain/manage";
+import { parseCards, type LayerCard } from "../../domain/layers";
 import { parseTracks, type Track } from "../../domain/music";
 import { isMinutes, parseCues, parseExtraPoints, type ExtraPoint, type StoredCue } from "../../domain/rundown";
 
@@ -57,7 +58,9 @@ export class FirestoreRundownStore implements RundownStore {
       }
       const playlist = data?.playlist === undefined ? [] : parseTracks(data.playlist);
       if (playlist === null) logServerError("rundown.parse", new Error("the playlist breaks the rules; read as empty"));
-      return ok({ points: points ?? [], minutes, playlist: playlist ?? [] });
+      const cards = data?.cards === undefined ? [] : parseCards(data.cards);
+      if (cards === null) logServerError("rundown.parse", new Error("the cards break the rules; read as none"));
+      return ok({ points: points ?? [], minutes, playlist: playlist ?? [], cards: cards ?? [] });
     } catch (cause) {
       logServerError("rundown.readPlan", cause);
       return err({ code: "unknown" });
@@ -71,6 +74,16 @@ export class FirestoreRundownStore implements RundownStore {
       return ok(undefined);
     } catch (cause) {
       logServerError("rundown.savePoints", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async saveCards(cards: readonly LayerCard[]): Promise<Result<void, { code: string }>> {
+    try {
+      await (await this.ref()).set({ cards: cards.map(({ id, kind, title, text, link, x, y, hideAfter }) => ({ id, kind, title, text, link, x, y, hideAfter })), updatedAt: new Date() }, { merge: true });
+      return ok(undefined);
+    } catch (cause) {
+      logServerError("rundown.saveCards", cause);
       return err({ code: "unknown" });
     }
   }

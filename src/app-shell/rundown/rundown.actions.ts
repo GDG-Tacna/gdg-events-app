@@ -5,8 +5,8 @@ import { rundownDeps } from "@/app-shell/composition/rundown.server";
 import { getSession } from "@/app-shell/guards";
 import { moduleOn } from "@/app-shell/modules.server";
 import { mayEdit } from "@/app-shell/permissions.server";
-import type { SaveCuesResult, SaveMinutesAction, SavePlaylistAction, SavePointsAction } from "@/features/rundown";
-import { saveExtraPoints, saveItemCues, saveItemMinutes, saveMusicPlaylist } from "@/features/rundown/server";
+import type { SaveCardsAction, SaveCuesResult, SaveMinutesAction, SavePlaylistAction, SavePointsAction } from "@/features/rundown";
+import { saveExtraPoints, saveItemCues, saveItemMinutes, saveLayerCards, saveMusicPlaylist } from "@/features/rundown/server";
 import { FEATURES } from "@/shared/config/features";
 
 /** Shape only; the use case checks every piece again (the path above all). */
@@ -18,6 +18,11 @@ const inputSchema = z.object({
 
 const pointsSchema = z.object({ points: z.array(z.object({ id: z.string().max(60), title: z.string().max(200), who: z.string().max(200), time: z.string().max(5) })).max(60) });
 const playlistSchema = z.object({ tracks: z.array(z.object({ id: z.string().max(60), name: z.string().max(200), path: z.string().max(300) })).max(120) });
+const cardsSchema = z.object({
+  cards: z
+    .array(z.object({ id: z.string().max(60), kind: z.string().max(10), title: z.string().max(200), text: z.string().max(400), link: z.string().max(200), x: z.number(), y: z.number(), hideAfter: z.number().nullable() }))
+    .max(40),
+});
 const minutesSchema = z.object({ itemId: z.string().max(60), minutes: z.number().nullable() });
 
 /** The admin who may edit the stage, or the reason they may not. The same checks for every action of the console. */
@@ -37,6 +42,16 @@ export const savePointsAction: SavePointsAction = async (input) => {
   if (!parsed.success) return { ok: false, code: "invalid-points" };
   const saved = await saveExtraPoints(rundownDeps, who.actor, parsed.data);
   return saved.ok ? { ok: true, points: saved.value } : { ok: false, code: saved.error.code };
+};
+
+/** Server Action behind the cards that can be put over the screen: their text and the place of each. */
+export const saveCardsAction: SaveCardsAction = async (input) => {
+  const who = await consoleActor();
+  if (!who.ok) return who;
+  const parsed = cardsSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "invalid-cards" };
+  const saved = await saveLayerCards(rundownDeps, who.actor, parsed.data);
+  return saved.ok ? { ok: true, cards: saved.value } : { ok: false, code: saved.error.code };
 };
 
 /** Server Action behind the playlist of the music: the songs and their order (never the songs themselves). */

@@ -1,3 +1,4 @@
+import { CARD_KINDS, COUNTER_SIZES, CARD_LINK_MAX, CARD_TEXT_MAX, CARD_TITLE_MAX, COUNTER_LABEL_MAX, CARDS_MAX, type CardWire, type CounterWire } from "./layers";
 import { MEDIA_KINDS, isMediaPath, parseCue, type StoredCue } from "./rundown";
 
 /**
@@ -14,6 +15,8 @@ export type ConsoleMessage =
   | { type: "transport"; slide: number; playing: boolean; loop?: boolean; volume?: number; muted?: boolean }
   /** Jumps the video on the air to a second. */
   | { type: "seek"; seconds: number }
+  /** The layers over the screen: the counter and the cards that are shown. Always the whole picture, never a change. */
+  | { type: "layers"; counter: CounterWire; cards: CardWire[] }
   /** Asks the projector's window to say it is there and what it shows. */
   | { type: "ping" };
 
@@ -55,6 +58,25 @@ function parseSound(data: Record<string, unknown>): { loop?: boolean; volume?: n
   return sound;
 }
 
+const isPercent = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
+const isText = (value: unknown, max: number): value is string => typeof value === "string" && value.length <= max;
+
+function parseCounterWire(value: unknown): CounterWire | null {
+  if (!isRecord(value)) return null;
+  const { visible, remainingMs, running, sentAt, x, y, size, label } = value;
+  if (typeof visible !== "boolean" || typeof running !== "boolean" || !isPercent(x) || !isPercent(y) || !isText(label, COUNTER_LABEL_MAX)) return null;
+  if (typeof remainingMs !== "number" || !Number.isFinite(remainingMs) || remainingMs < 0 || remainingMs > 6 * 3600 * 1000) return null;
+  if (typeof sentAt !== "number" || !Number.isFinite(sentAt) || !(COUNTER_SIZES as readonly unknown[]).includes(size)) return null;
+  return { visible, remainingMs, running, sentAt, x, y, size: size as CounterWire["size"], label };
+}
+
+function parseCardWire(value: unknown): CardWire | null {
+  if (!isRecord(value) || !isCueId(value.id) || !(CARD_KINDS as readonly unknown[]).includes(value.kind)) return null;
+  if (typeof value.title !== "string" || value.title.length === 0 || value.title.length > CARD_TITLE_MAX || !isText(value.text, CARD_TEXT_MAX) || !isText(value.link, CARD_LINK_MAX)) return null;
+  if (!isPercent(value.x) || !isPercent(value.y)) return null;
+  return { id: value.id, kind: value.kind as CardWire["kind"], title: value.title, text: value.text as string, link: value.link as string, x: value.x, y: value.y };
+}
+
 /** A piece on the air: checked like one read from the store (a file's path stays inside the folder). */
 function parseProgramCue(value: unknown): ProgramCue | null {
   if (!isRecord(value) || !isCueId(value.id)) return null;
@@ -78,6 +100,12 @@ export function parseChannelMessage(data: unknown): ChannelMessage | null {
     case "transport": {
       const sound = parseSound(data);
       return sound && isSlide(data.slide) && typeof data.playing === "boolean" ? { type: "transport", slide: data.slide, playing: data.playing, ...sound } : null;
+    }
+    case "layers": {
+      const counter = parseCounterWire(data.counter);
+      if (!counter || !Array.isArray(data.cards) || data.cards.length > CARDS_MAX) return null;
+      const cards = data.cards.map(parseCardWire);
+      return cards.every((card) => card !== null) ? { type: "layers", counter, cards: cards as CardWire[] } : null;
     }
     case "seek":
       return isSeconds(data.seconds) ? { type: "seek", seconds: data.seconds } : null;
