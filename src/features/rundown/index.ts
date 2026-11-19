@@ -1,7 +1,6 @@
 // Public API (client-safe). Server-only exports live in `./server`.
 export { RundownConsole, SCREEN_LOST_AFTER_MS, type RundownConsoleProps } from "./ui/RundownConsole";
 export { MediaProgram, type MediaProgramProps } from "./ui/MediaProgram";
-export { MusicProgram, type MusicProgramProps } from "./ui/MusicProgram";
 export type { Track } from "./domain/music";
 export type { ProjectTalkRunner, SaveCuesAction, SaveCuesResult, SaveMinutesAction, SavePlaylistAction, SavePointsAction, StageRunner, StageRunnerCommand, StageRunnerResult } from "./ui/actions";
 export type { StageViewName } from "./ui/console-model";

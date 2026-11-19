@@ -2,10 +2,10 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
-import type { ChannelMessage } from "../domain/channel";
 import type { Track } from "../domain/music";
 import type { MediaCue } from "../domain/rundown";
 import type { ProjectTalkRunner, SaveCuesAction, SavePlaylistAction, StageRunner } from "./actions";
+import type { MusicPlayerProps, MusicWanted } from "./MusicPlayer";
 import { RundownConsole } from "./RundownConsole";
 import { channelPair, fakeLibrary, mp3, mp4 } from "./test-helpers";
 
@@ -13,6 +13,19 @@ const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => <a href={href} {...rest}>{children}</a> }));
 vi.mock("./SlideCanvas", () => ({ SlideCanvas: () => <div data-testid="slide" /> }));
+
+// The sound itself is the player's job (tested on its own): here it is a stand-in that records what the console asks of it.
+const player = vi.hoisted(() => ({ apply: vi.fn(), seek: vi.fn(), retry: vi.fn(), props: null as null | MusicPlayerProps }));
+vi.mock("./MusicPlayer", async () => {
+  const { useImperativeHandle } = await import("react");
+  return {
+    MusicPlayer: (props: MusicPlayerProps) => {
+      useImperativeHandle(props.handleRef, () => ({ apply: player.apply, seek: player.seek, retry: player.retry }), []);
+      player.props = props;
+      return null;
+    },
+  };
+});
 
 const t = copy.stageConsole;
 const m = t.music;
@@ -26,10 +39,8 @@ const settle = () =>
     for (let round = 0; round < 8; round += 1) await Promise.resolve();
   });
 
-function setup(options: { playlist?: Track[]; savePlaylist?: SavePlaylistAction | null; stored?: Record<string, MediaCue[]> } = {}) {
+function setup(options: { playlist?: Track[]; savePlaylist?: SavePlaylistAction | null } = {}) {
   const lines = channelPair();
-  const heard: ChannelMessage[] = [];
-  lines.stage.subscribe((message) => heard.push(message));
   const fake = fakeLibrary({ "musica/intro.mp3": mp3(), "musica/medio.mp3": mp3(), "musica/cierre.mp3": mp3(), "musica/otra.wav": mp3("otra.wav"), "apertura/video.mp4": mp4() });
   const savePlaylist = options.savePlaylist === null ? undefined : (options.savePlaylist ?? vi.fn<SavePlaylistAction>(async ({ tracks }) => ({ ok: true, tracks })));
   render(
@@ -37,7 +48,7 @@ function setup(options: { playlist?: Track[]; savePlaylist?: SavePlaylistAction 
       edition="devfest-2026"
       agenda={[{ id: "keynote", time: "09:00", title: "Keynote", who: "Equipo GDG" }]}
       qrItems={["keynote"]}
-      stored={options.stored ?? { keynote: [CLIP] }}
+      stored={{ keynote: [CLIP] }}
       frozen={false}
       view="both"
       squadsOn
@@ -52,8 +63,9 @@ function setup(options: { playlist?: Track[]; savePlaylist?: SavePlaylistAction 
       openChannel={() => lines.console}
     />,
   );
-  const musics = () => heard.filter((message): message is Extract<ChannelMessage, { type: "music" }> => message.type === "music");
-  return { heard, musics, savePlaylist, stage: lines.stage };
+  /** What the console last asked the player. */
+  const asked = () => player.apply.mock.calls.map((call) => call[0] as MusicWanted);
+  return { asked, savePlaylist };
 }
 
 const panel = () => screen.getByRole("region", { name: m.title });
@@ -62,89 +74,106 @@ const click = async (name: string | RegExp) => {
   fireEvent.click(inPanel().getByRole("button", { name }));
   await settle();
 };
+const openList = () => click(/^Lista \(/);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  player.props = null;
   window.open = vi.fn();
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:file");
   vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
 });
 
-describe("the music panel", () => {
-  it("is not there without a way to save the playlist, and says it is empty when it has no songs", async () => {
-    const { rerender } = { rerender: null };
-    void rerender;
+describe("the music line", () => {
+  it("is not there without a way to save the playlist", async () => {
     setup({ savePlaylist: null });
     await settle();
+
     expect(screen.queryByRole("region", { name: m.title })).not.toBeInTheDocument();
+    expect(player.props).toBeNull();
   });
 
-  it("invites adding songs when the playlist is empty", async () => {
+  it("sits in one line of controls like the video's, and has the playlist closed under it", async () => {
+    setup();
+    await settle();
+
+    for (const name of [m.previous, m.play, m.next, m.stop, m.repeat.all]) expect(inPanel().getByRole("button", { name })).toBeInTheDocument();
+    for (const name of [m.position, m.volume]) expect(inPanel().getByRole("slider", { name })).toBeInTheDocument();
+    expect(inPanel().getByRole("combobox", { name: m.fade })).toBeInTheDocument();
+    expect(inPanel().getByRole("checkbox", { name: m.duck })).toBeInTheDocument();
+    expect(inPanel().queryByRole("list", { name: m.list })).not.toBeInTheDocument();
+
+    await openList();
+    expect(inPanel().getByRole("list", { name: m.list })).toBeInTheDocument();
+  });
+
+  it("with no songs, offers adding them and has no playback controls", async () => {
     setup({ playlist: [] });
     await settle();
 
-    expect(inPanel().getByText(m.empty)).toBeInTheDocument();
-    expect(inPanel().getByText("0 canciones")).toBeInTheDocument();
     expect(inPanel().queryByRole("button", { name: m.play })).not.toBeInTheDocument();
+    await openList();
+    expect(inPanel().getByText(m.empty)).toBeInTheDocument();
+    expect(inPanel().getByRole("button", { name: m.add })).toBeInTheDocument();
   });
 
   it("plays a song from the list: it fades in as set, and the console shows it playing", async () => {
-    const { musics } = setup();
+    const { asked } = setup();
     await settle();
+    await openList();
 
     await click("Reproducir Medio");
-    expect(musics().at(-1)).toEqual({ type: "music", track: MEDIO, playing: true, volume: 0.8, fadeMs: 2000 });
+    expect(asked().at(-1)).toEqual({ track: MEDIO, playing: true, volume: 0.8, fadeMs: 2000 });
     expect(inPanel().getByText(m.playing)).toBeInTheDocument();
     expect(inPanel().getByRole("button", { name: m.pause })).toBeInTheDocument();
   });
 
   it("pauses with a fade, and the first play starts from the first song", async () => {
-    const { musics } = setup();
+    const { asked } = setup();
     await settle();
 
     await click(m.play);
-    expect(musics().at(-1)).toMatchObject({ track: INTRO, playing: true });
+    expect(asked().at(-1)).toMatchObject({ track: INTRO, playing: true });
     await click(m.pause);
-    expect(musics().at(-1)).toMatchObject({ track: INTRO, playing: false, fadeMs: 2000 });
+    expect(asked().at(-1)).toMatchObject({ track: INTRO, playing: false, fadeMs: 2000 });
   });
 
   it("moves to the next and the previous song, and stops by unloading", async () => {
-    const { musics } = setup();
+    const { asked } = setup();
     await settle();
+    await openList();
     await click("Reproducir Intro");
 
     await click(m.next);
-    expect(musics().at(-1)).toMatchObject({ track: MEDIO, playing: true });
+    expect(asked().at(-1)).toMatchObject({ track: MEDIO, playing: true });
     await click(m.previous);
-    expect(musics().at(-1)).toMatchObject({ track: INTRO });
+    expect(asked().at(-1)).toMatchObject({ track: INTRO });
     await click(m.stop);
-    expect(musics().at(-1)).toMatchObject({ track: null, playing: false });
-    expect(inPanel().getByText(m.nothing)).toBeInTheDocument();
+    expect(asked().at(-1)).toMatchObject({ track: null, playing: false });
     expect(inPanel().getByText(m.idle)).toBeInTheDocument();
   });
 
   it("changes the volume at once (no fade) and the length of the fade", async () => {
-    const { musics } = setup();
+    const { asked } = setup();
     await settle();
-    await click("Reproducir Intro");
+    await click(m.play);
 
     fireEvent.change(inPanel().getByRole("slider", { name: m.volume }), { target: { value: "0.4" } });
     await settle();
-    expect(musics().at(-1)).toMatchObject({ volume: 0.4, fadeMs: 0 });
+    expect(asked().at(-1)).toMatchObject({ volume: 0.4, fadeMs: 0 });
 
     fireEvent.change(inPanel().getByRole("combobox", { name: m.fade }), { target: { value: "5" } });
     await click(m.pause);
-    expect(musics().at(-1)).toMatchObject({ playing: false, fadeMs: 5000 });
+    expect(asked().at(-1)).toMatchObject({ playing: false, fadeMs: 5000 });
     fireEvent.change(inPanel().getByRole("combobox", { name: m.fade }), { target: { value: "0" } });
     await click(m.play);
-    expect(musics().at(-1)).toMatchObject({ playing: true, fadeMs: 0 });
+    expect(asked().at(-1)).toMatchObject({ playing: true, fadeMs: 0 });
   });
 
   it("goes through the repeat modes", async () => {
     setup();
     await settle();
 
-    expect(inPanel().getByRole("button", { name: m.repeat.all })).toBeInTheDocument();
     await click(m.repeat.all);
     expect(inPanel().getByRole("button", { name: m.repeat.one })).toBeInTheDocument();
     await click(m.repeat.one);
@@ -152,101 +181,101 @@ describe("the music panel", () => {
   });
 
   it("goes on to the next song when one ends by itself, and stops at the end of a list that does not repeat", async () => {
-    const { musics, stage } = setup();
+    const { asked } = setup();
     await settle();
+    await openList();
     await click("Reproducir Medio");
 
-    await act(async () => stage.post({ type: "musicProgress", trackId: "song-0002", time: 10, duration: 100 }));
-    await act(async () => stage.post({ type: "musicEnded", trackId: "song-0002" }));
+    await act(async () => player.props?.onProgress("song-0002", 10, 100));
+    await act(async () => player.props?.onEnded("song-0002"));
     await settle();
-    expect(musics().at(-1)).toMatchObject({ track: CIERRE, playing: true });
+    expect(asked().at(-1)).toMatchObject({ track: CIERRE, playing: true });
 
     await click(m.repeat.all);
     await click(m.repeat.one);
-    await act(async () => stage.post({ type: "musicProgress", trackId: "song-0003", time: 10, duration: 100 }));
-    await act(async () => stage.post({ type: "musicEnded", trackId: "song-0003" }));
+    await act(async () => player.props?.onProgress("song-0003", 10, 100));
+    await act(async () => player.props?.onEnded("song-0003"));
     await settle();
-    expect(musics().at(-1)).toMatchObject({ track: CIERRE, playing: false });
+    expect(asked().at(-1)).toMatchObject({ track: CIERRE, playing: false });
   });
 
   it("says a song could not be played when it ends without ever starting, and moves on without looping", async () => {
-    const { musics, stage } = setup();
+    const { asked } = setup();
     await settle();
+    await openList();
     await click("Reproducir Medio");
 
-    await act(async () => stage.post({ type: "musicEnded", trackId: "song-0002" }));
+    await act(async () => player.props?.onEnded("song-0002"));
     await settle();
 
     expect(screen.getByRole("alert")).toHaveTextContent("No se pudo reproducir «Medio»");
-    expect(musics().at(-1)).toMatchObject({ track: CIERRE, playing: true });
+    expect(asked().at(-1)).toMatchObject({ track: CIERRE, playing: true });
   });
 
-  it("shows the position the projector's window reports and jumps when the bar moves", async () => {
-    const { heard, stage } = setup();
+  it("ignores the end of a song that is not the loaded one", async () => {
+    const { asked } = setup();
     await settle();
-    await click("Reproducir Intro");
+    await click(m.play);
+    const count = asked().length;
 
-    await act(async () => stage.post({ type: "musicProgress", trackId: "song-0001", time: 65, duration: 185 }));
+    await act(async () => player.props?.onEnded("song-0003"));
+    await settle();
+    expect(asked().length).toBe(count);
+  });
+
+  it("shows the position the player reports and jumps when the bar moves", async () => {
+    setup();
+    await settle();
+    await click(m.play);
+
+    await act(async () => player.props?.onProgress("song-0001", 65, 185));
     expect(inPanel().getByText("1:05 de 3:05")).toBeInTheDocument();
     fireEvent.change(inPanel().getByRole("slider", { name: m.position }), { target: { value: "120" } });
-    expect(heard.at(-1)).toEqual({ type: "musicSeek", seconds: 120 });
+    expect(player.seek).toHaveBeenCalledWith(120);
   });
 
-  it("tells the person when the screen needs a click to make sound", async () => {
-    const { stage } = setup();
+  it("offers a button to unlock the sound when the browser holds it back, and asks the player to try again", async () => {
+    setup();
     await settle();
-    await click("Reproducir Intro");
+    await click(m.play);
 
-    await act(async () => stage.post({ type: "musicBlocked", blocked: true }));
-    expect(inPanel().getByRole("alert")).toHaveTextContent(m.blocked);
-    await act(async () => stage.post({ type: "musicBlocked", blocked: false }));
-    expect(inPanel().queryByRole("alert")).not.toBeInTheDocument();
+    await act(async () => player.props?.onBlocked(true));
+    expect(inPanel().getByText(m.blocked)).toBeInTheDocument();
+    await click(m.unlock);
+    expect(player.retry).toHaveBeenCalledTimes(1);
+
+    await act(async () => player.props?.onBlocked(false));
+    expect(inPanel().queryByRole("button", { name: m.unlock })).not.toBeInTheDocument();
   });
 
   it("fades out of the way of a video, and comes back when it stops", async () => {
-    const { musics } = setup();
+    const { asked } = setup();
     await settle();
-    await click("Reproducir Intro");
-    expect(musics().at(-1)).toMatchObject({ playing: true });
+    await click(m.play);
+    expect(asked().at(-1)).toMatchObject({ playing: true });
 
     fireEvent.click(screen.getByRole("button", { name: t.transport.take }));
     await settle();
-    expect(musics().at(-1)).toMatchObject({ track: INTRO, playing: false, fadeMs: 2000 });
+    expect(asked().at(-1)).toMatchObject({ track: INTRO, playing: false, fadeMs: 2000 });
     expect(inPanel().getByText(m.ducked)).toBeInTheDocument();
 
-    // The console's own «Detener» (the music has its own, inside its panel).
+    // The console's own «Detener» (the music has its own, inside its line).
     fireEvent.click(screen.getAllByRole("button", { name: t.transport.stop }).find((button) => !panel().contains(button)) as HTMLElement);
     await settle();
-    expect(musics().at(-1)).toMatchObject({ track: INTRO, playing: true });
+    expect(asked().at(-1)).toMatchObject({ track: INTRO, playing: true });
   });
 
   it("keeps playing under a video when the setting is off", async () => {
-    const { musics } = setup();
+    const { asked } = setup();
     await settle();
-    await click("Reproducir Intro");
+    await click(m.play);
     fireEvent.click(inPanel().getByRole("checkbox", { name: m.duck }));
-    const count = musics().length;
+    const count = asked().length;
 
     fireEvent.click(screen.getByRole("button", { name: t.transport.take }));
     await settle();
-    expect(musics().at(-1)).toMatchObject({ playing: true });
-    expect(musics().length).toBe(count);
-  });
-
-  it("tells a projector's window that opens late what should be playing", async () => {
-    const { musics, stage } = setup();
-    await settle();
-    await click("Reproducir Medio");
-    const count = musics().length;
-
-    await act(async () => stage.post({ type: "musicAlive", trackId: "song-0002" }));
-    await settle();
-    expect(musics().length).toBe(count);
-
-    await act(async () => stage.post({ type: "musicAlive", trackId: null }));
-    await settle();
-    expect(musics().length).toBe(count + 1);
-    expect(musics().at(-1)).toMatchObject({ track: MEDIO, playing: true, fadeMs: 0 });
+    expect(asked().at(-1)).toMatchObject({ playing: true });
+    expect(asked().length).toBe(count);
   });
 });
 
@@ -254,6 +283,7 @@ describe("editing the playlist", () => {
   it("adds songs from the folder (only audio is offered), marks them and saves their paths", async () => {
     const { savePlaylist } = setup({ playlist: [INTRO] });
     await settle();
+    await openList();
 
     await click(m.add);
     const dialog = screen.getByRole("dialog", { name: m.dialog.title });
@@ -271,6 +301,7 @@ describe("editing the playlist", () => {
   it("goes back and says so when the playlist cannot be saved", async () => {
     setup({ playlist: [INTRO], savePlaylist: vi.fn<SavePlaylistAction>(async () => ({ ok: false, code: "unknown" })) });
     await settle();
+    await openList();
     await click(m.add);
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /musica\/otra\.wav/ }));
     await settle();
@@ -278,12 +309,13 @@ describe("editing the playlist", () => {
     expect(within(screen.getByRole("dialog")).getByRole("alert")).toHaveTextContent(m.saveFailed);
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: m.dialog.done }));
     await settle();
-    expect(inPanel().getByText("1 canciones")).toBeInTheDocument();
+    expect(inPanel().getByText("Lista (1)")).toBeInTheDocument();
   });
 
   it("moves and removes songs in edit mode, and the music lets go of the one that was playing", async () => {
-    const { savePlaylist, musics } = setup();
+    const { savePlaylist, asked } = setup();
     await settle();
+    await openList();
     await click("Reproducir Medio");
     await click(m.edit);
 
@@ -292,7 +324,7 @@ describe("editing the playlist", () => {
 
     await click(`${m.remove}: Medio`);
     expect(savePlaylist).toHaveBeenLastCalledWith({ tracks: [INTRO, CIERRE] });
-    expect(musics().at(-1)).toMatchObject({ track: null, playing: false });
+    expect(asked().at(-1)).toMatchObject({ track: null, playing: false });
     expect(inPanel().queryByRole("button", { name: "Reproducir Medio" })).not.toBeInTheDocument();
   });
 });

@@ -20,6 +20,7 @@ import { actionForKey, CONFIRM_WINDOW_MS, DECK_KEYS, isTypingTarget, NEEDS_CONFI
 import { FilePickerDialog } from "./FilePickerDialog";
 import { MusicDialog } from "./MusicDialog";
 import { MusicPanel } from "./MusicPanel";
+import { MusicPlayer, type MusicPlayerHandle } from "./MusicPlayer";
 import { PointDialog, type PointDraft } from "./PointDialog";
 import { RundownPanel } from "./RundownPanel";
 import { SetupDialog } from "./SetupDialog";
@@ -122,9 +123,10 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
   const [musicEditing, setMusicEditing] = useState(false);
   const [musicDialog, setMusicDialog] = useState(false);
   const [audioFiles, setAudioFiles] = useState<readonly string[]>([]);
-  // What the projector's window was last told, and a counter that makes the console tell it again (it was opened late).
+  // The music plays here, in the console's own window (the browser lets it play with the clicks made here); what the player
+  // was last told, to know when a change needs a fade and when it is only a new volume.
+  const player = useRef<MusicPlayerHandle>(null);
   const lastMusic = useRef<{ sig: string; volume: number } | null>({ sig: ":false", volume: INITIAL_MUSIC.volume });
-  const [musicResend, setMusicResend] = useState(0);
   // The songs that have started to play: one that ends without ever doing so could not be read.
   const heardTracks = useRef(new Set<string>());
   const [pointDialog, setPointDialog] = useState<{ key: number; itemId: string | null } | null>(null);
@@ -231,30 +233,6 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
         setFailures((before) => new Map(before).set(message.cueId, message.reason));
       } else if (message.type === "progress") {
         setProgress({ cueId: message.cueId, time: message.time, duration: message.duration });
-      } else if (message.type === "musicProgress") {
-        heardTracks.current.add(message.trackId);
-        setMusicProgress({ trackId: message.trackId, time: message.time, duration: message.duration });
-      } else if (message.type === "musicBlocked") {
-        setMusicBlocked(message.blocked);
-      } else if (message.type === "musicAlive") {
-        // A window that is new (or was reloaded) has no song loaded: it is told what should be playing.
-        const wanted = musicRef.current.trackId;
-        if (wanted !== null && message.trackId !== wanted) {
-          lastMusic.current = null;
-          setMusicResend((count) => count + 1);
-        }
-      } else if (message.type === "musicEnded") {
-        const current = musicRef.current;
-        if (current.trackId !== message.trackId) return;
-        if (!heardTracks.current.has(message.trackId)) {
-          // It never played: say so, and go on without repeating, so a missing file cannot make the list loop for ever.
-          const missing = tracksRef.current.find((track) => track.id === message.trackId);
-          if (missing) alert(interpolate(t.music.failed, { name: missing.name }));
-          setMusic(nextTrack({ ...current, repeat: "off" }, tracksRef.current, true));
-        } else {
-          heardTracks.current.delete(message.trackId);
-          setMusic(nextTrack(current, tracksRef.current, true));
-        }
       }
     });
     line.post({ type: "ping" });
@@ -577,7 +555,28 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
   const liveStatus = onAirFile?.kind === "video" ? (playout.playing ? t.program.playing : t.program.paused) : onAirFile?.kind === "gslides" ? t.program.googleSlides : onAirFile?.kind === "slides" && total > 0 ? interpolate(t.program.slide, { n: String(playout.slide), total: String(total) }) : onAirFile ? t.program.loading : sceneOnAir || qrOnAir ? t.program.sceneStatus : undefined;
   const videoPlaying = onAirFile?.kind === "video" && playout.playing;
 
-  // --- the music: tell the projector's window what to play ----------------------------------------------------------------------
+  // --- the music: tell the player what to do ----------------------------------------------------------------------------------------
+  const onMusicProgress = useCallback((trackId: string, time: number, duration: number) => {
+    heardTracks.current.add(trackId);
+    setMusicProgress({ trackId, time, duration });
+  }, []);
+  const onMusicEnded = useCallback(
+    (trackId: string) => {
+      const current = musicRef.current;
+      if (current.trackId !== trackId) return;
+      if (!heardTracks.current.has(trackId)) {
+        // It never played: say so, and go on without repeating, so a missing file cannot make the list loop for ever.
+        const missing = tracksRef.current.find((track) => track.id === trackId);
+        if (missing) alert(interpolate(t.music.failed, { name: missing.name }));
+        setMusic(nextTrack({ ...current, repeat: "off" }, tracksRef.current, true));
+      } else {
+        heardTracks.current.delete(trackId);
+        setMusic(nextTrack(current, tracksRef.current, true));
+      }
+    },
+    [alert],
+  );
+
   const sounding = soundingOf(music, videoPlaying);
   useEffect(() => {
     const track = tracks.find((entry) => entry.id === music.trackId) ?? null;
@@ -587,16 +586,8 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
     // A song that starts, stops or changes fades; a new volume only moves, at once.
     const fadeMs = before && before.sig !== sig ? music.fadeSeconds * 1000 : 0;
     lastMusic.current = { sig, volume: music.volume };
-    void (async () => {
-      let sent: File | undefined;
-      const library = libraryRef.current;
-      if (track && library && library.kind === "folder-input") {
-        const found = await library.resolve(track.path);
-        if (found.ok) sent = found.value;
-      }
-      channel.current?.post({ type: "music", track, playing: sounding, volume: music.volume, fadeMs, ...(sent ? { file: sent } : {}) });
-    })();
-  }, [music.trackId, music.volume, music.fadeSeconds, sounding, tracks, musicResend]);
+    player.current?.apply({ track, playing: sounding, volume: music.volume, fadeMs });
+  }, [music.trackId, music.volume, music.fadeSeconds, sounding, tracks]);
 
   // --- a piece with seconds takes the next one by itself ----------------------------------------------------------------------------
   const secondsOnAir = onAirFile?.seconds ?? null;
@@ -802,6 +793,32 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
             />
           ) : null}
 
+          {savePlaylist ? (
+            <MusicPanel
+              tracks={tracks}
+              music={music}
+              progress={musicProgress}
+              blocked={musicBlocked && sounding}
+              ducked={music.playing && music.duck && videoPlaying}
+              editing={musicEditing}
+              onToggleEditing={() => setMusicEditing((current) => !current)}
+              onAdd={openMusicDialog}
+              onPlay={(trackId) => setMusic((current) => playTrack(current, tracksRef.current, trackId))}
+              onTogglePlayback={() => setMusic((current) => togglePlayback(current, tracksRef.current))}
+              onPrevious={() => setMusic((current) => previousTrack(current, tracksRef.current))}
+              onNext={() => setMusic((current) => nextTrack(current, tracksRef.current))}
+              onStop={() => setMusic(stopMusic)}
+              onSeek={(seconds) => player.current?.seek(seconds)}
+              onUnlock={() => player.current?.retry()}
+              onVolume={(volume) => setMusic((current) => setMusicVolume(current, volume))}
+              onRepeat={() => setMusic(cycleRepeat)}
+              onFade={(seconds) => setMusic((current) => setFadeSeconds(current, seconds))}
+              onDuck={() => setMusic(toggleDuck)}
+              onMove={moveTrack}
+              onRemove={removeTrack}
+            />
+          ) : null}
+
           {firstSlides.length > 0 ? (
             <div className="bg-surface border-ink gap-space-2 flex shrink-0 items-center rounded-lg border-2 px-3.5 py-2">
               <span className="type-pixel-heading text-text-subtle shrink-0">{t.strip.label}</span>
@@ -846,30 +863,6 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
               })}
             </div>
           </section>
-          {savePlaylist ? (
-            <MusicPanel
-              tracks={tracks}
-              music={music}
-              progress={musicProgress}
-              blocked={musicBlocked && sounding}
-              ducked={music.playing && music.duck && videoPlaying}
-              editing={musicEditing}
-              onToggleEditing={() => setMusicEditing((current) => !current)}
-              onAdd={openMusicDialog}
-              onPlay={(trackId) => setMusic((current) => playTrack(current, tracksRef.current, trackId))}
-              onTogglePlayback={() => setMusic((current) => togglePlayback(current, tracksRef.current))}
-              onPrevious={() => setMusic((current) => previousTrack(current, tracksRef.current))}
-              onNext={() => setMusic((current) => nextTrack(current, tracksRef.current))}
-              onStop={() => setMusic(stopMusic)}
-              onSeek={(seconds) => channel.current?.post({ type: "musicSeek", seconds })}
-              onVolume={(volume) => setMusic((current) => setMusicVolume(current, volume))}
-              onRepeat={() => setMusic(cycleRepeat)}
-              onFade={(seconds) => setMusic((current) => setFadeSeconds(current, seconds))}
-              onDuck={() => setMusic(toggleDuck)}
-              onMove={moveTrack}
-              onRemove={removeTrack}
-            />
-          ) : null}
           <p className="type-caption text-text-subtle shrink-0">{t.shortcuts}</p>
         </div>
       </div>
@@ -898,6 +891,7 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
           onSave={savePoint}
         />
       ) : null}
+      {savePlaylist ? <MusicPlayer handleRef={player} library={media.library} revision={media.revision} onProgress={onMusicProgress} onEnded={onMusicEnded} onBlocked={setMusicBlocked} /> : null}
       <MusicDialog
         open={musicDialog}
         onOpenChange={setMusicDialog}

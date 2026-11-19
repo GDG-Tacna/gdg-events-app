@@ -30,30 +30,6 @@ describe("parseChannelMessage", () => {
     expect(parseChannelMessage({ type: "progress", cueId: "cue-0001", time: Number.NaN, duration: 90 })).toBeNull();
   });
 
-  it("carries what the music should do, with the song, the volume and the fade, and refuses a wrong one", () => {
-    const song = { id: "song-0001", name: "Intro", path: "musica/intro.mp3" };
-    const message = { type: "music", track: song, playing: true, volume: 0.8, fadeMs: 2000 };
-    expect(parseChannelMessage(message)).toEqual(message);
-    expect(parseChannelMessage({ ...message, track: null, playing: false })).toEqual({ ...message, track: null, playing: false });
-    for (const bad of [{ ...message, track: { ...song, path: "../intro.mp3" } }, { ...message, track: { ...song, path: "musica/video.mp4" } }, { ...message, playing: "yes" }, { ...message, volume: 1.5 }, { ...message, volume: -0.1 }, { ...message, fadeMs: -1 }, { ...message, fadeMs: 20_000 }, { ...message, fadeMs: Number.NaN }]) {
-      expect(parseChannelMessage(bad)).toBeNull();
-    }
-  });
-
-  it("carries a jump to a second of the song and what the projector's window says back about the music", () => {
-    expect(parseChannelMessage({ type: "musicSeek", seconds: 30 })).toEqual({ type: "musicSeek", seconds: 30 });
-    expect(parseChannelMessage({ type: "musicSeek", seconds: -2 })).toBeNull();
-    expect(parseChannelMessage({ type: "musicProgress", trackId: "song-0001", time: 3, duration: 200 })).toEqual({ type: "musicProgress", trackId: "song-0001", time: 3, duration: 200 });
-    expect(parseChannelMessage({ type: "musicProgress", trackId: "", time: 3, duration: 200 })).toBeNull();
-    expect(parseChannelMessage({ type: "musicEnded", trackId: "song-0001" })).toEqual({ type: "musicEnded", trackId: "song-0001" });
-    expect(parseChannelMessage({ type: "musicEnded" })).toBeNull();
-    expect(parseChannelMessage({ type: "musicBlocked", blocked: true })).toEqual({ type: "musicBlocked", blocked: true });
-    expect(parseChannelMessage({ type: "musicBlocked", blocked: "yes" })).toBeNull();
-    expect(parseChannelMessage({ type: "musicAlive", trackId: null })).toEqual({ type: "musicAlive", trackId: null });
-    expect(parseChannelMessage({ type: "musicAlive", trackId: "song-0001" })).toEqual({ type: "musicAlive", trackId: "song-0001" });
-    expect(parseChannelMessage({ type: "musicAlive", trackId: 5 })).toBeNull();
-  });
-
   it("carries a Google Slides piece, and refuses one whose presentation id is not one", () => {
     const deck = { id: "cue-0009", kind: "gslides", name: "Keynote", deckId: "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", published: false };
 

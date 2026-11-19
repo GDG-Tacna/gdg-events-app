@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
@@ -16,9 +17,9 @@ const FADES = [0, 1, 2, 3, 5, FADE_MAX_SECONDS];
 export interface MusicPanelProps {
   tracks: readonly Track[];
   music: MusicState;
-  /** Where the song is and how long it is, as the projector's window last said. */
+  /** Where the song is and how long it is, as the player last said. */
   progress: { trackId: string; time: number; duration: number } | null;
-  /** The browser is holding the sound back until the projector's window is clicked. */
+  /** The browser is holding the sound back until the page is clicked. */
   blocked: boolean;
   /** A video is playing and the music is fading out of its way. */
   ducked: boolean;
@@ -35,91 +36,73 @@ export interface MusicPanelProps {
   onRepeat: () => void;
   onFade: (seconds: number) => void;
   onDuck: () => void;
+  onUnlock: () => void;
   onMove: (trackId: string, delta: -1 | 1) => void;
   onRemove: (trackId: string) => void;
 }
 
 /**
- * The music of the event: a playlist from the connected folder with its own controls (play, previous, next, stop, a bar
- * to jump around, volume, repeat and the fade). The sound comes out of the projector's window; this only shows and asks.
+ * The music of the event, in one line like the controls of a video: what is loaded, play, previous, next, stop, a bar to
+ * jump around, volume, the fade, repeat and the lowering during videos; the playlist opens under it. The sound comes out
+ * of the console's own window (the same computer as the projector), so it needs no click anywhere else.
  */
-export function MusicPanel({ tracks, music, progress, blocked, ducked, editing, onToggleEditing, onAdd, onPlay, onTogglePlayback, onPrevious, onNext, onStop, onSeek, onVolume, onRepeat, onFade, onDuck, onMove, onRemove }: MusicPanelProps) {
+export function MusicPanel({ tracks, music, progress, blocked, ducked, editing, onToggleEditing, onAdd, onPlay, onTogglePlayback, onPrevious, onNext, onStop, onSeek, onVolume, onRepeat, onFade, onDuck, onUnlock, onMove, onRemove }: MusicPanelProps) {
+  const [listOpen, setListOpen] = useState(false);
   const loaded = tracks.find((track) => track.id === music.trackId) ?? null;
   const here = progress && progress.trackId === music.trackId ? progress : null;
   const duration = here?.duration ?? 0;
   const time = Math.min(here?.time ?? 0, duration);
   const status = !loaded ? t.idle : blocked ? t.blocked : ducked ? t.ducked : music.playing ? t.playing : t.paused;
   return (
-    <section aria-label={t.title} className="bg-surface border-ink gap-space-3 flex shrink-0 flex-col rounded-lg border-2 px-3.5 py-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="type-pixel-heading text-text-subtle">{t.title}</h2>
-        <p className="type-caption text-text-subtle">{interpolate(t.count, { n: String(tracks.length) })}</p>
-        <div className="flex-1" />
+    <section aria-label={t.title} className="bg-surface border-ink gap-space-3 flex shrink-0 flex-col rounded-lg border-2 px-3.5 py-2.5">
+      <div className="gap-space-3 flex flex-wrap items-center">
+        <span className="flex min-w-[150px] max-w-[220px] items-center gap-2">
+          <span aria-hidden="true" className="bg-surface-raised text-cyan-ink grid size-9 shrink-0 place-items-center rounded-md">
+            <Icon name="music" size={18} />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="type-label text-foreground truncate leading-tight">{loaded ? loaded.name : t.nothing}</span>
+            <span className={cn("type-caption truncate", blocked ? "text-danger-ink font-bold" : "text-text-subtle")}>{status}</span>
+          </span>
+        </span>
+
         {tracks.length > 0 ? (
-          <button type="button" onClick={onToggleEditing} aria-pressed={editing} className={cn(BUTTON, "h-9 px-3", editing ? "border-ink bg-ink text-on-ink" : "border-line-strong")}>
-            {editing ? t.editDone : t.edit}
-          </button>
-        ) : null}
-        <button type="button" onClick={onAdd} className={cn(BUTTON, "border-ink h-9 px-3")}>
-          {t.add}
-        </button>
-      </div>
+          <>
+            <div className="flex items-center gap-2" role="group" aria-label={t.controls}>
+              <button type="button" onClick={onPrevious} aria-label={t.previous} className={cn(BUTTON, "border-ink px-3")}>
+                <ConsoleIcon name="previous" size={18} />
+              </button>
+              <button type="button" onClick={onTogglePlayback} className={cn(BUTTON, "border-ink bg-ink text-on-ink")}>
+                {music.playing ? <ConsoleIcon name="pause" size={18} /> : <Icon name="play" size={18} />}
+                {music.playing ? t.pause : t.play}
+              </button>
+              <button type="button" onClick={onNext} aria-label={t.next} className={cn(BUTTON, "border-ink px-3")}>
+                <ConsoleIcon name="next" size={18} />
+              </button>
+              <button type="button" onClick={onStop} className={cn(BUTTON, "border-line-strong")}>
+                <ConsoleIcon name="stop" size={16} />
+                {t.stop}
+              </button>
+            </div>
 
-      {tracks.length === 0 ? (
-        <p className="type-body-sm text-muted-foreground">{t.empty}</p>
-      ) : (
-        <>
-          <div className="flex min-w-0 items-center gap-3">
-            <span aria-hidden="true" className="bg-surface-raised text-cyan-ink grid size-10 shrink-0 place-items-center rounded-md">
-              <Icon name="music" size={20} />
-            </span>
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="type-label text-foreground truncate">{loaded ? loaded.name : t.nothing}</span>
-              <span className={cn("type-caption", blocked ? "text-danger-ink font-bold" : "text-text-subtle")} role={blocked ? "alert" : undefined}>
-                {status}
-              </span>
-            </span>
-          </div>
+            <div className="flex min-w-[200px] flex-1 items-center gap-3">
+              <input
+                type="range"
+                aria-label={t.position}
+                min={0}
+                max={duration > 0 ? duration : 1}
+                step={0.5}
+                value={time}
+                disabled={duration <= 0}
+                onChange={(event) => onSeek(Number(event.target.value))}
+                className="accent-ink h-2 min-w-0 flex-1"
+              />
+              <span className="type-caption text-text-subtle shrink-0 font-mono tabular-nums">{duration > 0 ? interpolate(t.timeOf, { time: formatClock(time), total: formatClock(duration) }) : "-:--"}</span>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.controls}>
-            <button type="button" onClick={onPrevious} aria-label={t.previous} className={cn(BUTTON, "border-ink px-3")}>
-              <ConsoleIcon name="previous" size={18} />
-            </button>
-            <button type="button" onClick={onTogglePlayback} className={cn(BUTTON, "border-ink bg-ink text-on-ink")}>
-              {music.playing ? <ConsoleIcon name="pause" size={18} /> : <Icon name="play" size={18} />}
-              {music.playing ? t.pause : t.play}
-            </button>
-            <button type="button" onClick={onNext} aria-label={t.next} className={cn(BUTTON, "border-ink px-3")}>
-              <ConsoleIcon name="next" size={18} />
-            </button>
-            <button type="button" onClick={onStop} className={cn(BUTTON, "border-line-strong")}>
-              <ConsoleIcon name="stop" size={16} />
-              {t.stop}
-            </button>
-            <button type="button" onClick={onRepeat} className={cn(BUTTON, "border-ink", music.repeat !== "off" && "bg-ink text-on-ink")}>
-              {t.repeat[music.repeat]}
-            </button>
-          </div>
-
-          <div className="flex min-w-0 items-center gap-3">
-            <input
-              type="range"
-              aria-label={t.position}
-              min={0}
-              max={duration > 0 ? duration : 1}
-              step={0.5}
-              value={time}
-              disabled={duration <= 0}
-              onChange={(event) => onSeek(Number(event.target.value))}
-              className="accent-ink h-2 min-w-0 flex-1"
-            />
-            <span className="type-caption text-text-subtle shrink-0 font-mono tabular-nums">{duration > 0 ? interpolate(t.timeOf, { time: formatClock(time), total: formatClock(duration) }) : "-:--"}</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <label className="flex items-center gap-2 text-sm font-semibold">
               {t.volume}
-              <input type="range" aria-label={t.volume} min={0} max={1} step={0.05} value={music.volume} onChange={(event) => onVolume(Number(event.target.value))} className="accent-ink h-2 w-28" />
+              <input type="range" aria-label={t.volume} min={0} max={1} step={0.05} value={music.volume} onChange={(event) => onVolume(Number(event.target.value))} className="accent-ink h-2 w-24" />
             </label>
             <label className="flex items-center gap-2 text-sm font-semibold">
               {t.fade}
@@ -131,12 +114,40 @@ export function MusicPanel({ tracks, music, progress, blocked, ducked, editing, 
                 ))}
               </select>
             </label>
+            <button type="button" onClick={onRepeat} className={cn(BUTTON, "border-ink", music.repeat !== "off" && "bg-ink text-on-ink")}>
+              {t.repeat[music.repeat]}
+            </button>
             <label className="flex items-center gap-2 text-sm font-semibold">
               <input type="checkbox" checked={music.duck} onChange={onDuck} className="accent-ink size-5" />
               {t.duck}
             </label>
-          </div>
+          </>
+        ) : null}
 
+        <div className="flex-1" />
+        {blocked ? (
+          <button type="button" onClick={onUnlock} className={cn(BUTTON, "border-ink bg-gold text-on-accent")}>
+            {t.unlock}
+          </button>
+        ) : null}
+        <button type="button" onClick={() => setListOpen((open) => !open)} aria-expanded={listOpen} className={cn(BUTTON, "border-ink h-9 px-3")}>
+          {interpolate(t.listToggle, { n: String(tracks.length) })}
+        </button>
+      </div>
+
+      {listOpen ? (
+        <div className="gap-space-2 flex flex-col">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={onAdd} className={cn(BUTTON, "border-ink h-9 px-3")}>
+              {t.add}
+            </button>
+            {tracks.length > 0 ? (
+              <button type="button" onClick={onToggleEditing} aria-pressed={editing} className={cn(BUTTON, "h-9 px-3", editing ? "border-ink bg-ink text-on-ink" : "border-line-strong")}>
+                {editing ? t.editDone : t.edit}
+              </button>
+            ) : null}
+          </div>
+          {tracks.length === 0 ? <p className="type-body-sm text-muted-foreground">{t.empty}</p> : null}
           <ul aria-label={t.list} className="gap-space-2 flex max-h-56 min-h-0 flex-col overflow-y-auto">
             {tracks.map((track, index) => {
               const isLoaded = track.id === music.trackId;
@@ -170,8 +181,8 @@ export function MusicPanel({ tracks, music, progress, blocked, ducked, editing, 
               );
             })}
           </ul>
-        </>
-      )}
+        </div>
+      ) : null}
     </section>
   );
 }

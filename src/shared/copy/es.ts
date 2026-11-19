@@ -2687,8 +2687,10 @@ export const copy = {
       playing: "Sonando",
       paused: "En pausa",
       ducked: "Baja mientras suena un video",
-      blocked: "La pantalla necesita un clic para sonar",
-      unlock: "Activar la música",
+      blocked: "El navegador no deja sonar todavía",
+      unlock: "Activar sonido",
+      /** Placeholder: {n}. */
+      listToggle: "Lista ({n})",
       controls: "Controles de la música",
       previous: "Canción anterior",
       next: "Canción siguiente",
