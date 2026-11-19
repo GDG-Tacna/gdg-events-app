@@ -1,12 +1,12 @@
 import "server-only";
-import type { Firestore } from "firebase-admin/firestore";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { getActiveEventId, type ActiveEventResolver } from "@/shared/lib/firebase/active-event";
 import { getAdminFirestore } from "@/shared/lib/firebase/admin";
 import { EVENT_CONFIG_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
-import type { RundownStore, StoredCues } from "../../domain/manage";
-import { parseCues, type StoredCue } from "../../domain/rundown";
+import type { RundownPlan, RundownStore, StoredCues } from "../../domain/manage";
+import { isMinutes, parseCues, parseExtraPoints, type ExtraPoint, type StoredCue } from "../../domain/rundown";
 
 export const RUNDOWN_DOC = "rundown";
 
@@ -43,10 +43,52 @@ export class FirestoreRundownStore implements RundownStore {
     }
   }
 
+  async readPlan(): Promise<Result<RundownPlan, { code: string }>> {
+    try {
+      const snapshot = await (await this.ref()).get();
+      const data = snapshot.exists ? snapshot.data() : undefined;
+      // A broken list of points reads as none (logged), and a broken number of minutes is left out, instead of failing the console.
+      const points = data?.points === undefined ? [] : parseExtraPoints(data.points);
+      if (points === null) logServerError("rundown.parse", new Error("the points made in the console break the rules; read as none"));
+      const minutes: Record<string, number> = {};
+      if (typeof data?.minutes === "object" && data.minutes !== null) {
+        for (const [itemId, value] of Object.entries(data.minutes as Record<string, unknown>)) if (isMinutes(value)) minutes[itemId] = value;
+      }
+      return ok({ points: points ?? [], minutes });
+    } catch (cause) {
+      logServerError("rundown.readPlan", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async savePoints(points: readonly ExtraPoint[]): Promise<Result<void, { code: string }>> {
+    try {
+      // Replaced as a whole: a merge would keep the points that were removed.
+      await (await this.ref()).set({ points: points.map(({ id, title, who, time }) => ({ id, title, who, time })), updatedAt: new Date() }, { merge: true });
+      return ok(undefined);
+    } catch (cause) {
+      logServerError("rundown.savePoints", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async saveMinutes(itemId: string, minutes: number | null): Promise<Result<void, { code: string }>> {
+    try {
+      await (await this.ref()).set({ minutes: { [itemId]: minutes === null ? FieldValue.delete() : minutes }, updatedAt: new Date() }, { merge: true });
+      return ok(undefined);
+    } catch (cause) {
+      logServerError("rundown.saveMinutes", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
   async saveItem(itemId: string, cues: readonly StoredCue[]): Promise<Result<void, { code: string }>> {
     try {
       // Only the fields each kind has: a file keeps its path, a Google Slides piece its presentation.
-      const plain = cues.map((cue) => (cue.kind === "gslides" ? { id: cue.id, kind: cue.kind, name: cue.name, deckId: cue.deckId, published: cue.published } : { id: cue.id, kind: cue.kind, name: cue.name, path: cue.path }));
+      const plain = cues.map((cue) => ({
+        ...(cue.kind === "gslides" ? { id: cue.id, kind: cue.kind, name: cue.name, deckId: cue.deckId, published: cue.published } : { id: cue.id, kind: cue.kind, name: cue.name, path: cue.path }),
+        ...(cue.seconds !== undefined ? { seconds: cue.seconds } : {}),
+      }));
       await (await this.ref()).set({ items: { [itemId]: plain }, updatedAt: new Date() }, { merge: true });
       return ok(undefined);
     } catch (cause) {

@@ -24,6 +24,8 @@ export interface MediaCue {
   name: string;
   /** Relative to the connected folder, with forward slashes: `genkit/agente-genkit.pdf`. */
   path: string;
+  /** How long it stays on the air, in seconds, before the next piece is taken (a deck: each slide). None means it stays until the operator moves on. */
+  seconds?: number;
 }
 
 /**
@@ -38,6 +40,8 @@ export interface GoogleSlidesCue {
   deckId: string;
   /** True for a deck published to the web (its link is `/d/e/...`); false for one shared by link. */
   published: boolean;
+  /** How long it stays on the air, in seconds, before the next piece is taken. */
+  seconds?: number;
 }
 
 /** A piece of the order that is saved: a file or a Google Slides link. */
@@ -59,6 +63,10 @@ export interface RundownItem {
   time: string;
   title: string;
   who: string;
+  /** True for a point made in the console: it is not in the public agenda. */
+  custom?: boolean;
+  /** The time planned for the point, in minutes. */
+  minutes?: number;
   cues: readonly RundownCue[];
 }
 
@@ -68,6 +76,66 @@ export interface AgendaPoint {
   time: string;
   title: string;
   who: string;
+  custom?: boolean;
+  minutes?: number;
+}
+
+export const SECONDS_MAX = 3600;
+export const MINUTES_MAX = 600;
+export const EXTRA_POINTS_MAX = 40;
+const POINT_TITLE_MAX = 80;
+const POINT_ID = /^[a-z0-9][a-z0-9-]{1,47}$/;
+const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Whole seconds a piece stays on the air: from 1 second to an hour. */
+export const isSeconds = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= SECONDS_MAX;
+/** Whole minutes planned for a point of the agenda: from 1 to ten hours. */
+export const isMinutes = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= MINUTES_MAX;
+
+/** A point of the agenda made only in the console (a break, a welcome, a raffle): it is not in the public agenda. */
+export interface ExtraPoint {
+  id: string;
+  title: string;
+  who: string;
+  /** `HH:mm` on the venue's clock, or an empty text when it has no time. */
+  time: string;
+}
+
+/** A point made in the console, or `null` when any field breaks the rules. */
+export function parseExtraPoint(input: unknown): ExtraPoint | null {
+  if (typeof input !== "object" || input === null) return null;
+  const data = input as Record<string, unknown>;
+  if (typeof data.id !== "string" || !POINT_ID.test(data.id) || typeof data.title !== "string") return null;
+  const title = data.title.trim();
+  const who = typeof data.who === "string" ? data.who.trim() : data.who === undefined ? "" : null;
+  const time = typeof data.time === "string" ? data.time : data.time === undefined ? "" : null;
+  if (!title || title.length > POINT_TITLE_MAX || who === null || who.length > POINT_TITLE_MAX) return null;
+  if (time === null || (time !== "" && !CLOCK.test(time))) return null;
+  return { id: data.id, title, who, time };
+}
+
+/** The points made in the console, or `null` when there are too many, an id repeats or any one is invalid. */
+export function parseExtraPoints(input: unknown): ExtraPoint[] | null {
+  if (!Array.isArray(input) || input.length > EXTRA_POINTS_MAX) return null;
+  const points: ExtraPoint[] = [];
+  for (const entry of input) {
+    const point = parseExtraPoint(entry);
+    if (!point || points.some((other) => other.id === point.id)) return null;
+    points.push(point);
+  }
+  return points;
+}
+
+/**
+ * The agenda of the console: the talks of the edition and the points made here, in the order of the day. A point with a
+ * time goes where its time falls; one without goes last. Each carries the minutes planned for it, when there are any.
+ */
+export function mergeAgenda(talks: readonly AgendaPoint[], extras: readonly ExtraPoint[], minutes: Readonly<Record<string, number>> = {}): AgendaPoint[] {
+  const all: AgendaPoint[] = [...talks, ...extras.map((point) => ({ ...point, custom: true }))];
+  return all
+    .map((point, index) => ({ point, index }))
+    .sort((a, b) => (a.point.time || "99:99").localeCompare(b.point.time || "99:99") || a.index - b.index)
+    .map(({ point }) => (minutes[point.id] ? { ...point, minutes: minutes[point.id] } : point));
 }
 
 const CUE_ID = /^[A-Za-z0-9_-]{4,40}$/;
@@ -155,7 +223,8 @@ export function parseCue(input: unknown): StoredCue | null {
     if (typeof data.deckId !== "string" || !DECK_ID.test(data.deckId) || typeof data.published !== "boolean" || typeof data.name !== "string") return null;
     const label = data.name.trim();
     if (label.length === 0 || label.length > NAME_MAX) return null;
-    return { id: data.id, kind: "gslides", name: label, deckId: data.deckId, published: data.published };
+    if (data.seconds !== undefined && !isSeconds(data.seconds)) return null;
+    return { id: data.id, kind: "gslides", name: label, deckId: data.deckId, published: data.published, ...(data.seconds !== undefined ? { seconds: data.seconds } : {}) };
   }
   if (!isMediaPath(data.path) || typeof data.name !== "string") return null;
   const name = data.name.trim();
@@ -163,7 +232,8 @@ export function parseCue(input: unknown): StoredCue | null {
   // The kind is what the file is: a PDF cannot be called a video.
   const kind = kindOfPath(data.path);
   if (kind === null || data.kind !== kind) return null;
-  return { id: data.id, kind, name, path: data.path };
+  if (data.seconds !== undefined && !isSeconds(data.seconds)) return null;
+  return { id: data.id, kind, name, path: data.path, ...(data.seconds !== undefined ? { seconds: data.seconds } : {}) };
 }
 
 /** A list of pieces, or `null` when it is too long, repeats an id or holds anything invalid. */
