@@ -10,7 +10,7 @@ import { StageControlView } from "@/features/leaderboard";
 import { getFleetBoard, getStage } from "@/features/leaderboard/server";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
-import { ScreenEnter } from "@/shared/ui";
+import { ButtonLink, Card, ScreenEnter } from "@/shared/ui";
 import { moduleOn } from "@/app-shell/modules.server";
 import { requireSection } from "@/app-shell/permissions.server";
 import { uploadImageAction } from "@/app-shell/media/upload.action";
@@ -35,6 +35,13 @@ export default async function AdminStagePage() {
 
   return (
     <ScreenEnter>
+      <Card tone="cyan" className="gap-space-3 mb-space-5 flex flex-col">
+        <h2 className="type-heading text-foreground">{copy.stageConsole.adminCard.title}</h2>
+        <p className="type-body-sm text-muted-foreground">{copy.stageConsole.adminCard.body}</p>
+        <ButtonLink href={ROUTES.stageConsole} target="_blank" rel="opener">
+          {copy.stageConsole.adminCard.open}
+        </ButtonLink>
+      </Card>
       {/* The live preview is decoration: without it the controls still work. */}
       <StageControlView
         stage={stage.value}
