@@ -11,6 +11,11 @@ import { SlideCanvas } from "./SlideCanvas";
 import { useMediaLibrary } from "./use-library";
 import { useObjectUrl, useResolvedFile } from "./use-media";
 
+/** The volume is a property of the element, not an attribute: it is set from here, outside the component. */
+function setVolumeOf(element: HTMLVideoElement | null, volume: number) {
+  if (element) element.volume = volume;
+}
+
 /** How often the projector's window says it is there, in milliseconds. */
 export const ALIVE_EVERY_MS = 2000;
 
@@ -124,9 +129,7 @@ export function MediaProgram({ preview = false, library: injected, openChannel =
   const playing = onAir?.playing ?? false;
   const volume = onAir?.volume ?? 1;
   useEffect(() => {
-    // The volume is a property of the element, not an attribute.
-    const element = video.current;
-    if (element) element.volume = volume;
+    setVolumeOf(video.current, volume);
   }, [volume, url]);
   useEffect(() => {
     const element = video.current;
