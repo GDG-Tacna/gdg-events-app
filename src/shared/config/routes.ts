@@ -23,6 +23,8 @@ export const ROUTES = {
   network: "/red",
   /** The stage screen for the projector (phase 6). Admins only. */
   stage: "/escenario",
+  /** The stage console: the running order, what is on the screen, the controls and the quick scenes. Admins only. */
+  stageConsole: "/escenario/consola",
   /** The live poll, to vote in it. Attendees only. */
   poll: "/encuesta",
   /** The avatar editor ("Mi avatar"). Attendees only. */

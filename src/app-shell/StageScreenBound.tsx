@@ -8,6 +8,7 @@ import {
 } from "@/features/leaderboard";
 import { StageQr } from "@/features/ephemeral-qr";
 import { LivePollStage } from "@/features/polls";
+import { MediaProgram } from "@/features/rundown";
 import { issueQrAction } from "./ephemeral-qr/issue-qr.action";
 import { stagePollAction } from "./polls/stage.action";
 
@@ -23,7 +24,10 @@ export function StageScreenBound({
 }: Omit<StageScreenProps, "feed" | "renderPoll" | "renderTalkQr"> & { pollsOn?: boolean; talkQrOn?: boolean }) {
   const [feed] = useState(createStageFeed);
   return (
-    <StageScreen
+    <>
+      {/* The console's videos, slides and pictures cover the stage's own scenes while they are on the air. */}
+      <MediaProgram />
+      <StageScreen
       {...props}
       feed={feed}
       renderPoll={
@@ -32,6 +36,7 @@ export function StageScreenBound({
           : undefined
       }
       renderTalkQr={talkQrOn ? ({ talkId, name }) => <StageQr checkpointId={talkId} name={name} issue={issueQrAction} /> : undefined}
-    />
+      />
+    </>
   );
 }
