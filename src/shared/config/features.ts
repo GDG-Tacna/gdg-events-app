@@ -31,6 +31,11 @@ export const FEATURES = {
   polls: true,
   /** Block 7: speakers linked to their account may also play as cadets; switched off, they only reach their code. */
   speakerPlay: true,
+  /**
+   * The show feed: read-only data (the fleet ranking and the talk in progress's code) for the event's local screens,
+   * behind the SHOW_FEED_TOKEN secret. The app never drives the projector; the show pulls. Off without the secret.
+   */
+  showFeed: true,
 } as const;
 
 export type FeatureName = keyof typeof FEATURES;

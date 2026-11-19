@@ -36,6 +36,7 @@ Ajustes hechos en esta revisión: la tarjeta del sorteo leía todos los sorteos 
 4. **Secretos del servidor** (nunca `NEXT_PUBLIC_`):
    - `QR_SIGNING_SECRET`: 32 caracteres o más. Genéralo con `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`.
    - `GEMINI_API_KEY`: de Google AI Studio (solo para "Sugerir con IA").
+   - `SHOW_FEED_TOKEN` (opcional): la clave del feed del show local (`/api/show-feed/*`, ver `docs/show-feed.md`). 32 caracteres o más, generada con el mismo comando que `QR_SIGNING_SECRET`. Sin ella el feed responde "disabled" y nada más cambia. La misma clave va en `js/feed.js` de la laptop del show.
 5. **Primer admin**: entra una vez a la app publicada con tu cuenta y corre `npm run admin:first -- tucorreo@gmail.com` (con `.env.local` apuntando al proyecto del evento).
 
 ## 3. Opción A: Firebase App Hosting
@@ -47,6 +48,7 @@ Ajustes hechos en esta revisión: la tarjeta del sorteo leía todos los sorteos 
   firebase apphosting:secrets:set qr-signing-secret
   firebase apphosting:secrets:set gemini-api-key
   ```
+- Feed del show (opcional): crea el secreto con `firebase apphosting:secrets:set show-feed-token` y **después** agrega a `apphosting.yaml` la entrada `- variable: SHOW_FEED_TOKEN` / `secret: show-feed-token` / `availability: [RUNTIME]`. No la agregues antes: un secreto declarado que no existe hace fallar el despliegue.
 - Crea el backend (Firebase console > App Hosting > conectar el repositorio de GitHub, rama `main`). Cada push publica una versión nueva.
 - No hace falta la clave de cuenta de servicio: en App Hosting el servidor usa la cuenta propia del backend.
 - Cambia `BUILD_ID` en cada despliegue para que los teléfonos vean el aviso de nueva versión.
@@ -56,7 +58,7 @@ Ajustes hechos en esta revisión: la tarjeta del sorteo leía todos los sorteos 
 - Importa el repositorio en Vercel (framework Next.js, sin cambios de build).
 - Variables de entorno (Settings > Environment Variables), en Production:
   - Públicas: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID`.
-  - Servidor: `FIREBASE_SERVICE_ACCOUNT_KEY` (el JSON en una línea; en Vercel sí hace falta), `QR_SIGNING_SECRET`, `GEMINI_API_KEY`.
+  - Servidor: `FIREBASE_SERVICE_ACCOUNT_KEY` (el JSON en una línea; en Vercel sí hace falta), `QR_SIGNING_SECRET`, `GEMINI_API_KEY` y, si se usa el show local, `SHOW_FEED_TOKEN`.
   - `BUILD_ID`: puedes usar el commit de cada despliegue.
 - Región de las funciones: elige la más cercana a la región de Firestore del proyecto.
 
