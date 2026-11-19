@@ -1,4 +1,6 @@
 import type { RundownErrorCode } from "../domain/manage";
+import type { LayerCard } from "../domain/layers";
+import type { Track } from "../domain/music";
 import type { ExtraPoint, StoredCue } from "../domain/rundown";
 
 /** What saving the pieces of a point answers. */
@@ -7,6 +9,10 @@ export type SaveCuesAction = (input: { itemId: string; cues: readonly StoredCue[
 
 /** Saves the points made in the console. */
 export type SavePointsAction = (input: { points: readonly ExtraPoint[] }) => Promise<{ ok: true; points: readonly ExtraPoint[] } | { ok: false; code: RundownErrorCode }>;
+/** Saves the cards that can be put over the screen. */
+export type SaveCardsAction = (input: { cards: readonly LayerCard[] }) => Promise<{ ok: true; cards: readonly LayerCard[] } | { ok: false; code: RundownErrorCode }>;
+/** Saves the playlist (the songs and their order). */
+export type SavePlaylistAction = (input: { tracks: readonly Track[] }) => Promise<{ ok: true; tracks: readonly Track[] } | { ok: false; code: RundownErrorCode }>;
 /** Sets (or clears, with `null`) the minutes planned for a point. */
 export type SaveMinutesAction = (input: { itemId: string; minutes: number | null }) => Promise<{ ok: true } | { ok: false; code: RundownErrorCode }>;
 

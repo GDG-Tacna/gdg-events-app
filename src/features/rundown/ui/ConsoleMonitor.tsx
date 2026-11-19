@@ -11,6 +11,8 @@ export interface ConsoleMonitorProps {
   status?: string;
   /** The picture of the piece when it can be shown (a slide, an image); otherwise the icon stands for it. */
   preview?: ReactNode;
+  /** Controls drawn over the picture (the frames that move the layers). */
+  overlay?: ReactNode;
   /** The stand-in when there is no picture. */
   icon: ReactNode;
   /** Names the monitor for assistive technology. */
@@ -23,7 +25,7 @@ export interface ConsoleMonitorProps {
  * will be). The picture is the real thing whenever the console can draw it; the icon with the name stands in only for a
  * piece that has no picture (or while it is being read).
  */
-export function ConsoleMonitor({ tone, tag, title, status, preview, icon, label, className }: ConsoleMonitorProps) {
+export function ConsoleMonitor({ tone, tag, title, status, preview, overlay, icon, label, className }: ConsoleMonitorProps) {
   const live = tone === "live";
   return (
     <section aria-label={label} className={cn("bg-surface overflow-hidden rounded-lg border-2", live ? "border-danger" : "border-lime", className)}>
@@ -44,6 +46,7 @@ export function ConsoleMonitor({ tone, tag, title, status, preview, icon, label,
             <span className="type-label px-space-4 line-clamp-2">{title}</span>
           </div>
         )}
+        {overlay}
       </div>
     </section>
   );

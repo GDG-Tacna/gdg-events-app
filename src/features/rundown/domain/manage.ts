@@ -1,5 +1,7 @@
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
+import { parseCards, type LayerCard } from "./layers";
+import { parseTracks, type Track } from "./music";
 import { isMinutes, parseCues, parseExtraPoints, type ExtraPoint, type StoredCue } from "./rundown";
 
 /** The stored pieces of every point of the agenda, by the point's id (a talk's id). */
@@ -9,6 +11,10 @@ export type StoredCues = Readonly<Record<string, readonly StoredCue[]>>;
 export interface RundownPlan {
   points: readonly ExtraPoint[];
   minutes: Readonly<Record<string, number>>;
+  /** The songs of the event's playlist, in order. */
+  playlist: readonly Track[];
+  /** The cards that can be put over the screen. */
+  cards: readonly LayerCard[];
 }
 
 export interface RundownStore {
@@ -20,6 +26,10 @@ export interface RundownStore {
   readPlan(): Promise<Result<RundownPlan, { code: string }>>;
   /** Replaces the points made in the console. */
   savePoints(points: readonly ExtraPoint[]): Promise<Result<void, { code: string }>>;
+  /** Replaces the cards. */
+  saveCards(cards: readonly LayerCard[]): Promise<Result<void, { code: string }>>;
+  /** Replaces the playlist. */
+  savePlaylist(tracks: readonly Track[]): Promise<Result<void, { code: string }>>;
   /** Sets the minutes planned for a point, or clears them with `null`. */
   saveMinutes(itemId: string, minutes: number | null): Promise<Result<void, { code: string }>>;
 }
@@ -28,7 +38,7 @@ export interface RundownDeps {
   store: RundownStore;
 }
 
-export type RundownErrorCode = "invalid-item" | "invalid-cues" | "invalid-points" | "invalid-minutes" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
+export type RundownErrorCode = "invalid-item" | "invalid-cues" | "invalid-points" | "invalid-minutes" | "invalid-tracks" | "invalid-cards" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
 
 export interface RundownActor {
   uid: string;
@@ -65,6 +75,32 @@ export async function saveExtraPoints(deps: Pick<RundownDeps, "store">, actor: R
     return err(rundownError("unknown"));
   }
   return ok(points);
+}
+
+/** Saves the cards that can be put over the screen, with the place of each. */
+export async function saveLayerCards(deps: Pick<RundownDeps, "store">, actor: RundownActor, input: { cards: unknown }): Promise<Result<readonly LayerCard[], { code: RundownErrorCode }>> {
+  if (actor.role !== "admin") return err(rundownError("forbidden"));
+  const cards = parseCards(input.cards);
+  if (cards === null) return err(rundownError("invalid-cards"));
+  const saved = await deps.store.saveCards(cards);
+  if (!saved.ok) {
+    logServerError("rundown.cards", new Error(saved.error.code));
+    return err(rundownError("unknown"));
+  }
+  return ok(cards);
+}
+
+/** Saves the playlist: the songs and their order. Only where each song is kept, never the song. */
+export async function saveMusicPlaylist(deps: Pick<RundownDeps, "store">, actor: RundownActor, input: { tracks: unknown }): Promise<Result<readonly Track[], { code: RundownErrorCode }>> {
+  if (actor.role !== "admin") return err(rundownError("forbidden"));
+  const tracks = parseTracks(input.tracks);
+  if (tracks === null) return err(rundownError("invalid-tracks"));
+  const saved = await deps.store.savePlaylist(tracks);
+  if (!saved.ok) {
+    logServerError("rundown.playlist", new Error(saved.error.code));
+    return err(rundownError("unknown"));
+  }
+  return ok(tracks);
 }
 
 /** Sets the minutes planned for a point of the agenda (a talk or one made here), or clears them with `null`. */

@@ -30,6 +30,29 @@ describe("parseChannelMessage", () => {
     expect(parseChannelMessage({ type: "progress", cueId: "cue-0001", time: Number.NaN, duration: 90 })).toBeNull();
   });
 
+  it("carries the layers over the screen as a whole picture, and refuses a wrong one", () => {
+    const counter = { visible: true, remainingMs: 272_000, running: true, sentAt: 1_700_000_000_000, x: 98, y: 3, size: "sm", label: "" };
+    const card = { id: "card-0001", kind: "speaker", title: "Luis Eduardo", text: "Genkit", link: "", x: 4, y: 90 };
+    const message = { type: "layers", counter, cards: [card] };
+    expect(parseChannelMessage(message)).toEqual(message);
+    expect(parseChannelMessage({ type: "layers", counter, cards: [] })).toEqual({ type: "layers", counter, cards: [] });
+    for (const bad of [
+      { ...message, counter: { ...counter, x: 120 } },
+      { ...message, counter: { ...counter, size: "xl" } },
+      { ...message, counter: { ...counter, remainingMs: -1 } },
+      { ...message, counter: { ...counter, running: "yes" } },
+      { ...message, counter: { ...counter, label: "x".repeat(41) } },
+      { ...message, cards: [{ ...card, kind: "banner" }] },
+      { ...message, cards: [{ ...card, title: "" }] },
+      { ...message, cards: [{ ...card, y: -5 }] },
+      { ...message, cards: "x" },
+      { ...message, cards: Array.from({ length: 21 }, (_, index) => ({ ...card, id: `card-${String(index).padStart(4, "0")}` })) },
+      { type: "layers", cards: [] },
+    ]) {
+      expect(parseChannelMessage(bad)).toBeNull();
+    }
+  });
+
   it("carries a Google Slides piece, and refuses one whose presentation id is not one", () => {
     const deck = { id: "cue-0009", kind: "gslides", name: "Keynote", deckId: "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", published: false };
 

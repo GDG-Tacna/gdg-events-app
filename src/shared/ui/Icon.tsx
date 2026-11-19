@@ -1,5 +1,6 @@
 import {
   ArrowBigUp,
+  Music,
   CameraOff,
   ChevronDown,
   ChevronLeft,
@@ -88,6 +89,7 @@ const ICONS = {
   left: ChevronLeft,
   right: ChevronRight,
   up: ChevronUp,
+  music: Music,
   down: ChevronDown,
   jump: ArrowBigUp,
   users: UsersRound,

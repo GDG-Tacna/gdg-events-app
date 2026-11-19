@@ -159,10 +159,25 @@ export function kindOfPath(path: string): MediaKind | null {
  * and again where it is read.
  */
 export function isMediaPath(value: unknown): value is string {
+  return isSafePath(value) && kindOfPath(value) !== null;
+}
+
+/** The audio files a song may be (the formats a browser plays). */
+export const AUDIO_EXTENSIONS: readonly string[] = ["mp3", "m4a", "wav", "ogg", "oga", "aac", "flac"];
+
+/** Whether a text is a path to a song: the same rules as a piece's path, with an audio extension. */
+export function isAudioPath(value: unknown): value is string {
+  return isSafePath(value) && AUDIO_EXTENSIONS.includes(extensionOf(value));
+}
+
+/** Whether a path may be read from the connected folder at all: a piece or a song. */
+export const isFilePath = (value: unknown): value is string => isMediaPath(value) || isAudioPath(value);
+
+/** A relative path with forward slashes that cannot leave the folder, whatever the file is. */
+function isSafePath(value: unknown): value is string {
   if (typeof value !== "string" || value.length === 0 || value.length > PATH_MAX) return false;
   if (FORBIDDEN_IN_PATH.test(value) || value.startsWith("/") || value.endsWith("/")) return false;
-  if (value.split("/").some((segment) => segment === "" || segment === "." || segment === "..")) return false;
-  return kindOfPath(value) !== null;
+  return !value.split("/").some((segment) => segment === "" || segment === "." || segment === "..");
 }
 
 /** The name a file gives its piece: the file's name without the extension, with dashes and underscores as spaces. */

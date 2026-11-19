@@ -11,12 +11,46 @@ import { openStageChannel, type StageChannel } from "../data/client/stage-channe
 import type { FailureReason } from "../domain/channel";
 import type { RundownErrorCode, StoredCues } from "../domain/manage";
 import { back, cueOf, forget, forward, goToSlide, mediaOnProgram, selectNext, setVolume, showScene, startOf, stop, take, toggleLoop, toggleMute, togglePlay, type DataScene, type PlayoutState } from "../domain/playout";
-import { buildRundown, cueFromPath, googleSlidesCueFromLink, isFileCue, isSeconds, mergeAgenda, moveCue, qrCueId, queueOf, withSeconds, type AgendaPoint, type ExtraPoint, type StoredCue } from "../domain/rundown";
-import type { ProjectTalkRunner, SaveCuesAction, SaveMinutesAction, SavePointsAction, StageRunner } from "./actions";
+import { buildRundown, cueFromPath, googleSlidesCueFromLink, isAudioPath, isFileCue, isMediaPath, isSeconds, mergeAgenda, moveCue, qrCueId, queueOf, withSeconds, type AgendaPoint, type ExtraPoint, type StoredCue } from "../domain/rundown";
+import {
+  addCounterTime,
+  cardWire,
+  counterWire,
+  defaultPlaceOf,
+  finishCounter,
+  INITIAL_COUNTER,
+  isRunning,
+  moveCounter,
+  parseDuration,
+  pauseCounter,
+  PLACES,
+  placeOf,
+  remainingOf,
+  resetCounter,
+  setCounterDuration,
+  setCounterLabel,
+  setCounterSize,
+  setOnZero,
+  showCounter,
+  startCounter,
+  type CounterSize,
+  type CounterState,
+  type LayerCard,
+  type OnZero,
+  type PlaceName,
+} from "../domain/layers";
+import { cycleRepeat, forgetTrack, INITIAL_MUSIC, nextTrack, playTrack, previousTrack, setFadeSeconds, setMusicVolume, soundingOf, stopMusic, toggleDuck, togglePlayback, trackFromPath, type MusicState, type Track } from "../domain/music";
+import type { ProjectTalkRunner, SaveCardsAction, SaveCuesAction, SaveMinutesAction, SavePlaylistAction, SavePointsAction, StageRunner } from "./actions";
 import { ConsoleIcon } from "./ConsoleIcons";
 import { ConsoleMonitor } from "./ConsoleMonitor";
 import { actionForKey, CONFIRM_WINDOW_MS, DECK_KEYS, isTypingTarget, NEEDS_CONFIRMATION, nextView, slideWindow, type ConsoleAction, type DeckKeyId, type StageViewName } from "./console-model";
+import { CardDialog, type CardDraft } from "./CardDialog";
 import { FilePickerDialog } from "./FilePickerDialog";
+import { LayerHandles, type LayerTarget } from "./LayerHandles";
+import { LayersPanel } from "./LayersPanel";
+import { MusicDialog } from "./MusicDialog";
+import { MusicPanel } from "./MusicPanel";
+import { MusicPlayer, type MusicPlayerHandle } from "./MusicPlayer";
 import { PointDialog, type PointDraft } from "./PointDialog";
 import { RundownPanel } from "./RundownPanel";
 import { SetupDialog } from "./SetupDialog";
@@ -47,6 +81,12 @@ export interface RundownConsoleProps {
   /** Saves the points made in the console and the minutes planned; without them the console cannot add or plan points. */
   savePoints?: SavePointsAction;
   saveMinutes?: SaveMinutesAction;
+  /** The songs of the playlist as saved, and how to save them; without `savePlaylist` the console has no music. */
+  playlist?: readonly Track[];
+  savePlaylist?: SavePlaylistAction;
+  /** The cards that can be put over the screen as saved, and how to save them; without `saveCards` the console has no layers. */
+  cards?: readonly LayerCard[];
+  saveCards?: SaveCardsAction;
   runStage: StageRunner;
   projectTalk: ProjectTalkRunner;
   hrefs: { screen: string; settings: string; raffle: string; back: string };
@@ -85,7 +125,7 @@ const newPointId = (title: string) => {
   return `${slug}-${Math.random().toString(36).slice(2, 6)}`;
 };
 
-export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored, frozen: initialFrozen, view: initialView, squadsOn, polls, saveCues, savePoints, saveMinutes, runStage, projectTalk, hrefs, library: injectedLibrary, openChannel = openStageChannel }: RundownConsoleProps) {
+export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored, frozen: initialFrozen, view: initialView, squadsOn, polls, saveCues, savePoints, saveMinutes, playlist: initialPlaylist = [], savePlaylist, cards: initialCards = [], saveCards, runStage, projectTalk, hrefs, library: injectedLibrary, openChannel = openStageChannel }: RundownConsoleProps) {
   const router = useRouter();
   const media = useMediaLibrary(injectedLibrary);
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -104,6 +144,40 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
   const [playout, setPlayout] = useState<PlayoutState>(() => startOf(queueOf(buildRundown(initialAgenda, stored, new Set(qrItems)))));
   const playoutRef = useRef(playout);
   const [openItemId, setOpenItemId] = useState<string | null>(initialAgenda[0]?.id ?? null);
+  // --- the layers: a counter and cards over the screen ---------------------------------------------------------------------------
+  const [counter, setCounter] = useState<CounterState>(INITIAL_COUNTER);
+  const counterRef = useRef(counter);
+  useEffect(() => {
+    counterRef.current = counter;
+  }, [counter]);
+  const [clock, setClock] = useState(() => Date.now());
+  const [cardList, setCardList] = useState<readonly LayerCard[]>(initialCards);
+  const cardsRef = useRef(cardList);
+  useEffect(() => {
+    cardsRef.current = cardList;
+  }, [cardList]);
+  const [shownCards, setShownCards] = useState<ReadonlySet<string>>(new Set());
+  const hideTimers = useRef(new Map<string, number>());
+  const [cardDialog, setCardDialog] = useState<{ key: number; cardId: string | null } | null>(null);
+
+  // --- the music ---------------------------------------------------------------------------------------------------------------
+  const [tracks, setTracks] = useState<readonly Track[]>(initialPlaylist);
+  const tracksRef = useRef(tracks);
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+  const [music, setMusic] = useState<MusicState>(INITIAL_MUSIC);
+  const [musicProgress, setMusicProgress] = useState<{ trackId: string; time: number; duration: number } | null>(null);
+  const [musicBlocked, setMusicBlocked] = useState(false);
+  const [musicEditing, setMusicEditing] = useState(false);
+  const [musicDialog, setMusicDialog] = useState(false);
+  const [audioFiles, setAudioFiles] = useState<readonly string[]>([]);
+  // The music plays here, in the console's own window (the browser lets it play with the clicks made here); what the player
+  // was last told, to know when a change needs a fade and when it is only a new volume.
+  const player = useRef<MusicPlayerHandle>(null);
+  const lastMusic = useRef<{ sig: string; volume: number } | null>({ sig: ":false", volume: INITIAL_MUSIC.volume });
+  // The songs that have started to play: one that ends without ever doing so could not be read.
+  const heardTracks = useRef(new Set<string>());
   const [pointDialog, setPointDialog] = useState<{ key: number; itemId: string | null } | null>(null);
   const [editing, setEditing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -127,6 +201,10 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
   const [failures, setFailures] = useState<ReadonlyMap<string, FailureReason>>(new Map());
   // Where the video on the air is, as the projector's window last said.
   const [progress, setProgress] = useState<{ cueId: string; time: number; duration: number } | null>(null);
+  const musicRef = useRef(music);
+  useEffect(() => {
+    musicRef.current = music;
+  }, [music]);
   const libraryRef = useRef(media.library);
   useEffect(() => {
     libraryRef.current = media.library;
@@ -214,7 +292,7 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
       line.close();
       channel.current = null;
     };
-  }, [openChannel, announce]);
+  }, [openChannel, announce, alert]);
 
   // --- files that are not where the order says -------------------------------------------------------------------------
   const [missingInFolder, setMissingInFolder] = useState<ReadonlySet<string>>(new Set());
@@ -389,6 +467,106 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
     alert(t.changeFolder.done);
   }
 
+  /** Saves the cards; if they cannot be saved the list goes back to how it was. */
+  async function saveCardList(next: readonly LayerCard[], before: readonly LayerCard[]): Promise<boolean> {
+    if (!saveCards) return false;
+    setCardList(next);
+    const saved = await saveCards({ cards: next });
+    if (!saved.ok) {
+      setCardList(before);
+      alert(t.layers.saveFailed);
+    }
+    return saved.ok;
+  }
+
+  function hideCard(cardId: string) {
+    const timer = hideTimers.current.get(cardId);
+    if (timer !== undefined) window.clearTimeout(timer);
+    hideTimers.current.delete(cardId);
+    setShownCards((current) => {
+      if (!current.has(cardId)) return current;
+      const next = new Set(current);
+      next.delete(cardId);
+      return next;
+    });
+  }
+
+  function toggleCard(cardId: string) {
+    if (shownCards.has(cardId)) return hideCard(cardId);
+    const card = cardsRef.current.find((entry) => entry.id === cardId);
+    if (!card) return;
+    setShownCards((current) => new Set(current).add(cardId));
+    // A card with seconds takes itself off.
+    if (card.hideAfter) hideTimers.current.set(cardId, window.setTimeout(() => hideCard(cardId), card.hideAfter * 1000));
+  }
+
+  async function saveCard(draft: CardDraft): Promise<string | null> {
+    const id = cardDialog?.cardId ?? null;
+    const before = cardsRef.current;
+    const current = id ? before.find((entry) => entry.id === id) : null;
+    const place = current ? { x: current.x, y: current.y } : defaultPlaceOf(draft.kind);
+    const card: LayerCard = { id: current?.id ?? newCueId(), ...draft, ...place };
+    const next = current ? before.map((entry) => (entry.id === card.id ? card : entry)) : [...before, card];
+    return (await saveCardList(next, before)) ? null : t.layers.saveFailed;
+  }
+
+  async function removeCard(cardId: string) {
+    const card = cardsRef.current.find((entry) => entry.id === cardId);
+    if (!card) return;
+    const yes = await confirm({ title: t.layers.removeCardTitle, description: interpolate(t.layers.removeCardBody, { title: card.title }), confirmLabel: t.layers.removeCardConfirm, tone: "danger" });
+    if (!yes) return;
+    hideCard(cardId);
+    const before = cardsRef.current;
+    void saveCardList(before.filter((entry) => entry.id !== cardId), before);
+  }
+
+  /** Moves a layer while it is dragged; a card's new place is saved when the drag ends. */
+  function moveLayer(target: LayerTarget, place: { x: number; y: number }) {
+    if (target.type === "counter") return setCounter((current) => moveCounter(current, place));
+    // The ref moves at once too: the place is saved when the drag ends, which can be in the same event as the last move.
+    const moved = cardsRef.current.map((card) => (card.id === target.id ? { ...card, ...placeOf(place.x, place.y) } : card));
+    cardsRef.current = moved;
+    setCardList(moved);
+  }
+
+  function settleLayer(target: LayerTarget) {
+    if (target.type === "card") void saveCards?.({ cards: cardsRef.current }).then((saved) => (saved.ok ? undefined : alert(t.layers.saveFailed)));
+  }
+
+  /** Saves the playlist; if it cannot be saved the list goes back to how it was. */
+  async function saveTracks(next: readonly Track[], before: readonly Track[]): Promise<boolean> {
+    if (!savePlaylist) return false;
+    setTracks(next);
+    const saved = await savePlaylist({ tracks: next });
+    if (!saved.ok) {
+      setTracks(before);
+      alert(t.music.saveFailed);
+    }
+    return saved.ok;
+  }
+
+  async function addTrack(path: string): Promise<string | null> {
+    const track = trackFromPath(path, newCueId());
+    if (!track) return t.music.badPath;
+    return (await saveTracks([...tracksRef.current, track], tracksRef.current)) ? null : t.music.saveFailed;
+  }
+
+  function removeTrack(trackId: string) {
+    const before = tracksRef.current;
+    setMusic((current) => forgetTrack(current, trackId));
+    void saveTracks(before.filter((track) => track.id !== trackId), before);
+  }
+
+  function moveTrack(trackId: string, delta: -1 | 1) {
+    const before = tracksRef.current;
+    void saveTracks(moveCue(before, trackId, delta), before);
+  }
+
+  function openMusicDialog() {
+    setMusicDialog(true);
+    void media.library?.list().then((files) => setAudioFiles(files.filter(isAudioPath)));
+  }
+
   /** Sets how long a piece stays on the air; once that time passes the console takes the next piece by itself. */
   function setCueSeconds(itemId: string, cueId: string, seconds: number | null) {
     const before = cues[itemId] ?? [];
@@ -462,7 +640,7 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
 
   function openPicker() {
     setPickerOpen(true);
-    void media.library?.list().then(setPickerFiles);
+    void media.library?.list().then((files) => setPickerFiles(files.filter(isMediaPath)));
   }
 
   // --- the keyboard -----------------------------------------------------------------------------------------------------------
@@ -491,6 +669,69 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
   const liveTitle = onAirFile ? onAirFile.name : sceneOnAir ? t.program.scenes[sceneOnAir] : qrOnAir ? t.rundown.kinds.qr : t.program.nothing;
   const liveStatus = onAirFile?.kind === "video" ? (playout.playing ? t.program.playing : t.program.paused) : onAirFile?.kind === "gslides" ? t.program.googleSlides : onAirFile?.kind === "slides" && total > 0 ? interpolate(t.program.slide, { n: String(playout.slide), total: String(total) }) : onAirFile ? t.program.loading : sceneOnAir || qrOnAir ? t.program.sceneStatus : undefined;
   const videoPlaying = onAirFile?.kind === "video" && playout.playing;
+
+  // --- the music: tell the player what to do ----------------------------------------------------------------------------------------
+  const onMusicProgress = useCallback((trackId: string, time: number, duration: number) => {
+    heardTracks.current.add(trackId);
+    setMusicProgress({ trackId, time, duration });
+  }, []);
+  const onMusicEnded = useCallback(
+    (trackId: string) => {
+      const current = musicRef.current;
+      if (current.trackId !== trackId) return;
+      if (!heardTracks.current.has(trackId)) {
+        // It never played: say so, and go on without repeating, so a missing file cannot make the list loop for ever.
+        const missing = tracksRef.current.find((track) => track.id === trackId);
+        if (missing) alert(interpolate(t.music.failed, { name: missing.name }));
+        setMusic(nextTrack({ ...current, repeat: "off" }, tracksRef.current, true));
+      } else {
+        heardTracks.current.delete(trackId);
+        setMusic(nextTrack(current, tracksRef.current, true));
+      }
+    },
+    [alert],
+  );
+
+  const sounding = soundingOf(music, videoPlaying);
+  useEffect(() => {
+    const track = tracks.find((entry) => entry.id === music.trackId) ?? null;
+    const sig = `${track?.id ?? ""}:${sounding}`;
+    const before = lastMusic.current;
+    if (before && before.sig === sig && before.volume === music.volume) return;
+    // A song that starts, stops or changes fades; a new volume only moves, at once.
+    const fadeMs = before && before.sig !== sig ? music.fadeSeconds * 1000 : 0;
+    lastMusic.current = { sig, volume: music.volume };
+    player.current?.apply({ track, playing: sounding, volume: music.volume, fadeMs });
+  }, [music.trackId, music.volume, music.fadeSeconds, sounding, tracks]);
+
+  // --- the counter runs, and at zero it stops (and may take the next piece) -----------------------------------------------------------
+  const counterRunning = isRunning(counter);
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = run;
+  }, [run]);
+  useEffect(() => {
+    if (!counterRunning) return;
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      setClock(now);
+      const current = counterRef.current;
+      if (isRunning(current) && remainingOf(current, now) <= 0) {
+        // The ref is updated now, so the next tick cannot finish it a second time before the screen is drawn again.
+        const done = finishCounter(current);
+        counterRef.current = done;
+        setCounter(done);
+        if (current.onZero === "next") runRef.current({ type: "forward" });
+      }
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [counterRunning]);
+  const counterLeft = remainingOf(counter, clock);
+
+  // The whole picture of the layers goes to the screen each time one changes, and again when the screen (re)connects.
+  useEffect(() => {
+    channel.current?.post({ type: "layers", counter: counterWire(counter, Date.now()), cards: cardList.filter((card) => shownCards.has(card.id)).map(cardWire) });
+  }, [counter, cardList, shownCards, connected]);
 
   // --- a piece with seconds takes the next one by itself ----------------------------------------------------------------------------
   const secondsOnAir = onAirFile?.seconds ?? null;
@@ -623,6 +864,16 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
               title={failedOnAir ? t.program.failed : liveTitle}
               status={secondsLeft !== null && counting ? `${liveStatus ? `${liveStatus} · ` : ""}${interpolate(t.program.autoIn, { n: String(secondsLeft) })}` : liveStatus}
               className="md:flex-[1.5]"
+              overlay={
+                saveCards && (counter.visible || shownCards.size > 0) ? (
+                  <LayerHandles
+                    counter={counter.visible ? { x: counter.x, y: counter.y, size: counter.size } : null}
+                    cards={cardList.filter((card) => shownCards.has(card.id))}
+                    onMove={moveLayer}
+                    onMoveEnd={settleLayer}
+                  />
+                ) : undefined
+              }
               icon={sceneOnAir || qrOnAir || !onAirFile ? <Icon name={qrOnAir ? "qr" : "stage"} size={44} /> : onAirFile.kind === "video" ? <ConsoleIcon name="video" size={44} /> : <ConsoleIcon name="slides" size={44} />}
               preview={
                 onAirFile?.kind === "slides" && programFile.status === "ready" ? (
@@ -693,6 +944,62 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
               onToggleMute={() => run({ type: "mute" })}
               onVolume={(volume) => run({ type: "volume", volume })}
               onSeek={(seconds) => run({ type: "seek", seconds })}
+            />
+          ) : null}
+
+          {savePlaylist ? (
+            <MusicPanel
+              tracks={tracks}
+              music={music}
+              progress={musicProgress}
+              blocked={musicBlocked && sounding}
+              ducked={music.playing && music.duck && videoPlaying}
+              editing={musicEditing}
+              onToggleEditing={() => setMusicEditing((current) => !current)}
+              onAdd={openMusicDialog}
+              onPlay={(trackId) => setMusic((current) => playTrack(current, tracksRef.current, trackId))}
+              onTogglePlayback={() => setMusic((current) => togglePlayback(current, tracksRef.current))}
+              onPrevious={() => setMusic((current) => previousTrack(current, tracksRef.current))}
+              onNext={() => setMusic((current) => nextTrack(current, tracksRef.current))}
+              onStop={() => setMusic(stopMusic)}
+              onSeek={(seconds) => player.current?.seek(seconds)}
+              onUnlock={() => player.current?.retry()}
+              onVolume={(volume) => setMusic((current) => setMusicVolume(current, volume))}
+              onRepeat={() => setMusic(cycleRepeat)}
+              onFade={(seconds) => setMusic((current) => setFadeSeconds(current, seconds))}
+              onDuck={() => setMusic(toggleDuck)}
+              onMove={moveTrack}
+              onRemove={removeTrack}
+            />
+          ) : null}
+
+          {saveCards ? (
+            <LayersPanel
+              counter={counter}
+              remainingMs={counterLeft}
+              cards={cardList}
+              shown={shownCards}
+              onToggleCounter={() => setCounter((current) => showCounter(current, !current.visible))}
+              onStartPause={() => setCounter((current) => (isRunning(current) ? pauseCounter(current, Date.now()) : startCounter(current, Date.now())))}
+              onReset={() => setCounter(resetCounter)}
+              onAddMinute={() => setCounter((current) => addCounterTime(current, Date.now(), 60_000))}
+              onDuration={(text) => {
+                const ms = parseDuration(text);
+                if (ms === null) {
+                  alert(t.layers.badTime);
+                  return false;
+                }
+                setCounter((current) => setCounterDuration(current, ms));
+                return true;
+              }}
+              onSize={(size: CounterSize) => setCounter((current) => setCounterSize(current, size))}
+              onPlace={(name: PlaceName) => setCounter((current) => moveCounter(current, PLACES[name]))}
+              onLabel={(label) => setCounter((current) => setCounterLabel(current, label))}
+              onZero={(onZero: OnZero) => setCounter((current) => setOnZero(current, onZero))}
+              onToggleCard={toggleCard}
+              onNewCard={() => setCardDialog({ key: Date.now(), cardId: null })}
+              onEditCard={(cardId) => setCardDialog({ key: Date.now(), cardId })}
+              onRemoveCard={(cardId) => void removeCard(cardId)}
             />
           ) : null}
 
@@ -768,6 +1075,27 @@ export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored
           onSave={savePoint}
         />
       ) : null}
+      {savePlaylist ? <MusicPlayer handleRef={player} library={media.library} revision={media.revision} onProgress={onMusicProgress} onEnded={onMusicEnded} onBlocked={setMusicBlocked} /> : null}
+      {cardDialog ? (
+        <CardDialog
+          key={cardDialog.key}
+          open
+          onOpenChange={(open) => {
+            if (!open) setCardDialog(null);
+          }}
+          card={cardDialog.cardId ? (cardList.find((entry) => entry.id === cardDialog.cardId) ?? null) : null}
+          onSave={saveCard}
+        />
+      ) : null}
+      <MusicDialog
+        open={musicDialog}
+        onOpenChange={setMusicDialog}
+        files={audioFiles}
+        added={new Set(tracks.map((track) => track.path))}
+        folderReady={media.status === "ready"}
+        onConnect={() => void media.connect().then(() => media.library?.list().then((files) => setAudioFiles(files.filter(isAudioPath))))}
+        onAdd={addTrack}
+      />
       {confirmDialog}
       <SetupDialog
         open={setupManual || (!setupDismissed && media.library !== null && media.status === "none")}
