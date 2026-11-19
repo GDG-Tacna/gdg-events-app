@@ -288,7 +288,7 @@ describe("RundownConsole", () => {
     expect(saveCues).toHaveBeenCalledTimes(1);
     const saved = saveCues.mock.calls[0][0];
     expect(saved.itemId).toBe("keynote");
-    expect(saved.cues.map((cue) => cue.path)).toEqual(["apertura/keynote.pdf", "apertura/video.mp4", "portada.png"]);
+    expect(saved.cues.map((cue) => ("path" in cue ? cue.path : cue.id))).toEqual(["apertura/keynote.pdf", "apertura/video.mp4", "portada.png"]);
     expect(saved.cues.at(-1)).toMatchObject({ kind: "image", name: "portada" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText("portada.png")).toBeInTheDocument();

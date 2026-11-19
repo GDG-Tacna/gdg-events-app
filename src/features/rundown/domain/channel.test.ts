@@ -11,6 +11,14 @@ describe("parseChannelMessage", () => {
     expect(parseChannelMessage({ type: "ping" })).toEqual({ type: "ping" });
   });
 
+  it("carries a Google Slides piece, and refuses one whose presentation id is not one", () => {
+    const deck = { id: "cue-0009", kind: "gslides", name: "Keynote", deckId: "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", published: false };
+
+    expect(parseChannelMessage({ type: "program", cue: deck, slide: 1, playing: false })).toEqual({ type: "program", cue: deck, slide: 1, playing: false });
+    expect(parseChannelMessage({ type: "program", cue: { ...deck, deckId: "../x" }, slide: 1, playing: false })).toBeNull();
+    expect(parseChannelMessage({ type: "program", cue: { ...deck, published: "yes" }, slide: 1, playing: false })).toBeNull();
+  });
+
   it("keeps a file that comes with the piece (a browser that cannot remember the folder sends it)", () => {
     const file = new File(["x"], "keynote.pdf", { type: "application/pdf" });
 

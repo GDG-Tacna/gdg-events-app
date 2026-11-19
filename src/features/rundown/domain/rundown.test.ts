@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRundown, cueFromPath, isMediaPath, kindOfPath, moveCue, nameFromPath, parseCue, parseCues, qrCueId, queueOf } from "./rundown";
+import { buildRundown, cueFromPath, googleSlidesCueFromLink, googleSlidesEmbedUrl, googleSlidesPdfUrl, isFileCue, isMediaPath, kindOfPath, moveCue, nameFromPath, parseCue, parseCues, parseGoogleSlidesLink, qrCueId, queueOf } from "./rundown";
 
 const SLIDES = { id: "cue-0001", kind: "slides", name: "Keynote", path: "apertura/keynote.pdf" } as const;
 
@@ -72,6 +72,60 @@ describe("cueFromPath and parseCue", () => {
     expect(parseCues([SLIDES, { ...other, path: "x.exe" }])).toBeNull();
     expect(parseCues(Array.from({ length: 31 }, (_, i) => ({ ...SLIDES, id: `cue-${String(i).padStart(4, "0")}` })))).toBeNull();
     expect(parseCues("no")).toBeNull();
+  });
+});
+
+const DECK = "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";
+const PUBLISHED = "2PACX-1vQabcdefghijklmnopqrstuvwxyz";
+
+describe("Google Slides links", () => {
+  it("finds the presentation in the forms of link Google gives, and whether it was published to the web", () => {
+    expect(parseGoogleSlidesLink(`https://docs.google.com/presentation/d/${DECK}/edit?usp=sharing`)).toEqual({ deckId: DECK, published: false });
+    expect(parseGoogleSlidesLink(`https://docs.google.com/presentation/d/${DECK}/preview`)).toEqual({ deckId: DECK, published: false });
+    expect(parseGoogleSlidesLink(`  https://docs.google.com/presentation/d/${DECK}  `)).toEqual({ deckId: DECK, published: false });
+    expect(parseGoogleSlidesLink(`https://docs.google.com/presentation/d/e/${PUBLISHED}/pub?start=false`)).toEqual({ deckId: PUBLISHED, published: true });
+  });
+
+  it.each([
+    ["another site", "https://example.com/presentation/d/1AbCdEfGhIjKlMnOpQrStUvWxYz"],
+    ["http instead of https", "http://docs.google.com/presentation/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit"],
+    ["a document, not a presentation", "https://docs.google.com/document/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/edit"],
+    ["a look-alike host", "https://docs.google.com.evil.example/presentation/d/1AbCdEfGhIjKlMnOpQrStUvWxYz"],
+    ["an id that is too short", "https://docs.google.com/presentation/d/abc/edit"],
+    ["text that is not a link", "mi presentación"],
+    ["no text at all", 42],
+  ])("refuses %s", (_name, text) => {
+    expect(parseGoogleSlidesLink(text)).toBeNull();
+  });
+
+  it("makes a piece from a link, named by the admin or by default, and refuses what is not a deck", () => {
+    expect(googleSlidesCueFromLink(`https://docs.google.com/presentation/d/${DECK}/edit`, "cue-0009", "  Keynote final ")).toEqual({ id: "cue-0009", kind: "gslides", name: "Keynote final", deckId: DECK, published: false });
+    expect(googleSlidesCueFromLink(`https://docs.google.com/presentation/d/${DECK}/edit`, "cue-0009")?.name).toBe("Presentación de Google Slides");
+    expect(googleSlidesCueFromLink("https://example.com", "cue-0009")).toBeNull();
+    expect(googleSlidesCueFromLink(`https://docs.google.com/presentation/d/${DECK}`, "x")).toBeNull();
+  });
+
+  it("gives the address Google embeds: the clean embed when it is published, the preview when only shared", () => {
+    expect(googleSlidesEmbedUrl({ deckId: PUBLISHED, published: true })).toBe(`https://docs.google.com/presentation/d/e/${PUBLISHED}/embed?start=false&loop=false&delayms=3000&rm=minimal`);
+    expect(googleSlidesEmbedUrl({ deckId: DECK, published: false })).toBe(`https://docs.google.com/presentation/d/${DECK}/preview`);
+    expect(googleSlidesPdfUrl({ deckId: DECK, published: false })).toBe(`https://docs.google.com/presentation/d/${DECK}/export/pdf`);
+  });
+
+  it("reads a stored Google Slides piece, and refuses one with a bad id, no published flag or no name", () => {
+    const cue = { id: "cue-0009", kind: "gslides", name: "Keynote", deckId: DECK, published: false };
+    expect(parseCue(cue)).toEqual(cue);
+    expect(parseCue({ ...cue, extra: 1 })).toEqual(cue);
+    expect(parseCue({ ...cue, deckId: "../x" })).toBeNull();
+    expect(parseCue({ ...cue, deckId: "corto" })).toBeNull();
+    expect(parseCue({ ...cue, published: "yes" })).toBeNull();
+    expect(parseCue({ ...cue, name: "  " })).toBeNull();
+    expect(parseCues([cue, { id: "cue-0001", kind: "slides", name: "Deck", path: "a/deck.pdf" }])).toHaveLength(2);
+  });
+
+  it("tells a file piece from a Google Slides one and from the QR", () => {
+    expect(isFileCue({ id: "cue-0001", kind: "video", name: "V", path: "a.mp4" })).toBe(true);
+    expect(isFileCue({ id: "cue-0009", kind: "gslides", name: "G", deckId: DECK, published: false })).toBe(false);
+    expect(isFileCue({ id: "k:qr", kind: "qr", name: "QR" })).toBe(false);
   });
 });
 
