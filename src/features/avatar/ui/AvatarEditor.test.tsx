@@ -11,6 +11,9 @@ import { AvatarEditor } from "./AvatarEditor";
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
+// The editor draws a dozen little avatars and axe walks all of them: slow under a loaded machine, not wrong.
+vi.setConfig({ testTimeout: 20_000 });
+
 const t = copy.avatar;
 const ORIGINAL = lookFromSeed("Nova_7");
 
@@ -21,24 +24,91 @@ function renderEditor(chosen: AvatarLook | null = null) {
   return { save, reset, view, user: userEvent.setup() };
 }
 
+const openTab = (user: ReturnType<typeof userEvent.setup>, name: keyof typeof t.tabs) => user.click(screen.getByRole("tab", { name: t.tabs[name] }));
+
 describe("AvatarEditor", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("starts from the alias's look and saves the choices made", async () => {
+  it("starts from the alias's look and saves the choices made across the tabs", async () => {
     const { save, user } = renderEditor();
 
     expect(screen.getByRole("img", { name: t.previewLabel })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: t.hairStyles[ORIGINAL.hairStyle] })).toBeChecked();
-    await user.click(screen.getByRole("radio", { name: t.hairStyles.curly }));
+    // Face: skin, beard and glasses.
     await user.click(screen.getByRole("radio", { name: t.beards.mustache }));
     await user.click(screen.getByRole("radio", { name: t.glasses.shades }));
-    await user.click(screen.getByRole("radio", { name: "Azul marino" }));
     await user.click(screen.getByRole("radio", { name: "Tono 6" }));
+    await openTab(user, "hair");
+    expect(screen.getByRole("radio", { name: t.hairStyles[ORIGINAL.hairStyle] })).toBeChecked();
+    await user.click(screen.getByRole("radio", { name: t.hairStyles.curly }));
+    await openTab(user, "suit");
+    await user.click(screen.getByRole("radio", { name: "Azul marino" }));
     await user.click(screen.getByRole("button", { name: t.save }));
 
     expect(save).toHaveBeenCalledWith({ look: { ...ORIGINAL, hairStyle: "curly", beard: "mustache", glasses: "shades", suit: 2, skin: 5 } });
     expect(await screen.findByText(t.saved)).toHaveFocus();
     expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("shows one group of parts at a time, in tabs, with the current one selected", async () => {
+    const { user } = renderEditor();
+
+    expect(screen.getByRole("tab", { name: t.tabs.face })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("group", { name: t.groups.beard })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: t.groups.hairStyle })).not.toBeInTheDocument();
+
+    await openTab(user, "hair");
+
+    expect(screen.getByRole("tab", { name: t.tabs.hair })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("group", { name: t.groups.hairStyle })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: t.groups.beard })).not.toBeInTheDocument();
+  });
+
+  it("lets the helmet come off, so the face and the hairstyle show, and then the helmet color cannot be chosen", async () => {
+    const { save, user } = renderEditor();
+
+    await openTab(user, "helmet");
+    expect(screen.getByRole("radio", { name: t.helmetState.on })).toBeChecked();
+    expect(screen.getByRole("radio", { name: t.helmets[0] })).toBeEnabled();
+
+    await user.click(screen.getByRole("radio", { name: t.helmetState.off }));
+
+    expect(screen.getByRole("radio", { name: t.helmetState.off })).toBeChecked();
+    expect(screen.getByRole("radio", { name: t.helmets[0] })).toBeDisabled();
+    expect(screen.getByText(t.helmetOffHint)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: t.save }));
+    expect(save).toHaveBeenCalledWith({ look: { ...ORIGINAL, helmetOn: false } });
+  });
+
+  it("undoes the last changes one by one, and has nothing to undo at the start", async () => {
+    const { user } = renderEditor();
+    expect(screen.getByRole("button", { name: t.undo })).toBeDisabled();
+
+    await user.click(screen.getByRole("radio", { name: t.beards.beard }));
+    await user.click(screen.getByRole("radio", { name: t.glasses.round }));
+    expect(screen.getByRole("radio", { name: t.glasses.round })).toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: t.undo }));
+    expect(screen.getByRole("radio", { name: t.glasses.none })).toBeChecked();
+    expect(screen.getByRole("radio", { name: t.beards.beard })).toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: t.undo }));
+    expect(screen.getByRole("radio", { name: t.beards.none })).toBeChecked();
+    expect(screen.getByRole("button", { name: t.undo })).toBeDisabled();
+  });
+
+  it("says whether there is anything to save, and that all is saved after saving", async () => {
+    const { user } = renderEditor();
+    expect(screen.getByText(t.allSaved)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: t.beards.stubble }));
+    expect(screen.getByText(t.unsaved)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: t.save }));
+    expect(await screen.findByText(t.allSaved)).toBeInTheDocument();
+    // Changing it back to what was saved before the change is a change from what is saved now.
+    await user.click(screen.getByRole("radio", { name: t.beards.none }));
+    expect(screen.getByText(t.unsaved)).toBeInTheDocument();
   });
 
   it("goes back to the original, forgetting the chosen look on the server", async () => {

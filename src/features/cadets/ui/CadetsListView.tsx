@@ -20,8 +20,8 @@ export interface CadetsListViewProps {
 const chip = "type-caption border-line-strong text-foreground px-space-3 rounded-full border py-1";
 
 /**
- * The Cadetes screen: everyone registered in the edition, by alias, each with their real name and email, with a search by the start of the alias and a link
- * to each one's page. It only shows (the search is a plain form, the next page a plain link): no state, no client code.
+ * The Cadetes screen: everyone registered in the edition, by alias, each with their real name and email, with a search
+ * by alias, name, email or squad and a link to each one's page. It only shows (the search is a plain form, the next page a plain link): no state, no client code.
  */
 export function CadetsListView({ cadets, total, search, nextHref, hrefs }: CadetsListViewProps) {
   const t = copy.admin.cadets;
@@ -47,7 +47,7 @@ export function CadetsListView({ cadets, total, search, nextHref, hrefs }: Cadet
             name="q"
             type="search"
             defaultValue={search}
-            maxLength={40}
+            maxLength={80}
             autoComplete="off"
             placeholder={t.searchPlaceholder}
             className="type-body bg-bg-deep text-foreground border-line-strong focus-visible:ring-ring h-12 w-full min-w-0 rounded-md border px-4 text-base focus-visible:ring-[3px] focus-visible:outline-none"
@@ -87,7 +87,7 @@ export function CadetsListView({ cadets, total, search, nextHref, hrefs }: Cadet
                 </div>
                 <div className="gap-space-2 flex shrink-0 flex-wrap items-center">
                   <TicketChip type={cadet.ticket} />
-                  {cadet.banned ? <span className={`${chip} border-danger text-danger`}>{t.banned}</span> : null}
+                  {cadet.banned ? <span className={`${chip} border-danger text-danger-ink`}>{t.banned}</span> : null}
                   <span className={chip}>{cadet.attended ? t.attended : t.notArrived}</span>
                 </div>
               </Card>

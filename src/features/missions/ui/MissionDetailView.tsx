@@ -29,6 +29,8 @@ export interface MissionDetailViewProps {
   achievementsHref?: string;
   /** The mini-game bonus of a completed mission, built by the app shell (the missions feature does not know mini-games). */
   bonusSlot?: ReactNode;
+  /** The names to look for when a speaker or team mission names certain people (empty when it accepts everyone). */
+  people?: readonly string[];
 }
 
 interface Progress {
@@ -60,7 +62,7 @@ function feedbackFor(type: MissionType, next: Progress): Feedback {
  * sends the cadet to the scanner and a stand mission to their own QR (the staff scan it at the stand). Whether an answer is right is decided on the
  * server; this screen shows the answer it gets back and refreshes the board behind it.
  */
-export function MissionDetailView({ mission, answer, backHref, scanHref, passHref, quadrant, minigame, achievementsHref, bonusSlot }: MissionDetailViewProps) {
+export function MissionDetailView({ mission, answer, backHref, scanHref, passHref, quadrant, minigame, achievementsHref, bonusSlot, people = [] }: MissionDetailViewProps) {
   const router = useRouter();
   const [progress, setProgress] = useState<Progress>({ status: mission.status, xpEarned: mission.xpEarned, creditsEarned: mission.creditsEarned, attemptsLeft: mission.attemptsLeft });
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -106,14 +108,14 @@ export function MissionDetailView({ mission, answer, backHref, scanHref, passHre
 
       <header className="gap-space-3 flex flex-col">
         <div className="gap-space-3 flex items-start">
-          <span aria-hidden="true" className="border-cyan/50 text-cyan bg-bg-deep relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md border">
+          <span aria-hidden="true" className="border-cyan/50 text-cyan-ink bg-bg-deep relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md border">
             {mission.imageUrl ? <Image src={mission.imageUrl} alt="" fill unoptimized sizes="56px" className="object-cover" /> : <Icon name={MISSION_TYPE_ICON[mission.type]} size={26} />}
           </span>
           <div className="gap-space-1 flex min-w-0 flex-1 flex-col">
             <h1 className="type-title text-foreground">{mission.title}</h1>
             <span className="gap-space-2 flex items-center">
               <span className="type-pixel-tag text-primary">{interpolate(copy.missions.xp, { xp: formatNumber(mission.xp) })}</span>
-              {mission.credits > 0 ? <span className="type-pixel-tag text-gold">{interpolate(copy.missions.credits, { n: formatNumber(mission.credits) })}</span> : null}
+              {mission.credits > 0 ? <span className="type-pixel-tag text-gold-ink">{interpolate(copy.missions.credits, { n: formatNumber(mission.credits) })}</span> : null}
             </span>
           </div>
         </div>
@@ -128,7 +130,7 @@ export function MissionDetailView({ mission, answer, backHref, scanHref, passHre
             tabIndex={-1}
             className={cn(
               "type-label gap-space-2 p-space-3 flex items-center rounded-md border focus-visible:outline-none",
-              feedback.tone === "success" ? "border-accent/60 text-accent bg-accent/10" : "border-line-strong text-foreground bg-surface-raised",
+              feedback.tone === "success" ? "border-accent/60 text-lime-ink bg-accent/10" : "border-line-strong text-foreground bg-surface-raised",
             )}
           >
             <Icon name={feedback.tone === "success" ? "check" : progress.status === "failed" ? "failed" : "alert"} size={20} />
@@ -156,15 +158,39 @@ export function MissionDetailView({ mission, answer, backHref, scanHref, passHre
       {answerable && (mission.config.type === "talk" || mission.config.type === "stand" || mission.config.type === "speaker") ? (
         <Card className="gap-space-4 flex flex-col">
           <p className="type-body text-foreground">{copy.missions.howTo[mission.config.type]}</p>
-          {mission.config.type !== "stand" ? (
-            <ButtonLink href={scanHref} variant="primary">
-              {copy.missions.scan}
-            </ButtonLink>
-          ) : passHref ? (
-            <ButtonLink href={passHref} variant="primary">
+          {mission.config.type === "speaker" && people.length > 0 ? <p className="type-body text-muted-foreground">{interpolate(copy.missions.people, { names: people.join(", ") })}</p> : null}
+          <ButtonLink href={scanHref} variant="primary">
+            {copy.missions.scan}
+          </ButtonLink>
+          {mission.config.type === "stand" && passHref ? (
+            <ButtonLink href={passHref} variant="secondary">
               {copy.missions.showQr}
             </ButtonLink>
           ) : null}
+        </Card>
+      ) : null}
+
+      {answerable && mission.config.type === "team" ? (
+        <Card className="gap-space-4 flex flex-col">
+          <p className="type-body text-foreground">{copy.missions.howTo[mission.config.role]}</p>
+          {people.length > 0 ? <p className="type-body text-muted-foreground">{interpolate(copy.missions.people, { names: people.join(", ") })}</p> : null}
+          <ButtonLink href={scanHref} variant="primary">
+            {copy.missions.scan}
+          </ButtonLink>
+        </Card>
+      ) : null}
+
+      {answerable && mission.config.type === "squads" ? (
+        <Card className="gap-space-4 flex flex-col">
+          <p className="type-body text-foreground">{copy.missions.howTo.squads}</p>
+          {mission.progress ? (
+            <p className="type-label text-primary tabular-nums">
+              {interpolate(copy.missions.squadsProgress, { done: String(mission.progress.done), total: String(mission.progress.total) })}
+            </p>
+          ) : null}
+          <ButtonLink href={scanHref} variant="primary">
+            {copy.missions.scan}
+          </ButtonLink>
         </Card>
       ) : null}
     </div>
@@ -177,7 +203,7 @@ function ClosedNote({ status, xpEarned, creditsEarned }: { status: "open" | Comp
     <p
       className={cn(
         "type-label gap-space-2 p-space-3 flex items-center rounded-md border",
-        completed ? "border-accent/60 text-accent bg-accent/10" : "border-line-strong text-muted-foreground bg-surface-raised",
+        completed ? "border-accent/60 text-lime-ink bg-accent/10" : "border-line-strong text-muted-foreground bg-surface-raised",
       )}
     >
       <Icon name={completed ? "check" : "failed"} size={20} />

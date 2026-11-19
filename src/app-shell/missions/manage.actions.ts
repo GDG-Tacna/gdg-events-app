@@ -26,7 +26,9 @@ import { mayEdit } from "@/app-shell/permissions.server";
 const configSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("talk"), checkpointId: z.string().max(60) }),
   z.object({ type: z.literal("stand"), checkpointId: z.string().max(60) }),
-  z.object({ type: z.literal("speaker"), speakerId: z.string().max(60) }),
+  z.object({ type: z.literal("speaker"), speakerIds: z.array(z.string().max(60)).max(50).nullable() }),
+  z.object({ type: z.literal("team"), role: z.string().max(20), memberUids: z.array(z.string().max(128)).max(50).nullable() }),
+  z.object({ type: z.literal("squads") }),
   z.object({ type: z.literal("quiz"), question: z.string().max(400), options: z.array(z.string().max(200)).max(6), answer: z.number().int() }),
   z.object({ type: z.literal("keyword"), prompt: z.string().max(400), keywords: z.array(z.string().max(80)).max(10) }),
 ]);

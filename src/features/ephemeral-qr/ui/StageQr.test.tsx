@@ -40,6 +40,18 @@ describe("StageQr", () => {
     expect(screen.getByText(copy.admin.qr.scanHint)).toBeInTheDocument();
   });
 
+  it("names the speaker and lists the three steps beside the code", async () => {
+    render(<StageQr checkpointId="keynote" name="Keynote de apertura" speaker="Equipo GDG Tacna" issue={async () => showing()} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByText("Equipo GDG Tacna")).toBeInTheDocument();
+    expect(screen.getByText(copy.stage.talkQr.eyebrow)).toBeInTheDocument();
+    const steps = screen.getAllByRole("listitem");
+    expect(steps.map((step) => step.textContent)).toEqual(["1Abre el app y toca «Escanear QR»", "2Apunta la cámara a este código", "3Recibe tu XP"]);
+  });
+
   it("shows the name while the first code is on its way", () => {
     render(<StageQr checkpointId="keynote" name="Keynote de apertura" issue={() => new Promise<IssueQrActionResult>(() => undefined)} />);
 

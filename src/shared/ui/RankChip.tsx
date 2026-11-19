@@ -13,11 +13,11 @@ export function RankChip({ level, name, className }: RankChipProps) {
   return (
     <span
       className={cn(
-        "bg-secondary border-input inline-flex items-center gap-space-2 rounded-pill border px-space-3 py-space-1",
+        "bg-surface border-ink inline-flex items-center gap-space-2 rounded-pill border-2 px-space-3 py-space-1",
         className,
       )}
     >
-      <span className="type-pixel-tag text-primary">NV {level}</span>
+      <span className="type-pixel-tag text-gold-ink">NV {level}</span>
       <span className="type-label text-foreground">{name}</span>
     </span>
   );

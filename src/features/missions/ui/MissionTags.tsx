@@ -3,7 +3,7 @@ import { Icon, PixelPlanet, type IconName, type PlanetKind } from "@/shared/ui";
 import type { MissionType } from "../domain/mission";
 
 /** The line icon of each kind of mission. */
-export const MISSION_TYPE_ICON: Record<MissionType, IconName> = { talk: "qr", stand: "map-pin", speaker: "person", quiz: "question", keyword: "key" };
+export const MISSION_TYPE_ICON: Record<MissionType, IconName> = { talk: "qr", stand: "map-pin", speaker: "person", team: "users", squads: "flag", quiz: "question", keyword: "key" };
 
 export interface MissionTagsProps {
   type: MissionType;
@@ -30,7 +30,7 @@ export function MissionTags({ type, quadrant, minigame }: MissionTagsProps) {
         </li>
       ) : null}
       {minigame ? (
-        <li className={`${chip} border-gold/60 text-gold`}>
+        <li className={`${chip} border-gold/60 text-gold-ink`}>
           <span className="type-pixel-tag text-[12px] leading-4">{copy.missions.tags.minigameBonus}</span>
           {copy.missions.tags.minigame}
         </li>

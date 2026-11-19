@@ -9,13 +9,21 @@ import { FirestoreMissionSource, toMission } from "./firestore-mission-source";
 const isAlreadyExists = (cause: unknown) =>
   typeof cause === "object" && cause !== null && ((cause as { code?: unknown }).code === 6 || (cause as { code?: unknown }).code === "already-exists");
 
-/** Plain copy of a config for Firestore (no readonly arrays shared with callers). */
+/**
+ * Plain copy of a config for Firestore (no readonly arrays shared with callers). A choice of everyone is stored as an
+ * explicit `null`. Saving writes the whole `config` map, so the `speakerId` of a mission saved before the choice of
+ * several is replaced by `speakerIds` rather than left beside it.
+ */
 const configData = (config: MissionConfig) =>
   config.type === "quiz"
     ? { ...config, options: [...config.options] }
     : config.type === "keyword"
       ? { ...config, keywords: [...config.keywords] }
-      : { ...config };
+      : config.type === "speaker"
+        ? { type: config.type, speakerIds: config.speakerIds === null ? null : [...config.speakerIds] }
+        : config.type === "team"
+          ? { type: config.type, role: config.role, memberUids: config.memberUids === null ? null : [...config.memberUids] }
+          : { ...config };
 
 const missionData = (mission: Mission) => ({
   title: mission.title,

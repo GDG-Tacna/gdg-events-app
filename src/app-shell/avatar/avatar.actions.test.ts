@@ -28,6 +28,13 @@ describe("avatar actions", () => {
     expect(server.resetAvatarLook).toHaveBeenCalledWith({ marker: "avatars" }, { uid: "u1", role: "attendee" });
   });
 
+  it("pass the helmet choice on to the use case instead of dropping it, and refuse one that is not on or off", async () => {
+    await saveAvatarAction({ look: { ...LOOK, helmetOn: false } });
+    expect(server.saveAvatarLook).toHaveBeenCalledWith({ marker: "avatars" }, { uid: "u1", role: "attendee" }, { ...LOOK, helmetOn: false });
+
+    expect(await saveAvatarAction({ look: { ...LOOK, helmetOn: "no" } })).toEqual({ ok: false, code: "invalid-look" });
+  });
+
   it("refuse without a session or with input of the wrong shape, and pass refusals through", async () => {
     expect(await saveAvatarAction({ look: { ...LOOK, skin: "dark" } })).toEqual({ ok: false, code: "invalid-look" });
     server.saveAvatarLook.mockResolvedValueOnce({ ok: false, error: { code: "forbidden" } });

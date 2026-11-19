@@ -175,23 +175,72 @@ describe("MissionDetailView", () => {
   });
 
   it("sends a «Conoce al speaker» mission to the scanner (the speaker shows the code)", () => {
-    renderView({ ...STAND, id: "meet-ana", type: "speaker", config: { type: "speaker" } });
+    renderView({ ...STAND, id: "meet-ana", type: "speaker", config: { type: "speaker", speakerIds: null } });
 
     expect(screen.getByText(copy.missions.howTo.speaker)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: copy.missions.scan })).toHaveAttribute("href", "/scan");
     expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
   });
 
-  it("sends a stand mission to the cadet's own QR (the staff scan it at the stand), never to the scanner", () => {
+  it("names the people to look for when a speaker or team mission names some, and nothing when it accepts everyone", () => {
+    const { unmount } = renderView({ ...STAND, id: "meet-some", type: "speaker", config: { type: "speaker", speakerIds: ["ana-torres", "luis"] } }, undefined, { people: ["Ana Torres", "Luis Mamani"] });
+    expect(screen.getByText("Escanea el código de cualquiera de ellos: Ana Torres, Luis Mamani.")).toBeInTheDocument();
+    unmount();
+
+    const team = renderView({ ...STAND, id: "meet-vol", type: "team", config: { type: "team", role: "volunteer", memberUids: ["uid-ana-123"] } }, undefined, { people: ["Ana"] });
+    expect(screen.getByText("Escanea el código de cualquiera de ellos: Ana.")).toBeInTheDocument();
+    team.unmount();
+
+    renderView({ ...STAND, id: "meet-all", type: "speaker", config: { type: "speaker", speakerIds: null } });
+    expect(screen.queryByText(/cualquiera de ellos/)).not.toBeInTheDocument();
+  });
+
+  it("sends a «Conoce a un organizador / voluntario» mission to the scanner, with the words of the role it asks for", () => {
+    const { unmount } = renderView({ ...STAND, id: "meet-org", type: "team", config: { type: "team", role: "organizer", memberUids: null } });
+
+    expect(screen.getByText(copy.missions.howTo.organizer)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: copy.missions.scan })).toHaveAttribute("href", "/scan");
+    expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
+    unmount();
+
+    renderView({ ...STAND, id: "meet-vol", type: "team", config: { type: "team", role: "volunteer", memberUids: null } });
+    expect(screen.getByText(copy.missions.howTo.volunteer)).toBeInTheDocument();
+    expect(screen.queryByText(copy.missions.howTo.organizer)).not.toBeInTheDocument();
+  });
+
+  it("shows how many squads a «Conoce a cada escuadrón» mission has met, and sends the cadet to the scanner", () => {
+    const squads: BoardMission = { ...STAND, id: "meet-squads", type: "squads", config: { type: "squads" }, progress: { done: 1, total: 2 } };
+    const { unmount } = renderView(squads);
+
+    expect(screen.getByText(copy.missions.howTo.squads)).toBeInTheDocument();
+    expect(screen.getByText("1 de 2 escuadrones")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: copy.missions.scan })).toHaveAttribute("href", "/scan");
+    unmount();
+
+    // Without progress (nothing to meet yet, or it could not be read) only the explanation shows.
+    renderView({ ...squads, progress: undefined });
+    expect(screen.getByText(copy.missions.howTo.squads)).toBeInTheDocument();
+    expect(screen.queryByText(/escuadrones$/)).not.toBeInTheDocument();
+  });
+
+  it("offers no scan for a completed «Conoce a…» mission", () => {
+    renderView({ ...STAND, id: "meet-org", type: "team", config: { type: "team", role: "organizer", memberUids: null }, status: "completed", xpEarned: 30 });
+
+    expect(screen.queryByText(copy.missions.howTo.organizer)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: copy.missions.scan })).not.toBeInTheDocument();
+  });
+
+  it("sends a stand mission to the scanner (the stand's screen), and also offers the cadet's own QR for staff to scan", () => {
     const { unmount } = renderView(STAND);
 
     expect(screen.getByText(copy.missions.howTo.stand)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: copy.missions.scan })).toHaveAttribute("href", "/scan");
     expect(screen.getByRole("link", { name: copy.missions.showQr })).toHaveAttribute("href", "/pass");
-    expect(screen.queryByRole("link", { name: copy.missions.scan })).not.toBeInTheDocument();
     unmount();
 
-    // With check-ins off there is no QR to show: the explanation stays, without a button.
+    // With check-ins off there is no QR to show: only the scanner stays.
     renderView(STAND, undefined, { passHref: undefined });
+    expect(screen.getByRole("link", { name: copy.missions.scan })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: copy.missions.showQr })).not.toBeInTheDocument();
   });
 

@@ -1,9 +1,15 @@
 import "server-only";
 import { FirestoreAuditLog } from "@/features/admin/server";
 import { createAlias } from "@/features/attendee";
-import { FirebaseAccountDirectory, FirestoreCadetStore, type CadetsDeps } from "@/features/cadets/server";
+import { CachedCadetStore, FirebaseAccountDirectory, FirestoreCadetStore, type CadetsDeps } from "@/features/cadets/server";
 import { err, ok } from "@/shared/lib/result";
 import { squadStore } from "./squads.server";
+
+// The search reads every cadet: kept for a minute, and dropped whenever a change goes through this store.
+const cadetStore = new CachedCadetStore(new FirestoreCadetStore());
+
+/** Drops the kept list of cadets: for a change to a cadet's profile that does not go through the cadets store. */
+export const forgetCadetList = (): void => cadetStore.forget();
 
 /**
  * Composition root for managing the edition's cadets. The alias rules come from the attendee feature and the squads
@@ -11,13 +17,17 @@ import { squadStore } from "./squads.server";
  * neither; changes go to the admin audit trail.
  */
 export const cadetsDeps: CadetsDeps = {
-  store: new FirestoreCadetStore(),
+  store: cadetStore,
   accounts: new FirebaseAccountDirectory(),
   aliases: { check: createAlias },
   squads: {
     exists: async (id) => {
       const listed = await squadStore.list();
       return listed.ok ? ok(listed.value.some((squad) => squad.id === id)) : err({ code: "unknown" });
+    },
+    names: async () => {
+      const listed = await squadStore.list();
+      return listed.ok ? ok(new Map(listed.value.map((squad) => [squad.id, squad.name] as const))) : err({ code: "unknown" });
     },
   },
   audit: new FirestoreAuditLog(),

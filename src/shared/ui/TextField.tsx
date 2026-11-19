@@ -36,7 +36,7 @@ export function TextField({ label, hint, error, counter, className, ...props }: 
         aria-describedby={describedBy}
         className={cn(
           // `dark:` variants of the primitive win over plain ones, so the dark fill is overridden explicitly.
-          "type-body h-12 rounded-md px-4 text-base md:text-base",
+          "type-body border-line-strong focus-visible:border-ink h-12 rounded-md border-2 px-4 text-base md:text-base",
           "bg-bg-deep dark:bg-bg-deep text-foreground",
           // The example must not read as typed text.
           "placeholder:text-text-subtle",
@@ -60,7 +60,7 @@ export function TextField({ label, hint, error, counter, className, ...props }: 
         </div>
       ) : null}
       {error ? (
-        <p id={errorId} role="alert" className="type-body-sm text-danger">
+        <p id={errorId} role="alert" className="type-body-sm text-danger-ink">
           {error}
         </p>
       ) : null}

@@ -64,7 +64,7 @@ export function CodeOrder({ difficulty, codeLanguages, paused, onFinish, random 
       <section aria-label={t.program} className="bg-bg-deep border-line-strong p-space-3 min-h-24 rounded-md border">
         <ol className="gap-1 flex flex-col">
           {placed.map((line) => (
-            <li key={line} className="text-accent font-mono text-[13px] leading-snug whitespace-pre-wrap">
+            <li key={line} className="text-lime-ink font-mono text-[13px] leading-snug whitespace-pre-wrap">
               {line}
             </li>
           ))}
@@ -72,7 +72,7 @@ export function CodeOrder({ difficulty, codeLanguages, paused, onFinish, random 
       </section>
 
       <section aria-label={t.lines} className="gap-space-2 flex flex-col">
-        <p aria-live="polite" className="type-caption text-danger min-h-5">
+        <p aria-live="polite" className="type-caption text-danger-ink min-h-5">
           {wrong ? t.wrong : ""}
         </p>
         {pool.map((line) => (

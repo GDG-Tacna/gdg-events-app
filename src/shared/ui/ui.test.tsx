@@ -143,21 +143,22 @@ describe("Button", () => {
 });
 
 describe("Card", () => {
-  it("keeps an opaque surface fill (a transparent card lets the starfield show through)", () => {
+  it("keeps an opaque surface fill with the 2px ink border", () => {
     const { container } = render(<Card>contenido</Card>);
     const classes = (container.firstElementChild as HTMLElement).className.split(/\s+/);
 
     expect(classes).toContain("bg-card");
-    expect(classes).toContain("shadow-card");
+    expect(classes).toContain("border-2");
+    expect(classes).toContain("border-ink");
   });
 
-  it("keeps the card elevation when the cyan glow is on", () => {
+  it("swaps the ink border for the brand blue when highlighted", () => {
     const { container } = render(<Card tone="cyan">contenido</Card>);
-    const className = (container.firstElementChild as HTMLElement).className;
+    const classes = (container.firstElementChild as HTMLElement).className.split(/\s+/);
 
-    expect(className).toContain("bg-card");
-    expect(className).toContain("--shadow-card");
-    expect(className).toContain("--shadow-glow-cyan");
+    expect(classes).toContain("bg-card");
+    expect(classes).toContain("border-cyan");
+    expect(classes).not.toContain("border-ink");
   });
 });
 

@@ -24,7 +24,7 @@ import {
 import { isTicketSource, ticketTypeOf } from "@/features/tickets";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
-import type { CadetPage, CadetRecord, CadetRemoval, CadetStore, CadetSummary } from "../../domain/manage";
+import type { CadetPage, CadetRecord, CadetRemoval, CadetStore, CadetSummary, IndexedCadet } from "../../domain/manage";
 
 const toDate = (value: unknown): Date | null => {
   if (value instanceof Date) return value;
@@ -70,12 +70,11 @@ export class FirestoreCadetStore implements CadetStore {
     return { db, eventId, collection: (name: Parameters<typeof eventCollection>[2]) => eventCollection(db, eventId, name) };
   }
 
-  async list(query: { search: string; after: string | null; limit: number }): Promise<Result<CadetPage, { code: string }>> {
+  async list(query: { after: string | null; limit: number }): Promise<Result<CadetPage, { code: string }>> {
     try {
       const { collection } = await this.scope();
       const participants = collection(PARTICIPANTS_COLLECTION);
       let ordered = participants.orderBy("aliasLower");
-      if (query.search) ordered = ordered.where("aliasLower", ">=", query.search).where("aliasLower", "<=", `${query.search}`);
       if (query.after) ordered = ordered.startAfter(query.after);
       const [page, total] = await Promise.all([ordered.limit(query.limit + 1).get(), participants.count().get()]);
 
@@ -85,6 +84,22 @@ export class FirestoreCadetStore implements CadetStore {
       return ok({ cadets, next: page.docs.length > query.limit && typeof last === "string" ? last : null, total: total.data().count });
     } catch (cause) {
       logServerError("cadets.store.list", cause);
+      return err({ code: "unknown" });
+    }
+  }
+
+  async listAll(): Promise<Result<{ cadets: readonly IndexedCadet[]; total: number }, { code: string }>> {
+    try {
+      const { collection } = await this.scope();
+      const snapshot = await collection(PARTICIPANTS_COLLECTION).get();
+      const cadets = snapshot.docs.flatMap((doc): IndexedCadet[] => {
+        const data = doc.data();
+        const cadet = toCadet(doc.id, data);
+        return cadet ? [{ ...cadet, aliasKey: typeof data.aliasLower === "string" ? data.aliasLower : cadet.alias.toLowerCase() }] : [];
+      });
+      return ok({ cadets, total: snapshot.docs.length });
+    } catch (cause) {
+      logServerError("cadets.store.listAll", cause);
       return err({ code: "unknown" });
     }
   }

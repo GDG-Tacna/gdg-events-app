@@ -16,10 +16,13 @@ export function useScanner(record: RecordCheckInAction) {
   const submit = useCallback(
     async (text: string): Promise<ScanOutcome> => {
       const result = await record(text);
-      if (result.ok && result.recorded) track({ name: "check_in", params: { kind: result.kind } });
+      // A contact is not a check-in: it counts as a contact, never for the key metric.
+      if (result.ok && result.kind === "contact") {
+        if (result.recorded) track({ name: "contact_made" });
+      } else if (result.ok && result.recorded) track({ name: "check_in", params: { kind: result.kind } });
       if (result.ok) for (const mission of result.missions ?? []) if (mission.justCompleted) track({ name: "mission_complete", params: { via: "scan" } });
       return result.ok
-        ? { ok: true, kind: result.kind, recorded: result.recorded, firstEntrance: result.firstEntrance, missions: result.missions ?? [], talkCredits: result.talkCredits ?? 0, achievements: result.achievements ?? [], checkpoint: result.checkpoint ?? null }
+        ? { ok: true, kind: result.kind, recorded: result.recorded, firstEntrance: result.firstEntrance, missions: result.missions ?? [], talkCredits: result.talkCredits ?? 0, achievements: result.achievements ?? [], checkpoint: result.checkpoint ?? null, contact: result.contact ?? null, progress: result.progress ?? null }
         : { ok: false, code: result.code };
     },
     [record],

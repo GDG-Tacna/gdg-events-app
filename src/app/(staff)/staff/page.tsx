@@ -31,6 +31,9 @@ export default async function StaffHomePage() {
         <header className="gap-space-1 flex flex-col">
           <h1 className="type-title-xl text-foreground">{copy.staff.title}</h1>
           <p className="type-body text-muted-foreground">{copy.staff.subtitle}</p>
+          <ButtonLink href={ROUTES.teamCode} variant="secondary" className="mt-space-3 self-start">
+            {copy.teamCode.open}
+          </ButtonLink>
         </header>
 
         {groups.length === 0 ? (

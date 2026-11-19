@@ -87,7 +87,7 @@ function KindChoice({
                 "peer-focus-visible:ring-ring peer-focus-visible:ring-[3px]",
               )}
             >
-              <Icon name={KIND_ICON[kind]} size={20} className="text-cyan shrink-0" />
+              <Icon name={KIND_ICON[kind]} size={20} className="text-cyan-ink shrink-0" />
               <span className="gap-space-1 flex flex-col">
                 <span className="type-label text-foreground">{copy.admin.checkpoints.kinds[kind]}</span>
                 <span className="type-caption text-text-subtle">{copy.admin.checkpoints.kindHelp[kind]}</span>
@@ -98,7 +98,7 @@ function KindChoice({
       </div>
       {note ? <p className="type-caption text-muted-foreground">{note}</p> : null}
       {error ? (
-        <p role="alert" className="type-caption text-destructive">
+        <p role="alert" className="type-caption text-danger-ink">
           {error}
         </p>
       ) : null}
@@ -356,7 +356,7 @@ export function CheckpointsAdminView({ checkpoints, create, edit, setActive, rem
                     {checkpoint.image ? (
                       <Thumbnail url={checkpoint.image.url} size={44} />
                     ) : (
-                      <span aria-hidden="true" className="border-cyan/40 text-cyan bg-bg-deep grid size-11 shrink-0 place-items-center rounded-md border">
+                      <span aria-hidden="true" className="border-cyan/40 text-cyan-ink bg-bg-deep grid size-11 shrink-0 place-items-center rounded-md border">
                         <Icon name={KIND_ICON[checkpoint.kind]} size={20} />
                       </span>
                     )}

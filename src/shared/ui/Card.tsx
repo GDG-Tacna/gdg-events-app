@@ -8,17 +8,15 @@ export interface CardProps extends ComponentProps<"div"> {
   pad?: boolean;
 }
 
-/** Base container: `surface` fill with a faint top sheen, 1px `line` border, large radius. */
+/** Base container: flat `surface` panel with a 2px ink border and large radius, like the DevFest Tacna site. */
 export function Card({ tone, pad = true, className, ...props }: CardProps) {
   return (
     <div
       {...props}
       className={cn(
-        "bg-card text-card-foreground border-border rounded-lg border",
-        // `bg-linear-*` is the Tailwind v4 name; the old `bg-gradient-to-*` made tailwind-merge drop `bg-card`.
-        "bg-linear-to-b from-white/[0.03] to-transparent",
-        // The glow keeps the card elevation instead of replacing it.
-        tone === "cyan" ? "shadow-[var(--shadow-card),var(--shadow-glow-cyan)]" : "shadow-card",
+        "bg-card text-card-foreground rounded-lg border-2",
+        // The highlighted card swaps the ink border for the brand blue instead of adding a glow.
+        tone === "cyan" ? "border-cyan" : "border-ink",
         pad && "p-space-5",
         className,
       )}

@@ -8,8 +8,11 @@ export type SavePollAction = (input: { id?: string; draft: PollDraft }) => Promi
 export type PollStateAction = (input: { id: string; action: "open" | "close" | "delete" }) => Promise<PollActionResult>;
 export type PollResultsAction = (input: { id: string }) => Promise<{ ok: true; tally: PollTally } | { ok: false; code: PollAdminErrorCode }>;
 
-export type VoteActionResult = { ok: true; xp: number; credits: number } | { ok: false; code: VoteErrorCode };
+/** A vote answers what it earned and, when it could be read, how the poll's votes stand now (with this vote in). */
+export type VoteActionResult = { ok: true; xp: number; credits: number; tally?: PollTally } | { ok: false; code: VoteErrorCode };
 export type VoteAction = (input: { pollId: string; optionId: string }) => Promise<VoteActionResult>;
+/** How the open poll's votes stand, for a cadet who voted; `closed` once the poll is no longer open. */
+export type PollTallyAction = (input: { pollId: string }) => Promise<{ ok: true; tally: PollTally } | { ok: false; code: VoteErrorCode }>;
 
 /** What the stage draws of a poll (plain data: pictures by their address). */
 export interface StagePollView {

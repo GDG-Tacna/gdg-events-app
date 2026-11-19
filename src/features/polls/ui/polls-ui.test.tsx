@@ -5,12 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
 import { answerConfirm } from "@/test-utils/confirm";
-import type { Poll } from "../domain/poll";
+import type { Poll, PollTally } from "../domain/poll";
 import type { CadetPoll } from "../domain/vote";
-import type { PollResultsAction, PollStateAction, SavePollAction, VoteAction } from "./actions";
+import type { PollResultsAction, PollStateAction, PollTallyAction, SavePollAction, VoteAction } from "./actions";
 import { PollForm } from "./PollForm";
 import { PollResultsView } from "./PollResultsView";
 import { PollsAdminView } from "./PollsAdminView";
+import { PollTallyCard } from "./PollTallyCard";
 import { LivePollCard, PollVoteView } from "./PollVoteView";
 
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
@@ -188,10 +189,11 @@ describe("PollResultsView", () => {
 describe("cadet poll", () => {
   const current = (extra: Partial<CadetPoll> = {}, pollExtra: Partial<Poll> = {}): CadetPoll => ({ poll: poll("poll-1", { status: "open", ...pollExtra }), myVote: null, reward: { xp: 20, credits: 0 }, ...extra });
 
-  function renderVote(state: CadetPoll | null) {
-    const vote = vi.fn<VoteAction>(async () => ({ ok: true, xp: 20, credits: 0 }));
-    const view = render(<PollVoteView current={state} vote={vote} homeHref="/dashboard" />);
-    return { vote, view, user: userEvent.setup() };
+  function renderVote(state: CadetPoll | null, options: { initialTally?: PollTally | null; voted?: PollTally } = {}) {
+    const vote = vi.fn<VoteAction>(async () => ({ ok: true, xp: 20, credits: 0, ...(options.voted ? { tally: options.voted } : {}) }));
+    const tally = vi.fn<PollTallyAction>(async () => ({ ok: true, tally: { counts: {}, total: 0 } }));
+    const view = render(<PollVoteView current={state} vote={vote} homeHref="/dashboard" initialTally={options.initialTally ?? null} tally={tally} />);
+    return { vote, tally, view, user: userEvent.setup() };
   }
 
   it("shows the card on the dashboard with the prize, or a way back to it once voted", () => {
@@ -241,8 +243,105 @@ describe("cadet poll", () => {
     expect(screen.getByRole("link", { name: c.back })).toHaveAttribute("href", "/dashboard");
   });
 
+  it("always offers the way back to the start, before and after voting", async () => {
+    const { user } = renderVote(current());
+    expect(screen.getByRole("link", { name: c.back })).toHaveAttribute("href", "/dashboard");
+
+    await user.click(screen.getByRole("radio", { name: "Keynote" }));
+    await user.click(screen.getByRole("button", { name: c.vote }));
+    await screen.findByText("¡Voto registrado! Ganaste 20 XP.");
+    expect(screen.getByRole("link", { name: c.back })).toHaveAttribute("href", "/dashboard");
+  });
+
+  it("shows how the votes stand after voting, with the cadet's choice marked, and no form for a final vote", async () => {
+    const { user } = renderVote(current(), { voted: { counts: { o1: 2, o2: 1 }, total: 3 } });
+
+    expect(screen.queryByText(c.results.title)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Keynote" }));
+    await user.click(screen.getByRole("button", { name: c.vote }));
+
+    expect(await screen.findByRole("heading", { name: c.results.title })).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Keynote" })).toHaveAttribute("aria-valuetext", "2 votos · 67%");
+    expect(screen.getByRole("progressbar", { name: "Firebase" })).toHaveAttribute("aria-valuetext", "1 voto · 33%");
+    expect(screen.getByText(c.results.yourVoteTag)).toBeInTheDocument();
+    expect(screen.getByText(/3 votos/)).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: c.vote })).not.toBeInTheDocument();
+  });
+
+  it("shows the standings on arrival when the cadet already voted, keeping the form only if the vote can change", () => {
+    const initialTally = { counts: { o1: 1, o2: 3 }, total: 4 };
+    const fixed = renderVote(current({ myVote: "o2" }), { initialTally });
+    expect(screen.getByRole("heading", { name: c.results.title })).toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    fixed.view.unmount();
+
+    renderVote(current({ myVote: "o2" }, { changeable: true }), { initialTally });
+    expect(screen.getByRole("heading", { name: c.results.title })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Keynote" })).toBeInTheDocument();
+  });
+
+  it("shows no standings to a cadet who has not voted", () => {
+    renderVote(current(), { initialTally: { counts: { o1: 1 }, total: 1 } });
+    expect(screen.queryByRole("heading", { name: c.results.title })).not.toBeInTheDocument();
+  });
+
   it("has no detectable accessibility violations", async () => {
-    const { view } = renderVote(current());
+    const { view } = renderVote(current({ myVote: "o1" }, { changeable: true }), { initialTally: { counts: { o1: 2, o2: 1 }, total: 3 } });
     expect((await axe(view.container)).violations).toEqual([]);
+  });
+});
+
+describe("PollTallyCard", () => {
+  afterEach(() => vi.useRealTimers());
+  const open = () => poll("poll-1", { status: "open" });
+
+  it("refreshes on its own while the poll is open, and keeps the last numbers when a refresh fails", async () => {
+    vi.useFakeTimers();
+    const refresh = vi
+      .fn<PollTallyAction>()
+      .mockResolvedValueOnce({ ok: true, tally: { counts: { o1: 3, o2: 1 }, total: 4 } })
+      .mockRejectedValueOnce(new Error("offline"));
+    render(<PollTallyCard poll={open()} tally={{ counts: { o1: 1, o2: 1 }, total: 2 }} myVote="o1" refresh={refresh} every={1000} />);
+
+    expect(screen.getByRole("progressbar", { name: "Keynote" })).toHaveAttribute("aria-valuetext", "1 voto · 50%");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(refresh).toHaveBeenCalledWith({ pollId: "poll-1" });
+    expect(screen.getByRole("progressbar", { name: "Keynote" })).toHaveAttribute("aria-valuetext", "3 votos · 75%");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.getByRole("progressbar", { name: "Keynote" })).toHaveAttribute("aria-valuetext", "3 votos · 75%");
+  });
+
+  it("highlights the leading option, and stops asking once the server says the poll closed", async () => {
+    vi.useFakeTimers();
+    const refresh = vi.fn<PollTallyAction>(async () => ({ ok: false, code: "closed" }));
+    render(<PollTallyCard poll={open()} tally={{ counts: { o1: 1, o2: 4 }, total: 5 }} myVote="o1" refresh={refresh} every={1000} />);
+
+    expect(screen.getByText("Firebase")).toHaveClass("text-lime-ink");
+    expect(screen.getByText("Keynote")).not.toHaveClass("text-lime-ink");
+    expect(screen.getByText(new RegExp(c.results.live))).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.getByText(new RegExp(c.results.closed))).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays still for a poll that is already closed", async () => {
+    vi.useFakeTimers();
+    const refresh = vi.fn<PollTallyAction>();
+    render(<PollTallyCard poll={poll("poll-1", { status: "closed" })} tally={{ counts: { o1: 1 }, total: 1 }} myVote="o1" refresh={refresh} every={1000} />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(refresh).not.toHaveBeenCalled();
   });
 });

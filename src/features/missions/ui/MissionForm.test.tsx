@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
+import { interpolate } from "@/shared/lib/format";
 import { axe } from "@/test-utils/axe";
 import type { UploadImageAction } from "@/features/media";
 import type { Mission } from "../domain/mission";
@@ -144,23 +145,222 @@ describe("MissionForm", () => {
     expect(save.mock.calls[0][0].draft).toMatchObject({ quadrantId: "cloud", xp: 30, config: { type: "stand", checkpointId: "stand-ai-2" } });
   });
 
-  it("points a «Conoce al speaker» mission to an active speaker, and asks to add one when there is none", async () => {
-    const save = renderForm({ speakers: [{ id: "ana-torres", name: "Ana Torres" }, { id: "luis", name: "Luis Quispe" }] });
+  const SPEAKERS = [
+    { id: "ana-torres", name: "Ana Torres" },
+    { id: "luis", name: "Luis Quispe" },
+  ];
+  const TEAM = {
+    organizer: [{ id: "uid-olga-123", name: "Olga Rojas" }],
+    volunteer: [
+      { id: "uid-ana-123", name: "Ana Mamani" },
+      { id: "uid-bruno-1", name: "Bruno Flores" },
+    ],
+  };
+  const radio = (name: string) => screen.getByRole("radio", { name });
+  const box = (name: string) => screen.getByRole("checkbox", { name });
+
+  it("a «Conoce al speaker» mission starts accepting every speaker, with the speakers there to choose from", async () => {
+    const save = renderForm({ speakers: SPEAKERS });
 
     type(f.type, "speaker");
     expect(screen.getByLabelText(f.xp)).toHaveValue("40");
-    type(f.checkpoint.speaker, "luis");
-    type(f.title, "Conoce a Luis");
+    expect(radio(f.people.all)).toBeChecked();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    type(f.title, "Conoce a un speaker");
     submit();
 
     await waitFor(() => expect(save).toHaveBeenCalled());
-    expect(save.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerId: "luis" } });
+    expect(save.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerIds: null } });
+  });
+
+  it("chooses one speaker, or several, and sends the ones ticked", async () => {
+    const save = renderForm({ speakers: SPEAKERS });
+
+    type(f.type, "speaker");
+    type(f.title, "Conoce a Luis");
+    fireEvent.click(radio(f.people.pick));
+    expect(screen.getByText(interpolate(f.people.count, { n: "0" }))).toBeInTheDocument();
+    fireEvent.click(box("Luis Quispe"));
+    expect(screen.getByText(f.people.countOne)).toBeInTheDocument();
+    submit();
+    // The form is editable again once it has gone back to the list (`push`).
+    await waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    expect(save.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerIds: ["luis"] } });
+
+    fireEvent.click(box("Ana Torres"));
+    expect(screen.getByText(interpolate(f.people.count, { n: "2" }))).toBeInTheDocument();
+    submit();
+    await waitFor(() => expect(push).toHaveBeenCalledTimes(2));
+    expect(save.mock.calls[1][0].draft).toMatchObject({ config: { type: "speaker", speakerIds: ["luis", "ana-torres"] } });
+
+    // Back to «Todos» drops the choice.
+    fireEvent.click(radio(f.people.all));
+    submit();
+    await waitFor(() => expect(push).toHaveBeenCalledTimes(3));
+    expect(save.mock.calls[2][0].draft).toMatchObject({ config: { type: "speaker", speakerIds: null } });
+  });
+
+  it("refuses «Elegir» with nobody chosen, on the picker, and saves nothing", () => {
+    const save = renderForm({ speakers: SPEAKERS });
+
+    type(f.type, "speaker");
+    type(f.title, "Conoce a alguien");
+    fireEvent.click(radio(f.people.pick));
+    submit();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.admin.missions.errors["invalid-speaker"]);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("with no speakers yet, only «Todos» can be chosen, and the form still saves", async () => {
+    const save = renderForm();
+
+    type(f.type, "speaker");
+    type(f.title, "Conoce a un speaker");
+    expect(radio(f.people.pick)).toBeDisabled();
+    expect(screen.getByText(f.people.speakers.none)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: f.save })).toBeEnabled();
+    submit();
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerIds: null } });
+  });
+
+  it("edits a speaker mission: «Todos» stays, and a chosen list comes back ticked", async () => {
+    const every = renderForm({
+      mode: "edit",
+      speakers: SPEAKERS,
+      mission: { ...quizMission({ id: "meet-any", title: "Conoce a un speaker", xp: 40 }), config: { type: "speaker", speakerIds: null } },
+    });
+    expect(radio(f.people.all)).toBeChecked();
+    submit();
+    await waitFor(() => expect(every).toHaveBeenCalled());
+    expect(every.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerIds: null } });
     cleanup();
 
-    renderForm();
+    const some = renderForm({
+      mode: "edit",
+      speakers: SPEAKERS,
+      mission: { ...quizMission({ id: "meet-some", title: "Conoce a Ana", xp: 40 }), config: { type: "speaker", speakerIds: ["ana-torres"] } },
+    });
+    expect(radio(f.people.pick)).toBeChecked();
+    expect(box("Ana Torres")).toBeChecked();
+    expect(box("Luis Quispe")).not.toBeChecked();
+    submit();
+    await waitFor(() => expect(some).toHaveBeenCalled());
+    expect(some.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerIds: ["ana-torres"] } });
+  });
+
+  it("keeps a chosen speaker who is no longer offered, marked, so the admin can untick them", async () => {
+    const save = renderForm({
+      mode: "edit",
+      speakers: SPEAKERS,
+      mission: { ...quizMission({ id: "meet-gone", title: "Conoce a Zoe", xp: 40 }), config: { type: "speaker", speakerIds: ["ana-torres", "zoe"] } },
+    });
+
+    const gone = box(interpolate(f.people.unavailable, { name: "zoe" }));
+    expect(gone).toBeChecked();
+    fireEvent.click(gone);
+    expect(screen.queryByRole("checkbox", { name: /zoe/ })).not.toBeInTheDocument();
+    submit();
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].draft).toMatchObject({ config: { type: "speaker", speakerIds: ["ana-torres"] } });
+  });
+
+  it("asks which role a «Conoce al equipo» mission asks to meet, accepting every member of it by default", async () => {
+    const save = renderForm({ team: TEAM });
+
+    type(f.type, "team");
+    expect(screen.getByLabelText(f.xp)).toHaveValue("30");
+    expect(screen.getByLabelText(f.teamRole)).toHaveValue("volunteer");
+    type(f.teamRole, "organizer");
+    expect(radio(f.people.all)).toBeChecked();
+    type(f.title, "Conoce a un organizador");
+    submit();
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].draft).toMatchObject({ xp: 30, config: { type: "team", role: "organizer", memberUids: null } });
+  });
+
+  it("chooses team members from the people of the role, and sends their uids", async () => {
+    const save = renderForm({ team: TEAM });
+
+    type(f.type, "team");
+    type(f.title, "Conoce a Ana o a Bruno");
+    fireEvent.click(radio(f.people.pick));
+    expect(screen.getByRole("checkbox", { name: "Ana Mamani" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Olga Rojas" })).not.toBeInTheDocument();
+    fireEvent.click(box("Ana Mamani"));
+    fireEvent.click(box("Bruno Flores"));
+    submit();
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].draft).toMatchObject({ config: { type: "team", role: "volunteer", memberUids: ["uid-ana-123", "uid-bruno-1"] } });
+  });
+
+  it("changing the role clears the chosen members and lists the other role's people, still waiting for a choice", () => {
+    const save = renderForm({ team: TEAM });
+
+    type(f.type, "team");
+    type(f.title, "Conoce a alguien");
+    fireEvent.click(radio(f.people.pick));
+    fireEvent.click(box("Ana Mamani"));
+    type(f.teamRole, "organizer");
+
+    expect(radio(f.people.pick)).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Ana Mamani" })).not.toBeInTheDocument();
+    expect(box("Olga Rojas")).not.toBeChecked();
+    submit();
+    expect(screen.getByRole("alert")).toHaveTextContent(copy.admin.missions.errors["invalid-team-members"]);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("edits a team mission with its chosen members ticked", async () => {
+    const save = renderForm({
+      mode: "edit",
+      team: TEAM,
+      mission: { ...quizMission({ id: "meet-vol", title: "Conoce a Bruno", xp: 30 }), config: { type: "team", role: "volunteer", memberUids: ["uid-bruno-1"] } },
+    });
+
+    expect(radio(f.people.pick)).toBeChecked();
+    expect(box("Bruno Flores")).toBeChecked();
+    expect(box("Ana Mamani")).not.toBeChecked();
+    submit();
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].draft).toMatchObject({ config: { type: "team", role: "volunteer", memberUids: ["uid-bruno-1"] } });
+  });
+
+  it("shows a refused speaker or team member on the picker", async () => {
+    renderForm({ speakers: SPEAKERS, save: vi.fn<SaveMissionAction>(async () => ({ ok: false, code: "unknown-speaker" })) });
+
     type(f.type, "speaker");
-    expect(screen.getByText(f.noCheckpoints.speaker)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: f.save })).toBeDisabled();
+    type(f.title, "Conoce a un speaker");
+    submit();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.missions.errors["unknown-speaker"]);
+    cleanup();
+
+    renderForm({ team: TEAM, save: vi.fn<SaveMissionAction>(async () => ({ ok: false, code: "unknown-team-member" })) });
+    type(f.type, "team");
+    type(f.title, "Conoce a alguien");
+    submit();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.missions.errors["unknown-team-member"]);
+  });
+
+  it("needs nothing more than texts for a «Conoce a cada escuadrón» mission", async () => {
+    const save = renderForm();
+
+    type(f.type, "squads");
+    expect(screen.getByLabelText(f.xp)).toHaveValue("60");
+    expect(screen.getByText(f.squadsHint)).toBeInTheDocument();
+    type(f.title, "Conoce a cada escuadrón");
+    submit();
+
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    expect(save.mock.calls[0][0].draft).toMatchObject({ xp: 60, config: { type: "squads" } });
   });
 
   it("offers G-Credits only when the edition gives them, with the type's default as the hint, and sends what was typed", async () => {
@@ -337,9 +537,11 @@ describe("MissionForm", () => {
   });
 
   it("has no detectable accessibility violations for each type", async () => {
-    const { container } = render(<MissionForm mode="create" save={vi.fn()} upload={upload} quadrants={QUADRANTS} checkpoints={CHECKPOINTS} listHref="/x" minigames={GAMES} />);
+    const { container } = render(
+      <MissionForm mode="create" save={vi.fn()} upload={upload} quadrants={QUADRANTS} checkpoints={CHECKPOINTS} speakers={SPEAKERS} team={TEAM} listHref="/x" minigames={GAMES} />,
+    );
     type(f.minigame, "bug-kong");
-    for (const value of ["quiz", "keyword", "stand", "talk"]) {
+    for (const value of ["quiz", "keyword", "stand", "talk", "speaker", "team", "squads"]) {
       type(f.type, value);
       expect((await axe(container)).violations).toEqual([]);
     }

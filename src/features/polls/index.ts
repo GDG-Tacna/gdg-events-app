@@ -16,10 +16,11 @@ export {
 } from "./domain/poll";
 export type { PollAdminErrorCode } from "./domain/manage";
 export type { CadetPoll, VoteErrorCode } from "./domain/vote";
-export type { PollActionResult, PollResultsAction, PollStateAction, SavePollAction, VoteAction, VoteActionResult } from "./ui/actions";
+export type { PollActionResult, PollResultsAction, PollStateAction, PollTallyAction, SavePollAction, VoteAction, VoteActionResult } from "./ui/actions";
 export { PollsAdminView, rewardLabel, type PollsAdminViewProps } from "./ui/PollsAdminView";
 export { PollForm, type PollFormProps } from "./ui/PollForm";
 export { PollResultsView, votesLabel, type PollResultsViewProps } from "./ui/PollResultsView";
+export { PollTallyCard, type PollTallyCardProps } from "./ui/PollTallyCard";
 export { LivePollCard, PollVoteView, rewardLine, type PollVoteViewProps } from "./ui/PollVoteView";
 export { LivePollStage, PollStageView } from "./ui/PollStageView";
 export type { StagePollAction, StagePollView } from "./ui/actions";

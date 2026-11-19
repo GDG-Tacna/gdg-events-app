@@ -63,7 +63,7 @@ function BoardPreview({ board, label }: { board: FleetBoard; label: string }) {
                 <span className="type-body-sm text-foreground truncate">
                   {cadet.position}. {cadet.alias}
                 </span>
-                <span className="type-body-sm text-accent shrink-0 tabular-nums">{interpolate(t.xp, { n: formatNumber(cadet.xp) })}</span>
+                <span className="type-body-sm text-lime-ink shrink-0 tabular-nums">{interpolate(t.xp, { n: formatNumber(cadet.xp) })}</span>
               </li>
             ))}
           </ol>
@@ -75,7 +75,7 @@ function BoardPreview({ board, label }: { board: FleetBoard; label: string }) {
                 <span className="type-body-sm text-foreground truncate">
                   {squad.position}. {squad.name}
                 </span>
-                <span className="type-body-sm text-accent shrink-0 tabular-nums">{interpolate(t.xp, { n: formatNumber(squad.xp) })}</span>
+                <span className="type-body-sm text-lime-ink shrink-0 tabular-nums">{interpolate(t.xp, { n: formatNumber(squad.xp) })}</span>
               </li>
             ))}
           </ol>

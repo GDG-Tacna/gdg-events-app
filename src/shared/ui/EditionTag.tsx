@@ -7,7 +7,7 @@ import { Icon } from "./Icon";
 export function EditionTag({ eventId, className }: { eventId: string; className?: string }) {
   return (
     <p className={cn("type-caption border-cyan/50 bg-bg-deep text-foreground px-space-3 gap-space-2 inline-flex items-center self-start rounded-full border py-1", className)}>
-      <Icon name="calendar" size={16} className="text-cyan" />
+      <Icon name="calendar" size={16} className="text-cyan-ink" />
       {interpolate(copy.common.appliesToEdition, { id: eventId })}
     </p>
   );

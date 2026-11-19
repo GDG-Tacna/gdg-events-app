@@ -23,6 +23,9 @@ const EXPIRY_PATTERN = /^[0-9]{1,12}$/;
  */
 export const passSigningInput = (uid: string, expiresAt: number): string => `pass:${uid}.${expiresAt}`;
 
+/** Whether a scanned text is meant as a cadet's personal pass (shape aside), so the check-in scanner can say what it is. */
+export const isPassCode = (text: string): boolean => text.startsWith(PREFIX);
+
 export const formatPassPayload = (uid: string, expiresAt: number, signature: string): string =>
   `${PREFIX}${uid}.${expiresAt}.${signature}`;
 

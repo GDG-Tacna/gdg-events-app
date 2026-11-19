@@ -8,6 +8,9 @@ import { DEFAULT_XP } from "../domain/mission";
  *
  * Stand missions point to the checkpoint `stand-{area}` of a stand on the bundled plan, and the talk to
  * `talk-keynote`: both are created in Puestos. Keywords are placeholders the organizers replace.
+ *
+ * The «Conoce a…» missions (organizer, any speaker, volunteer, someone of every other squad) need no setup: the team
+ * and the speakers show their codes, and the squads one counts the cadet's contacts.
  */
 const base = (id: string, quadrantId: string, order: number) => ({ id, quadrantId, order, active: true, minigame: null, minigameDifficulty: null, credits: null });
 
@@ -19,11 +22,39 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
     xp: DEFAULT_XP.talk,
     config: { type: "talk", checkpointId: "talk-keynote" },
   },
+  {
+    ...base("meet-organizer", "community", 1),
+    title: "Conoce a un organizador",
+    description: "Pídele a un organizador del DevFest que te muestre su código y escanéalo.",
+    xp: DEFAULT_XP.team,
+    config: { type: "team", role: "organizer", memberUids: null },
+  },
+  {
+    ...base("meet-speaker", "community", 2),
+    title: "Conoce a un speaker",
+    description: "Pídele a cualquier speaker del evento que te muestre su código y escanéalo.",
+    xp: DEFAULT_XP.speaker,
+    config: { type: "speaker", speakerIds: null },
+  },
+  {
+    ...base("meet-volunteer", "community", 3),
+    title: "Conoce a un voluntario",
+    description: "Pídele a un voluntario del DevFest que te muestre su código y escanéalo.",
+    xp: DEFAULT_XP.team,
+    config: { type: "team", role: "volunteer", memberUids: null },
+  },
+  {
+    ...base("meet-squads", "community", 4),
+    title: "Conoce a alguien de cada escuadrón",
+    description: "Escanea el código de contacto de un cadete de cada escuadrón distinto al tuyo.",
+    xp: DEFAULT_XP.squads,
+    config: { type: "squads" },
+  },
 
   {
     ...base("cloud-stand", "cloud", 10),
     title: "Visita el stand de Google Cloud",
-    description: "Escanea el QR impreso del Stand Google Cloud 1.",
+    description: "Escanea el QR que muestra la pantalla del Stand Google Cloud 1.",
     xp: DEFAULT_XP.stand,
     config: { type: "stand", checkpointId: "stand-cloud-1" },
   },
@@ -50,7 +81,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   {
     ...base("firebase-stand", "firebase", 20),
     title: "Visita el stand de Firebase",
-    description: "Escanea el QR impreso del Stand Firebase 1.",
+    description: "Escanea el QR que muestra la pantalla del Stand Firebase 1.",
     xp: DEFAULT_XP.stand,
     config: { type: "stand", checkpointId: "stand-firebase-1" },
   },
@@ -77,7 +108,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   {
     ...base("android-stand", "android", 30),
     title: "Visita el stand de Android",
-    description: "Escanea el QR impreso del Stand Android 1.",
+    description: "Escanea el QR que muestra la pantalla del Stand Android 1.",
     xp: DEFAULT_XP.stand,
     config: { type: "stand", checkpointId: "stand-android-1" },
   },
@@ -104,7 +135,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   {
     ...base("ai-stand", "ai", 40),
     title: "Visita el stand de AI",
-    description: "Escanea el QR impreso del Stand AI 1.",
+    description: "Escanea el QR que muestra la pantalla del Stand AI 1.",
     xp: DEFAULT_XP.stand,
     config: { type: "stand", checkpointId: "stand-ai-1" },
   },
@@ -131,7 +162,7 @@ export const DEFAULT_MISSIONS: readonly Mission[] = [
   {
     ...base("community-stand", "community", 50),
     title: "Visita el stand de la comunidad",
-    description: "Escanea el QR impreso del Stand Comunidad GDG 1.",
+    description: "Escanea el QR que muestra la pantalla del Stand Comunidad GDG 1.",
     xp: DEFAULT_XP.stand,
     config: { type: "stand", checkpointId: "stand-community-1" },
   },

@@ -24,31 +24,36 @@ const BUNDLED_ZONES = [
 
 const TEAM = "Equipo GDG Tacna";
 
-// Titles are capped at 80 characters by the app: the two long ones are shortened and kept whole in the description.
+// Titles are capped at 80 characters by the app. A talk's id is the slug of its title, except where `id` is given:
+// those talks were renamed after they were first loaded, and their id stays the one already stored (check-ins, the
+// XP ledger and missions point at it). The same goes for a speaker's optional third element.
 const TALKS = [
   { time: "09:00", minutes: 15, title: "Keynote de apertura", speakers: [[TEAM]] },
   { time: "09:15", minutes: 40, title: "Construya su primer agente de IA con Genkit", speakers: [["Luis Eduardo", "GDE Firebase"]] },
   { time: "10:00", minutes: 40, title: "Desarrollo de videojuegos y financiamiento de proyectos", speakers: [["Rafael Gonzalez-Otoya B."]] },
-  { time: "10:40", minutes: 15, title: "Pausa para el café", speakers: [[TEAM]], description: "Vestíbulo principal." },
+  { id: "pausa-para-el-cafe", time: "10:40", minutes: 15, title: "Coffee Break", speakers: [[TEAM]], description: "Networking en el vestíbulo principal." },
   { time: "10:55", minutes: 40, title: "¿Y si la AI dibujara la pantalla?", speakers: [["Jimy Huacho Dolores", "GDE Angular"]] },
-  { time: "11:40", minutes: 40, title: "Automatización inteligente: GitHub Actions + Firebase", speakers: [["Eduardo Ormeño Meneses"]] },
-  { time: "12:20", minutes: 50, title: "Almuerzo / networking", speakers: [[TEAM]], description: "Área de networking." },
+  { time: "11:40", minutes: 40, title: "Automatización Inteligente: GitHub Actions + Firebase", speakers: [["Eduardo Ormeño Meneses"]] },
+  { time: "12:20", minutes: 90, title: "Almuerzo & Networking", speakers: [[TEAM]], description: "Área de Networking." },
+  { time: "13:50", minutes: 15, title: "Dinámica: Nombrando a nuestra Mascota", speakers: [[TEAM]] },
   {
-    time: "13:10",
+    id: "del-vibe-coding-al-sdd-web-apps-robustas-con-gen",
+    time: "14:05",
     minutes: 40,
-    title: "Del Vibe Coding al SDD: Web Apps robustas con Genkit, Gemini y Devin",
+    title: "Del Vibe Coding al SDD: Web Apps con Genkit, Gemini y Devin",
     description: "Del Vibe Coding al SDD: Cómo construir Web Apps robustas con Firebase Genkit, Gemini y Devin",
     speakers: [["Homer López Vidal"]],
   },
   {
-    time: "13:55",
+    id: "podemos-construir-jarvis-hoy-gemini-live-jev-y-c",
+    time: "14:45",
     minutes: 40,
-    title: "¿Podemos construir JARVIS hoy? Gemini Live, JEV y Computer Use",
+    title: "¿Podemos construir JARVIS hoy? Voz y Computer Use",
     description: "¿Podemos construir JARVIS hoy? Voz con Gemini Live, decisiones con JEV y Computer Use",
-    speakers: [["Jefferson Alfonso Vargas Espinoza"]],
+    speakers: [["Jefferson Vargas Espinoza", "", "jefferson-alfonso-vargas-espinoza"]],
   },
-  { time: "14:40", minutes: 40, title: "The Agentic Software Engineer: ¿Quién maneja este avión?", speakers: [["Juan Carlos Romaina"]] },
-  { time: "15:20", minutes: 60, title: "Cierre y networking final", speakers: [[TEAM]], description: "Auditorio principal y vestíbulo." },
+  { time: "15:25", minutes: 40, title: "The Agentic Software Engineer: ¿Quién maneja este avión?", speakers: [["Juan Carlos Romaina"]] },
+  { id: "cierre-y-networking-final", time: "16:05", minutes: 60, title: "Cierre y Agradecimientos", speakers: [[TEAM]], description: "Auditorio principal / vestíbulo." },
 ];
 
 const slug = (value, max) =>
@@ -61,6 +66,7 @@ const slug = (value, max) =>
     .slice(0, max)
     .replace(/-+$/g, "");
 
+const speakerId = (name, id) => id ?? slug(name, 48);
 const at = (time) => new Date(`${DATE}T${time}:00${UTC_OFFSET}`);
 const apply = process.argv.includes("--apply");
 
@@ -134,7 +140,7 @@ await create(
 // Speakers.
 console.log("Speakers");
 const speakers = new Map();
-for (const talk of TALKS) for (const [name, headline = ""] of talk.speakers) speakers.set(slug(name, 48), { name, headline });
+for (const talk of TALKS) for (const [name, headline = "", id] of talk.speakers) speakers.set(speakerId(name, id), { name, headline });
 for (const [id, { name, headline }] of speakers) {
   await create(
     event.collection("speakers").doc(id),
@@ -149,7 +155,7 @@ console.log("Talks");
 const ids = new Set();
 for (const talk of TALKS) {
   if (talk.title.length > 80) fail(`el título supera 80 caracteres: ${talk.title}`);
-  const id = slug(talk.title, 48);
+  const id = talk.id ?? slug(talk.title, 48);
   if (ids.has(id)) fail(`id repetido: ${id}`);
   ids.add(id);
   const startsAt = at(talk.time);
@@ -159,7 +165,7 @@ for (const talk of TALKS) {
     {
       kind: "talk",
       name: talk.title,
-      speakerIds: talk.speakers.map(([name]) => slug(name, 48)),
+      speakerIds: talk.speakers.map(([name, , id]) => speakerId(name, id)),
       startsAt,
       endsAt,
       roomId: ROOM.id,

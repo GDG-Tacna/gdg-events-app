@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Space_Grotesk, Tiny5 } from "next/font/google";
+import { Google_Sans, Google_Sans_Code } from "next/font/google";
 import { PwaChrome } from "@/app-shell/PwaChrome";
 import { AnalyticsBoot } from "@/features/analytics";
 import { AuthProvider } from "@/app-shell/providers/auth-provider";
@@ -8,31 +8,32 @@ import { ThemeProvider } from "@/app-shell/providers/theme-provider";
 import { copy } from "@/shared/copy/es";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-});
-
-const inter = Inter({
-  variable: "--font-inter",
+// Same faces as the DevFest Tacna site: Google Sans for text and titles, Google Sans Code for eyebrows and tags.
+const googleSans = Google_Sans({
+  variable: "--font-google-sans",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
 
-const tiny5 = Tiny5({
-  variable: "--font-tiny5",
+const googleSansCode = Google_Sans_Code({
+  variable: "--font-google-sans-code",
   subsets: ["latin"],
-  weight: "400",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
   title: copy.brand.name,
   description: copy.brand.description,
+  applicationName: copy.brand.installName,
+  // iPhones name the home screen icon after this, not after the manifest.
+  appleWebApp: { title: copy.brand.installName },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0a0f24",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f0f0f0" },
+    { media: "(prefers-color-scheme: dark)", color: "#1e1e1e" },
+  ],
   viewportFit: "cover",
   width: "device-width",
   initialScale: 1,
@@ -42,7 +43,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es"
-      className={`${spaceGrotesk.variable} ${inter.variable} ${tiny5.variable} h-full antialiased`}
+      className={`${googleSans.variable} ${googleSansCode.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">

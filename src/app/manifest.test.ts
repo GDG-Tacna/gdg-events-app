@@ -5,9 +5,10 @@ import manifest from "./manifest";
 const m = manifest();
 
 describe("web app manifest", () => {
-  it("names the app with the Design System brand and a short name that fits under the icon", () => {
-    expect(m.name).toBe(copy.brand.name);
-    expect(m.short_name).toBe(copy.brand.shortName);
+  it("names the installed app after the community, not one edition, with a short name that fits under the icon", () => {
+    expect(m.name).toBe("GDG Tacna");
+    expect(m.short_name).toBe("GDG Tacna");
+    expect(m.name).not.toMatch(/space arcade|devfest/i);
     expect((m.short_name ?? "").length).toBeLessThanOrEqual(12);
     expect(m.description).toBe(copy.brand.description);
   });
@@ -21,8 +22,8 @@ describe("web app manifest", () => {
   });
 
   it("uses the dark Design System background for the splash and the status bar", () => {
-    expect(m.background_color).toBe("#0a0f24");
-    expect(m.theme_color).toBe("#0a0f24");
+    expect(m.background_color).toBe("#1e1e1e");
+    expect(m.theme_color).toBe("#1e1e1e");
   });
 
   it("declares the icons browsers require for installing: 192 and 512 as 'any', and a maskable 512", () => {

@@ -122,7 +122,7 @@ export function MinigamePlayer({ missionId, offer, start, finish, backHref, achi
         <Card className="gap-space-4 flex flex-col">
           <div className="gap-space-2 flex flex-wrap items-center">
             <span className="type-caption border-line-strong text-foreground px-space-3 rounded-full border py-1">{t.difficulty[offer.difficulty]}</span>
-            <span className="type-pixel-tag text-accent">{interpolate(t.intro.reward, { xp })}</span>
+            <span className="type-pixel-tag text-lime-ink">{interpolate(t.intro.reward, { xp })}</span>
           </div>
           <p className="type-body text-foreground">{t.howTo[offer.gameId]}</p>
           <p className="type-caption text-text-subtle">{offer.state === "in-play" ? t.offer.inPlay : t.intro.oneTry}</p>
@@ -178,7 +178,7 @@ export function MinigamePlayer({ missionId, offer, start, finish, backHref, achi
           <h2 className="type-title-xl text-foreground" tabIndex={-1} ref={(node) => node?.focus()}>
             {phase.won ? t.result.won : t.result.lost}
           </h2>
-          <p className={phase.won ? "type-pixel-callout text-accent" : "type-body text-muted-foreground"}>
+          <p className={phase.won ? "type-pixel-callout text-lime-ink" : "type-body text-muted-foreground"}>
             {phase.won ? interpolate(t.result.wonBody, { xp: formatNumber(phase.xp) }) : interpolate(t.result.lostBody, { xp })}
           </p>
           <UnlockedBadges badges={phase.badges} href={achievementsHref} />

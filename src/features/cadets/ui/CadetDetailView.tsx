@@ -136,7 +136,7 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, changeTick
         <div className="mt-space-1 flex">
           <TicketChip type={cadet.ticket} />
         </div>
-        {cadet.banned ? <p className="type-label text-danger">{t.banned}</p> : null}
+        {cadet.banned ? <p className="type-label text-danger-ink">{t.banned}</p> : null}
       </header>
 
       {notice?.kind === "success" ? (
@@ -242,7 +242,7 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, changeTick
       {mayDeleteNow ? (
         <Card className="gap-space-3 border-danger/60 flex flex-col border">
           <form onSubmit={(event) => void submitDelete(event)} noValidate className="gap-space-3 flex flex-col">
-            <h2 className="type-heading text-danger">{t.deleteTitle}</h2>
+            <h2 className="type-heading text-danger-ink">{t.deleteTitle}</h2>
             <p className="type-body-sm text-muted-foreground">{t.deleteHelp}</p>
             <TextField
               label={interpolate(t.deleteConfirmLabel, { alias: cadet.alias })}

@@ -4,6 +4,7 @@ import "server-only";
 export {
   BAN_REASON_MAX,
   CADETS_PAGE_SIZE,
+  CADETS_SEARCH_MAX,
   banCadet,
   changeCadetSquad,
   deleteCadet,
@@ -27,6 +28,8 @@ export {
   type CadetsDeps,
   type CadetsError,
   type CadetsErrorCode,
+  type IndexedCadet,
 } from "./domain/manage";
 export { FirebaseAccountDirectory } from "./data/server/firebase-account-directory";
+export { CachedCadetStore, type CachedCadetStoreOptions } from "./data/server/cached-cadet-store";
 export { FirestoreCadetStore, toCadet } from "./data/server/firestore-cadet-store";

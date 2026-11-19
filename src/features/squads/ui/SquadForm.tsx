@@ -155,7 +155,7 @@ export function SquadForm(props: SquadFormProps) {
             <legend className="type-label text-foreground mb-space-2">{copy.admin.squads.form.logoLegend}</legend>
             <PixelLogoEditor value={logo} onChange={setLogo} disabled={pending} />
             {logoError ? (
-              <p role="alert" className="type-body-sm text-danger">
+              <p role="alert" className="type-body-sm text-danger-ink">
                 {logoError}
               </p>
             ) : null}

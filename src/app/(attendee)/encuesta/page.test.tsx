@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/composition/polls.server", () => ({ voteDeps: { marker: "votes" } }));
 vi.mock("@/app-shell/polls/vote.action", () => ({ votePollAction: vi.fn() }));
+vi.mock("@/app-shell/polls/cadet-tally.action", () => ({ pollTallyAction: vi.fn() }));
 const guards = { requireAttendee: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 class NotFound extends Error {}
@@ -12,13 +13,14 @@ vi.mock("next/navigation", () => ({
     throw new NotFound("not-found");
   },
 }));
-const server = vi.hoisted(() => ({ getCadetPoll: vi.fn() }));
+const server = vi.hoisted(() => ({ getCadetPoll: vi.fn(), getOpenPollTally: vi.fn() }));
 vi.mock("@/features/polls/server", () => server);
 const features = vi.hoisted(() => ({ FEATURES: { polls: true } }));
 vi.mock("@/shared/config/features", () => features);
 
 const { PollVoteView } = await import("@/features/polls");
 const { votePollAction } = await import("@/app-shell/polls/vote.action");
+const { pollTallyAction } = await import("@/app-shell/polls/cadet-tally.action");
 const { default: PollPage } = await import("./page");
 
 function findElement(node: ReactNode, type: unknown): { props: Record<string, unknown> } | null {
@@ -48,10 +50,25 @@ describe("cadet poll page", () => {
 
     const view = findElement(await PollPage(), PollVoteView);
     expect(server.getCadetPoll).toHaveBeenCalledWith({ marker: "votes" }, "u1");
-    expect(view?.props).toEqual({ current, vote: votePollAction, homeHref: "/dashboard" });
+    expect(view?.props).toEqual({ current, vote: votePollAction, homeHref: "/dashboard", initialTally: null, tally: pollTallyAction });
+    // A cadet who has not voted does not get the standings read.
+    expect(server.getOpenPollTally).not.toHaveBeenCalled();
 
     server.getCadetPoll.mockResolvedValue({ ok: true, value: null });
     expect(findElement(await PollPage(), PollVoteView)?.props.current).toBeNull();
+  });
+
+  it("hands the standings along when the cadet already voted, and leaves them out when they cannot be read", async () => {
+    const current = { poll: { id: "poll-1" }, myVote: "o1", reward: { xp: 0, credits: 0 } };
+    const tally = { counts: { o1: 2 }, total: 2 };
+    server.getCadetPoll.mockResolvedValue({ ok: true, value: current });
+    server.getOpenPollTally.mockResolvedValue({ ok: true, value: tally });
+
+    expect(findElement(await PollPage(), PollVoteView)?.props.initialTally).toEqual(tally);
+    expect(server.getOpenPollTally).toHaveBeenCalledWith({ marker: "votes" }, "poll-1");
+
+    server.getOpenPollTally.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+    expect(findElement(await PollPage(), PollVoteView)?.props.initialTally).toBeNull();
   });
 
   it("is not found with polls off, and surfaces a failed read", async () => {

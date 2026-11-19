@@ -6,6 +6,8 @@ import { PixelGdgLogo } from "./pixel/PixelGdgLogo";
 export interface BrandMarkProps {
   /** Heading level for the product name; use "h1" when the mark is the page title. */
   titleAs?: "h1" | "p";
+  /** A shorter mark for a header that stays on screen: a flatter tile and no tagline. */
+  compact?: boolean;
   className?: string;
 }
 
@@ -13,10 +15,10 @@ export interface BrandMarkProps {
  * The GDG Tacna mark in pixel art, the "DevFest" pixel wordmark, "SPACE ARCADE" and the tagline. Screen readers hear
  * the product's full name once.
  */
-export function BrandMark({ titleAs: Title = "p", className }: BrandMarkProps) {
+export function BrandMark({ titleAs: Title = "p", compact = false, className }: BrandMarkProps) {
   return (
     <div className={cn("gap-space-3 flex items-center", className)}>
-      <ArtTile className="size-16 shrink-0 p-0">
+      <ArtTile className={cn("shrink-0 p-0", compact ? "h-10 w-16" : "size-16")}>
         <PixelGdgLogo scale={2} />
       </ArtTile>
       <div className="gap-space-1 flex min-w-0 flex-col">
@@ -24,13 +26,15 @@ export function BrandMark({ titleAs: Title = "p", className }: BrandMarkProps) {
           <span aria-hidden="true">{copy.brand.wordmark}</span>
           <span className="sr-only">{copy.brand.name}</span>
         </Title>
-        <p aria-hidden="true" className="type-caption text-cyan font-semibold tracking-[0.18em] uppercase">
+        <p aria-hidden="true" className="type-caption text-cyan-ink font-semibold tracking-[0.18em] uppercase">
           {copy.brand.arcade}
         </p>
-        <p className="type-caption text-gold gap-space-1 flex items-center">
-          <span aria-hidden="true">★</span>
-          {copy.brand.tagline}
-        </p>
+        {compact ? null : (
+          <p className="type-caption text-gold-ink gap-space-1 flex items-center">
+            <span aria-hidden="true">★</span>
+            {copy.brand.tagline}
+          </p>
+        )}
       </div>
     </div>
   );

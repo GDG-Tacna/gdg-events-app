@@ -27,7 +27,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const server = vi.hoisted(() => ({ listCadets: vi.fn(), getCadet: vi.fn() }));
+const server = vi.hoisted(() => ({ CADETS_SEARCH_MAX: 80, listCadets: vi.fn(), getCadet: vi.fn() }));
 vi.mock("@/features/cadets/server", () => server);
 
 const { CadetDetailView, CadetsListView } = await import("@/features/cadets");

@@ -5,6 +5,7 @@ import { missionDeps } from "@/app-shell/composition/missions.server";
 import { galaxyDeps } from "@/app-shell/composition/quadrants.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { submitMissionAnswerAction } from "@/app-shell/missions/answer.action";
+import { missionPeopleNames } from "@/app-shell/missions/people-names.server";
 import { MinigameOfferCard } from "@/features/minigames";
 import { getMinigameOffer } from "@/features/minigames/server";
 import { MissionDetailView } from "@/features/missions";
@@ -38,11 +39,13 @@ export default async function MissionPage({ params }: PageProps<"/missions/[miss
   // The quadrant only decorates the mission: without the plan it shows without its tag.
   const quadrant = galaxy.ok ? (galaxy.value.quadrants.find((candidate) => candidate.id === mission.quadrantId) ?? null) : null;
   const bonus = offer?.ok && offer.value ? <MinigameOfferCard offer={offer.value} playHref={`${ROUTES.minigame}/${missionId}`} /> : undefined;
+  // Only an open mission still needs telling whom to look for.
+  const people = mission.status === "completed" ? [] : await missionPeopleNames(mission.config);
 
   return (
     <>
       <SpaceBackground />
-      <main className="px-space-4 pt-safe-space-6 pb-space-6 min-[760px]:pt-safe-space-8 min-[760px]:pb-space-8 mx-auto w-full max-w-[520px]">
+      <main className="px-space-4 pt-space-4 pb-space-6 min-[760px]:pt-space-4 min-[760px]:pb-space-8 mx-auto w-full max-w-[520px]">
         <ScreenEnter>
           <MissionDetailView
             mission={mission}
@@ -54,6 +57,7 @@ export default async function MissionPage({ params }: PageProps<"/missions/[miss
             minigame={mission.minigame !== null && Boolean(games?.has(mission.minigame))}
             achievementsHref={(await moduleOn("achievements")) ? ROUTES.achievements : undefined}
             bonusSlot={bonus}
+            people={people}
           />
         </ScreenEnter>
       </main>

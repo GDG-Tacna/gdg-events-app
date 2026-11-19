@@ -24,7 +24,7 @@ export function ActionMenu({ label, icon, title, items }: ActionMenuProps) {
       <DropdownMenuTrigger
         aria-label={label}
         title={label}
-        className="border-cyan/50 bg-bg-deep text-cyan hover:bg-secondary focus-visible:ring-ring data-[state=open]:border-cyan inline-grid size-12 place-items-center rounded-md border focus-visible:ring-[3px] focus-visible:outline-none"
+        className="border-cyan/50 bg-bg-deep text-cyan-ink hover:bg-secondary focus-visible:ring-ring data-[state=open]:border-cyan inline-grid size-12 place-items-center rounded-md border focus-visible:ring-[3px] focus-visible:outline-none"
       >
         <Icon name={icon} size={22} />
       </DropdownMenuTrigger>
@@ -34,7 +34,7 @@ export function ActionMenu({ label, icon, title, items }: ActionMenuProps) {
         {items.map((item) => (
           <DropdownMenuItem key={item.href} asChild className="type-label text-foreground focus:bg-secondary focus:text-foreground gap-space-3 h-12 cursor-pointer">
             <Link href={item.href}>
-              <Icon name={item.icon} size={18} className="text-cyan" />
+              <Icon name={item.icon} size={18} className="text-cyan-ink" />
               {item.label}
             </Link>
           </DropdownMenuItem>

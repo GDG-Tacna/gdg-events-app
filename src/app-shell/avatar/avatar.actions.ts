@@ -17,6 +17,8 @@ const lookSchema = z.object({
     beard: z.string().max(20),
     glasses: z.string().max(20),
     helmet: z.number(),
+    // Optional: a client from before the helmet could come off does not send it (the use case keeps it on then).
+    helmetOn: z.boolean().optional(),
     suit: z.number(),
   }),
 });

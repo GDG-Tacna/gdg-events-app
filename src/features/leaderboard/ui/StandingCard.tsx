@@ -29,7 +29,7 @@ function Row({ cadet }: { cadet: RankedCadet }) {
         </span>
         <span className="type-caption text-text-subtle truncate">{cadet.squad ?? t.noSquad}</span>
       </span>
-      <span className="type-label text-accent tabular-nums">{interpolate(t.xp, { n: formatNumber(cadet.xp) })}</span>
+      <span className="type-label text-lime-ink tabular-nums">{interpolate(t.xp, { n: formatNumber(cadet.xp) })}</span>
     </li>
   );
 }
@@ -50,7 +50,7 @@ export function StandingCard({ standing, alias, squad }: StandingCardProps) {
           <h2 className="type-title text-foreground">{t.title}</h2>
           {standing.position === null ? <p className="type-body-sm text-muted-foreground">{t.noPosition}</p> : null}
         </div>
-        <Icon name="trophy" size={28} className="text-gold" />
+        <Icon name="trophy" size={28} className="text-gold-ink" />
       </div>
 
       {standing.position !== null ? (

@@ -144,7 +144,7 @@ describe("FirestoreCadetStore", () => {
 
   describe("list", () => {
     it("lists the cadets by alias, with how many there are in all, skipping a document with no alias", async () => {
-      const listed = await store.list({ search: "", after: null, limit: 25 });
+      const listed = await store.list({ after: null, limit: 25 });
 
       expect(listed.ok && listed.value.cadets.map((cadet) => cadet.alias)).toEqual(["Mia", "Milo", "Nova"]);
       expect(listed.ok && listed.value.next).toBeNull();
@@ -152,19 +152,24 @@ describe("FirestoreCadetStore", () => {
     });
 
     it("pages with a cursor: asks one more than the page to know whether there is a next one", async () => {
-      const first = await store.list({ search: "", after: null, limit: 2 });
+      const first = await store.list({ after: null, limit: 2 });
       expect(first.ok && first.value.cadets.map((cadet) => cadet.alias)).toEqual(["Mia", "Milo"]);
       expect(first.ok && first.value.next).toBe("milo");
 
-      const second = await store.list({ search: "", after: "milo", limit: 2 });
+      const second = await store.list({ after: "milo", limit: 2 });
       expect(second.ok && second.value.cadets.map((cadet) => cadet.alias)).toEqual(["Nova"]);
       expect(second.ok && second.value.next).toBeNull();
     });
 
-    it("keeps only the aliases that start with the search", async () => {
-      const listed = await store.list({ search: "mi", after: null, limit: 25 });
+    it("reads every cadet of the edition with their alias key for a search, skipping a document with no alias", async () => {
+      const listed = await store.listAll();
 
-      expect(listed.ok && listed.value.cadets.map((cadet) => cadet.alias)).toEqual(["Mia", "Milo"]);
+      expect(listed.ok && listed.value.cadets.map((cadet) => [cadet.uid, cadet.aliasKey]).sort()).toEqual([
+        ["u-mia", "mia"],
+        ["u-milo", "milo"],
+        ["u-nova", "nova"],
+      ]);
+      expect(listed.ok && listed.value.total).toBe(4);
     });
   });
 
@@ -371,7 +376,8 @@ describe("FirestoreCadetStore", () => {
   it("turns unexpected failures into an unknown error", async () => {
     const broken = new FirestoreCadetStore(() => ({ collection: () => { throw new Error("offline"); } }) as unknown as Firestore, testEventResolver);
 
-    expect(await broken.list({ search: "", after: null, limit: 25 })).toEqual({ ok: false, error: { code: "unknown" } });
+    expect(await broken.list({ after: null, limit: 25 })).toEqual({ ok: false, error: { code: "unknown" } });
+    expect(await broken.listAll()).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.get("u-nova")).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.rename("u-nova", { display: "X", key: "x" })).toEqual({ ok: false, error: { code: "unknown" } });
     expect(await broken.setSquad("u-nova", null)).toEqual({ ok: false, error: { code: "unknown" } });

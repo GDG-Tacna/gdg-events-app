@@ -6,6 +6,7 @@ import {
 } from "@/app-shell/composition/leaderboard.server";
 import { squadCatalog } from "@/app-shell/composition/squads.server";
 import { requireRole } from "@/app-shell/guards";
+import { loadConsoleAgenda } from "@/app-shell/rundown/agenda.server";
 import { StageScreenBound } from "@/app-shell/StageScreenBound";
 import {
   currentEditionId,
@@ -14,7 +15,6 @@ import {
 } from "@/features/leaderboard/server";
 import { FEATURES } from "@/shared/config/features";
 import { copy } from "@/shared/copy/es";
-import { SpaceBackground } from "@/shared/ui";
 import { moduleOn } from "@/app-shell/modules.server";
 
 export const metadata: Metadata = {
@@ -22,11 +22,13 @@ export const metadata: Metadata = {
 };
 
 /** The stage screen for the projector. Admins only: its live listeners read with the admin's own session. */
-export default async function StagePage() {
-  await requireRole(["admin"]);
+export default async function StagePage({ searchParams }: { searchParams?: Promise<{ vista?: string | string[] }> } = {}) {
+  // `?vista=previa` is the console's small copy of this screen (it does not announce itself as a projector).
+  const preview = (await searchParams)?.vista === "previa";
+  const admin = await requireRole(["admin"]);
   if (!(await moduleOn("leaderboard"))) notFound();
 
-  const [eventId, stage, board, catalog, squadsOn, pollsOn] = await Promise.all(
+  const [eventId, stage, board, catalog, squadsOn, pollsOn, agenda] = await Promise.all(
     [
       currentEditionId(),
       getStage(stageDeps),
@@ -34,6 +36,8 @@ export default async function StagePage() {
       squadCatalog.list(),
       moduleOn("squads"),
       moduleOn("polls"),
+      // The next talk for the waiting screen and the speaker under a talk's QR: without them the screen still works.
+      loadConsoleAgenda({ uid: admin.uid, role: "admin" }).catch(() => null),
     ],
   );
   if (!stage.ok) throw new Error("Could not read the stage");
@@ -42,7 +46,6 @@ export default async function StagePage() {
 
   return (
     <>
-      <SpaceBackground />
       <StageScreenBound
         eventId={eventId}
         squads={squads.map(({ id, name, active }) => ({ id, name, active }))}
@@ -57,6 +60,8 @@ export default async function StagePage() {
         squadsOn={squadsOn}
         pollsOn={FEATURES.polls && pollsOn}
         talkQrOn={FEATURES.checkins}
+        agenda={agenda ?? []}
+        preview={preview}
       />
     </>
   );

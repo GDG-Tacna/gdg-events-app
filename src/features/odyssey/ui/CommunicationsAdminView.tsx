@@ -131,7 +131,7 @@ export function CommunicationsAdminView({ communications, quadrants, missions, d
                 <Card pad={false} className={cn("gap-space-3 p-space-3 flex flex-col", !communication.active && "opacity-75")}>
                   <div className="gap-space-3 flex items-start">
                     {handle}
-                    <span aria-hidden="true" className="bg-bg-deep border-line-strong text-violet-soft grid size-12 shrink-0 place-items-center rounded-md border">
+                    <span aria-hidden="true" className="bg-bg-deep border-line-strong text-violet-soft-ink grid size-12 shrink-0 place-items-center rounded-md border">
                       <Icon name="transmission" size={22} />
                     </span>
                     <div className="gap-space-1 flex min-w-0 flex-1 flex-col">

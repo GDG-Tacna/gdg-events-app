@@ -1,5 +1,6 @@
 import {
   ArrowBigUp,
+  Music,
   CameraOff,
   ChevronDown,
   ChevronLeft,
@@ -57,6 +58,8 @@ import {
   Upload,
   Trash2,
   type LucideIcon,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 
@@ -86,6 +89,7 @@ const ICONS = {
   left: ChevronLeft,
   right: ChevronRight,
   up: ChevronUp,
+  music: Music,
   down: ChevronDown,
   jump: ArrowBigUp,
   users: UsersRound,
@@ -119,6 +123,8 @@ const ICONS = {
   image: ImageIcon,
   upload: Upload,
   trash: Trash2,
+  sun: Sun,
+  moon: Moon,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

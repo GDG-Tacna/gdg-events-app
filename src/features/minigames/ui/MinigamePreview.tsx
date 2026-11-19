@@ -36,7 +36,7 @@ export function MinigamePreview({ gameId, difficulty, codeLanguages, games = GAM
         </Suspense>
       ) : (
         <div className="gap-space-4 py-space-4 flex flex-col items-center text-center">
-          <p role="status" className={won ? "type-pixel-callout text-accent" : "type-title text-foreground"}>
+          <p role="status" className={won ? "type-pixel-callout text-lime-ink" : "type-title text-foreground"}>
             {won ? t.won : t.lost}
           </p>
           <Button

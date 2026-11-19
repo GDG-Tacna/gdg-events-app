@@ -14,6 +14,11 @@ const serverEnvSchema = z.object({
    * is used, so a missing or short one stops QR codes with a clear log line instead of breaking sign-in.
    */
   qrSigningSecret: z.string().optional(),
+  /**
+   * Bearer secret of the show feed (`/api/show-feed/*`), shared with the local show's laptop. Optional on purpose:
+   * missing or shorter than 32 characters, the feed answers "disabled" and nothing else changes.
+   */
+  showFeedToken: z.string().optional(),
   /** The app's public address (https://…), for links in emails. Optional: without it no email is sent. */
   // A malformed one is ignored (no emails) instead of breaking every server request.
   appUrl: z.string().url().optional().catch(undefined),
@@ -34,6 +39,7 @@ export function getServerEnv(): ServerEnv {
     authEmulatorHost: process.env.FIREBASE_AUTH_EMULATOR_HOST || undefined,
     firestoreEmulatorHost: process.env.FIRESTORE_EMULATOR_HOST || undefined,
     qrSigningSecret: process.env.QR_SIGNING_SECRET || undefined,
+    showFeedToken: process.env.SHOW_FEED_TOKEN || undefined,
     appUrl: process.env.APP_URL?.replace(/\/+$/, "") || undefined,
     resendApiKey: process.env.RESEND_API_KEY || undefined,
     inviteFrom: process.env.INVITE_FROM || undefined,

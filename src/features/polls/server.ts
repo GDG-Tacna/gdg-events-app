@@ -15,5 +15,5 @@ export {
   type PollAdminErrorCode,
   type PollStore,
 } from "./domain/manage";
-export { castVote, getCadetPoll, type CadetPoll, type VoteDeps, type VoteErrorCode, type VoteStore } from "./domain/vote";
+export { castVote, getCadetPoll, getOpenPollTally, type CadetPoll, type VoteDeps, type VoteErrorCode, type VoteStore } from "./domain/vote";
 export { FirestorePollStore, toPoll } from "./data/server/firestore-poll-store";

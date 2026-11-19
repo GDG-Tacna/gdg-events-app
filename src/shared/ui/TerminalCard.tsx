@@ -21,8 +21,8 @@ export interface TerminalCardProps {
 }
 
 const TONES = {
-  cyan: { card: "border-cyan/45 from-surface to-bg-violet/40", tile: "border-cyan/40 text-cyan", title: "text-foreground" },
-  gold: { card: "border-gold/70 from-gold/10 to-surface", tile: "border-gold/60 text-gold", title: "text-gold" },
+  cyan: { card: "border-ink bg-surface", tile: "border-cyan/60 bg-cyan/10 text-cyan-ink", title: "text-foreground" },
+  gold: { card: "border-gold bg-surface", tile: "border-gold/70 bg-gold/10 text-gold-ink", title: "text-gold-ink" },
 } as const;
 
 /**
@@ -33,20 +33,20 @@ export function TerminalCard({ icon, title, body, badge, tag, tone = "cyan", act
   const t = TONES[tone];
   const content = (
     <>
-      <span aria-hidden="true" className={cn("bg-bg-deep grid size-12 shrink-0 place-items-center rounded-md border", t.tile)}>
+      <span aria-hidden="true" className={cn("grid size-12 shrink-0 place-items-center rounded-full border-2", t.tile)}>
         <Icon name={icon} size={22} />
       </span>
       <span className="gap-space-1 flex min-w-0 flex-1 flex-col">
         <span className="gap-space-2 flex flex-wrap items-center">
           <span className={cn("type-label tracking-wide uppercase", t.title)}>{title}</span>
-          {badge ? <span className="type-caption border-lime/60 text-lime rounded-sm border px-1.5 tracking-wider uppercase">{badge}</span> : null}
-          {tag ? <span className="type-pixel-tag border-gold/60 text-gold bg-gold/10 rounded-sm border px-1.5 text-[14px] leading-5">{tag}</span> : null}
+          {badge ? <span className="type-caption border-lime/60 text-lime-ink rounded-sm border px-1.5 tracking-wider uppercase">{badge}</span> : null}
+          {tag ? <span className="type-pixel-tag border-gold/60 text-gold-ink bg-gold/10 rounded-sm border px-1.5 text-[14px] leading-5">{tag}</span> : null}
         </span>
         <span className="type-body-sm text-muted-foreground">{body}</span>
       </span>
     </>
   );
-  const frame = cn("bg-gradient-to-br shadow-card rounded-lg border p-space-4", t.card);
+  const frame = cn("rounded-lg border-2 p-space-4", t.card);
 
   if (action.kind === "chevron") {
     return (
@@ -55,7 +55,7 @@ export function TerminalCard({ icon, title, body, badge, tag, tone = "cyan", act
         className={cn(frame, "gap-space-3 hover:border-cyan focus-visible:ring-ring flex items-center focus-visible:ring-[3px] focus-visible:outline-none")}
       >
         {content}
-        <span aria-hidden="true" className={cn("border-line-strong grid size-10 shrink-0 place-items-center rounded-md border", tone === "gold" ? "text-gold" : "text-cyan")}>
+        <span aria-hidden="true" className={cn("border-ink grid size-10 shrink-0 place-items-center rounded-full border-2", tone === "gold" ? "text-gold-ink" : "text-cyan-ink")}>
           <Icon name="right" size={20} />
         </span>
       </Link>
@@ -66,7 +66,7 @@ export function TerminalCard({ icon, title, body, badge, tag, tone = "cyan", act
       <div className="gap-space-3 flex items-start">{content}</div>
       <Link
         href={action.href}
-        className="type-label from-primary to-cyan text-primary-foreground focus-visible:ring-ring gap-space-2 inline-flex h-12 items-center justify-center rounded-md bg-gradient-to-r tracking-wide uppercase focus-visible:ring-[3px] focus-visible:outline-none"
+        className="type-label bg-primary text-primary-foreground border-ink hover:bg-gold hover:text-on-accent focus-visible:ring-ring gap-space-2 inline-flex h-12 items-center justify-center rounded-full border-2 font-semibold transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
       >
         {action.label}
         <Icon name="right" size={18} />

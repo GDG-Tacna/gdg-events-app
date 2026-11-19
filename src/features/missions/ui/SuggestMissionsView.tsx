@@ -190,7 +190,7 @@ function SuggestionCard({ suggestion, onReview }: { suggestion: SuggestedMission
               <li key={option} className="type-body-sm text-muted-foreground gap-space-2 flex items-center">
                 {index === config.answer ? (
                   <>
-                    <Icon name="check" size={16} className="text-accent" title={s.correct} />
+                    <Icon name="check" size={16} className="text-lime-ink" title={s.correct} />
                     <span className="text-foreground">{option}</span>
                   </>
                 ) : (

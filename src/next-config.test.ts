@@ -15,6 +15,16 @@ describe("next.config headers", () => {
     expect(headerValue(all, "Referrer-Policy")).toBe("strict-origin-when-cross-origin");
   });
 
+  it("lets only the stage screen be framed, and only by this same site (the console shows a copy of it)", async () => {
+    const list = await rules();
+    const stage = list.find((rule) => rule.source === "/escenario");
+
+    expect(headerValue(stage, "X-Frame-Options")).toBe("SAMEORIGIN");
+    // It comes after the rule for every route, which wins for the same header; the console itself stays unframeable.
+    expect(list.indexOf(stage as Rule)).toBeGreaterThan(list.findIndex((rule) => rule.source === "/(.*)"));
+    expect(list.some((rule) => rule.source === "/escenario/consola")).toBe(false);
+  });
+
   it("lets the app use the camera (the scanner) and nothing else sensitive", async () => {
     const all = (await rules()).find((rule) => rule.source === "/(.*)");
     const policy = headerValue(all, "Permissions-Policy") ?? "";

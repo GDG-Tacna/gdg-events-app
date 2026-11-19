@@ -33,11 +33,23 @@ const TYPE_ICON: Record<MissionType, IconName> = {
   talk: "qr",
   stand: "map-pin",
   speaker: "person",
+  team: "users",
+  squads: "flag",
   quiz: "question",
   keyword: "key",
 };
 /** A non-breaking space keeps the dot on the line of the item before it. */
 const SEPARATOR = " · ";
+
+/** Whom a speaker or team mission accepts, in words («Todos los speakers», «3 voluntarios»); nothing for the other types. */
+function peopleSummary(config: Mission["config"]): string | null {
+  if (config.type !== "speaker" && config.type !== "team") return null;
+  const words = copy.admin.missions.peopleSummary[config.type === "speaker" ? "speaker" : config.role];
+  const picked = config.type === "speaker" ? config.speakerIds : config.memberUids;
+  if (picked === null) return words.all;
+  return picked.length === 1 ? words.one : interpolate(words.many, { n: String(picked.length) });
+}
+
 const chip ="type-caption border-line-strong text-foreground px-space-3 rounded-full border py-1";
 
 /**
@@ -120,7 +132,7 @@ export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, se
               <Card pad={false} className={cn("gap-space-3 p-space-3 flex flex-col", !mission.active && "opacity-75")}>
                 <div className="gap-space-3 flex items-start">
                   {handle}
-                  <span aria-hidden="true" className="bg-bg-deep border-line-strong text-cyan relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-md border">
+                  <span aria-hidden="true" className="bg-bg-deep border-line-strong text-cyan-ink relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-md border">
                     {mission.image ? <Image src={mission.image.url} alt="" fill unoptimized sizes="48px" className="object-cover" /> : <Icon name={TYPE_ICON[mission.config.type]} size={22} />}
                   </span>
                   <div className="gap-space-1 flex min-w-0 flex-1 flex-col">
@@ -132,6 +144,12 @@ export function MissionsAdminView({ missions, quadrants, defaultsCount, seed, se
                       <span>{quadrantName(mission.quadrantId)}</span>
                       <span aria-hidden="true">{SEPARATOR}</span>
                       <span className="whitespace-nowrap">{interpolate(copy.admin.missions.xp, { xp: formatNumber(mission.xp) })}</span>
+                      {peopleSummary(mission.config) ? (
+                        <>
+                          <span aria-hidden="true">{SEPARATOR}</span>
+                          <span>{peopleSummary(mission.config)}</span>
+                        </>
+                      ) : null}
                       {mission.minigame && mission.minigame in copy.minigames.names ? (
                         <>
                           <span aria-hidden="true">{SEPARATOR}</span>

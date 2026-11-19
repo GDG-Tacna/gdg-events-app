@@ -17,7 +17,7 @@ export interface EconomySettingsViewProps {
   save: SaveEconomyAction;
 }
 
-const TYPE_LABELS = { talk: copy.missions.types.talk, stand: copy.missions.types.stand, speaker: copy.missions.types.speaker, quiz: copy.missions.types.quiz, keyword: copy.missions.types.keyword };
+const TYPE_LABELS = { talk: copy.missions.types.talk, stand: copy.missions.types.stand, speaker: copy.missions.types.speaker, team: copy.missions.types.team, squads: copy.missions.types.squads, quiz: copy.missions.types.quiz, keyword: copy.missions.types.keyword };
 
 const digits = (value: string) => value.replace(/[^0-9]/g, "");
 /** An empty field is not zero: it is refused, like the server does. */

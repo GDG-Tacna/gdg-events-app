@@ -31,7 +31,7 @@ function StatTile({ icon, value, label, hint }: { icon: ReactNode; value: number
       <span className="flex min-w-0 flex-col">
         <span className="type-title text-foreground tabular-nums leading-tight">{formatNumber(value)}</span>
         <span className="type-caption text-text-subtle tracking-wider uppercase">{label}</span>
-        {hint ? <span className="type-caption text-gold">{hint}</span> : null}
+        {hint ? <span className="type-caption text-gold-ink">{hint}</span> : null}
       </span>
     </div>
   );
@@ -49,7 +49,7 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
   return (
     <section
       aria-label={copy.dashboard.attendeeCardLabel}
-      className="border-cyan/60 from-surface to-bg-violet/50 shadow-card gap-space-4 p-space-4 flex flex-col rounded-lg border bg-gradient-to-br"
+      className="border-ink bg-surface gap-space-4 p-space-4 flex flex-col rounded-lg border-2"
     >
       <div className="gap-space-4 flex items-center">
         {avatarHref ? (
@@ -57,15 +57,15 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
             href={avatarHref}
             aria-label={copy.avatar.edit}
             title={copy.avatar.edit}
-            className="border-cyan/70 bg-gradient-to-b from-[#16306e] to-bg-deep shadow-[0_0_0_3px_rgba(34,211,238,0.12)] focus-visible:ring-ring relative grid size-[88px] shrink-0 place-items-center rounded-md border-2 focus-visible:ring-[3px] focus-visible:outline-none"
+            className="border-ink bg-pastel-blue focus-visible:ring-ring relative grid size-[88px] shrink-0 place-items-center rounded-md border-2 focus-visible:ring-[3px] focus-visible:outline-none"
           >
             <PixelAvatar seed={overview.alias} look={avatarLook} scale={2} />
-            <span aria-hidden="true" className="bg-primary text-primary-foreground absolute -right-2 -bottom-2 grid size-7 place-items-center rounded-full">
+            <span aria-hidden="true" className="bg-gold text-on-accent border-ink absolute -right-2 -bottom-2 grid size-7 place-items-center rounded-full border-2">
               <Icon name="edit" size={14} />
             </span>
           </Link>
         ) : (
-          <div className="border-cyan/70 bg-gradient-to-b from-[#16306e] to-bg-deep shadow-[0_0_0_3px_rgba(34,211,238,0.12)] grid size-[88px] shrink-0 place-items-center rounded-md border-2">
+          <div className="border-ink bg-pastel-blue grid size-[88px] shrink-0 place-items-center rounded-md border-2">
             <PixelAvatar seed={overview.alias} look={avatarLook} scale={2} />
           </div>
         )}
@@ -78,7 +78,7 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
                 href={networkHref}
                 aria-label={copy.dashboard.account.network}
                 title={copy.dashboard.account.network}
-                className="border-line-strong text-cyan hover:bg-secondary focus-visible:ring-ring inline-grid size-12 shrink-0 place-items-center rounded-md border focus-visible:ring-[3px] focus-visible:outline-none"
+                className="border-line-strong text-cyan-ink hover:bg-secondary focus-visible:ring-ring inline-grid size-12 shrink-0 place-items-center rounded-md border focus-visible:ring-[3px] focus-visible:outline-none"
               >
                 <Icon name="users" size={24} />
               </Link>
@@ -88,7 +88,7 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
                 href={qrHref}
                 aria-label={copy.pass.open}
                 title={copy.pass.open}
-                className="border-line-strong text-cyan hover:bg-secondary focus-visible:ring-ring inline-grid size-12 shrink-0 place-items-center rounded-md border focus-visible:ring-[3px] focus-visible:outline-none"
+                className="border-line-strong text-cyan-ink hover:bg-secondary focus-visible:ring-ring inline-grid size-12 shrink-0 place-items-center rounded-md border focus-visible:ring-[3px] focus-visible:outline-none"
               >
                 <Icon name="qr" size={24} />
               </Link>
@@ -106,7 +106,7 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
       <div className="gap-space-2 flex flex-col">
         <div className="gap-space-2 flex items-baseline justify-between">
           <span className="type-caption text-text-subtle">{copy.dashboard.rankProgress}</span>
-          <span className="type-caption text-cyan tabular-nums">{values ? interpolate(copy.dashboard.progressCaption, values) : copy.dashboard.maxRank}</span>
+          <span className="type-caption text-cyan-ink tabular-nums">{values ? interpolate(copy.dashboard.progressCaption, values) : copy.dashboard.maxRank}</span>
         </div>
         <ProgressBar
           value={overview.progressPercent}

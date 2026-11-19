@@ -117,7 +117,7 @@ export function SpeakerAccessDialog({ speaker, access, invite, unlink, origin, o
         {link ? (
           <div role="status" className="border-cyan/60 bg-bg-deep p-space-3 gap-space-2 flex flex-col rounded-md border">
             <p className="type-body-sm text-foreground">{t.created}</p>
-            <code className="type-caption text-cyan break-all select-all">{link}</code>
+            <code className="type-caption text-cyan-ink break-all select-all">{link}</code>
             <Button type="button" variant="secondary" size="sm" className="gap-space-2 self-start" onClick={() => void copyLink()}>
               <Icon name={copied ? "check" : "share"} size={16} />
               {copied ? t.copied : t.copy}

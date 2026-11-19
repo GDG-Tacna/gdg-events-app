@@ -56,7 +56,7 @@ const renderView = (props: Partial<Parameters<typeof DashboardView>[0]> = {}) =>
 
 describe("PlayerCard", () => {
   it("links the avatar to the editor and draws the chosen look, or keeps a plain avatar without the editor", () => {
-    const look = { skin: 5, hairStyle: "buzz" as const, hairColor: 6, beard: "beard" as const, glasses: "shades" as const, helmet: 1, suit: 3 };
+    const look = { skin: 5, hairStyle: "buzz" as const, hairColor: 6, beard: "beard" as const, glasses: "shades" as const, helmet: 1, helmetOn: true, suit: 3 };
     const { unmount } = render(<PlayerCard overview={overview(120)} avatarLook={look} avatarHref="/avatar" />);
 
     expect(screen.getByRole("link", { name: copy.avatar.edit })).toHaveAttribute("href", "/avatar");
@@ -216,18 +216,15 @@ describe("DashboardView", () => {
     expect(within(card).getByRole("link", { name: copy.pass.open })).toHaveAttribute("href", "/pass");
   });
 
-  it("has the brand, the screen title for screen readers, and only sign out on the header, with no welcome banner", () => {
+  it("has the screen title for screen readers and no welcome banner, and leaves the brand and sign out to the shell's header", () => {
     renderView({ qrHref: "/pass", networkHref: "/red" });
 
     expect(screen.getByRole("heading", { level: 1, name: copy.dashboard.title })).toHaveClass("sr-only");
     // The app is used for one day: the home keeps only what the cadet acts on.
     expect(screen.queryByText(/Bienvenido a bordo/)).not.toBeInTheDocument();
-    const header = screen.getByRole("banner");
-    // The QR and the Red live on the cadet card: the header has no account menu (the gear repeated them).
-    expect(within(header).getAllByRole("button")).toHaveLength(1);
-    // Sign out lives on the header, never inside the content where it gets lost.
-    expect(within(header).getByRole("button", { name: copy.auth.signOut }).className).toContain("size-12");
-    expect(screen.getAllByRole("button", { name: copy.auth.signOut })).toHaveLength(1);
+    // The header (brand and sign out) belongs to the attendee shell, so every tab has it and the home does not repeat it.
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: copy.auth.signOut })).not.toBeInTheDocument();
   });
 
   it("shows the squad badge inside the attendee card when the attendee has a squad, and no invitation", () => {

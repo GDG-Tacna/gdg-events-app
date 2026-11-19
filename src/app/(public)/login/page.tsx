@@ -4,7 +4,7 @@ import { getSession } from "@/app-shell/guards";
 import { SignInPanel } from "@/features/auth";
 import { copy } from "@/shared/copy/es";
 import { homeFor } from "@/shared/config/routes";
-import { ScreenEnter, SpaceBackground } from "@/shared/ui";
+import { ScreenEnter, SpaceBackground, ThemeToggle } from "@/shared/ui";
 
 export const metadata: Metadata = {
   title: `${copy.auth.title} · ${copy.brand.name}`,
@@ -19,6 +19,9 @@ export default async function LoginPage() {
   return (
     <>
       <SpaceBackground />
+      <div className="pt-safe right-space-4 top-space-4 fixed z-20">
+        <ThemeToggle />
+      </div>
       <main className="px-space-4 pt-safe-space-8 pb-safe-space-8 mx-auto flex min-h-dvh w-full max-w-[520px] flex-col justify-center">
         <ScreenEnter>
           <SignInPanel />

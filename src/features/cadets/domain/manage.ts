@@ -58,6 +58,11 @@ export interface CadetListItem extends CadetSummary {
   identity: CadetIdentity | null;
 }
 
+/** A cadet with the key their alias is ordered and paged by (the alias in lowercase). */
+export interface IndexedCadet extends CadetSummary {
+  aliasKey: string;
+}
+
 /** What the store answers: profiles only, no accounts. */
 export interface CadetPage {
   cadets: readonly CadetSummary[];
@@ -84,6 +89,8 @@ export interface CadetListPage {
 }
 
 export const CADETS_PAGE_SIZE = 25;
+/** Longest search kept: enough for a whole email. */
+export const CADETS_SEARCH_MAX = 80;
 export const BAN_REASON_MAX = 200;
 
 export type CadetsErrorCode =
@@ -109,8 +116,10 @@ export interface CadetsError {
 const cadetsError = (code: CadetsErrorCode): CadetsError => ({ code });
 
 export interface CadetStore {
-  /** Cadets by alias, after `after` (an alias key) and, when `search` is given, only those whose alias starts with it. */
-  list(query: { search: string; after: string | null; limit: number }): Promise<Result<CadetPage, { code: string }>>;
+  /** Cadets by alias, after `after` (an alias key). */
+  list(query: { after: string | null; limit: number }): Promise<Result<CadetPage, { code: string }>>;
+  /** Every cadet of the edition (a few hundred), for a search; `total` counts every profile, as `list` does. */
+  listAll(): Promise<Result<{ cadets: readonly IndexedCadet[]; total: number }, { code: string }>>;
   /** `null` when there is no such cadet in the edition. */
   get(uid: string): Promise<Result<CadetRecord | null, { code: string }>>;
   /** Changes the alias and its reservation in one transaction; `taken` when another cadet holds it. */
@@ -147,7 +156,11 @@ export interface CadetsDeps {
   /** The alias rules (the attendee feature owns them); the key is what makes an alias unique. */
   aliases: { check(raw: string): Result<{ display: string; key: string }, string> };
   /** Whether a squad exists in the edition (the squads feature answers it), retired ones included. */
-  squads: { exists(id: string): Promise<Result<boolean, { code: string }>> };
+  squads: {
+    exists(id: string): Promise<Result<boolean, { code: string }>>;
+    /** Every squad's name by id, retired ones included, so a search finds their old members too. */
+    names(): Promise<Result<ReadonlyMap<string, string>, { code: string }>>;
+  };
   audit: { append(entry: CadetAuditEntry): Promise<Result<void, { code: string }>> };
   now: () => Date;
 }
@@ -168,24 +181,79 @@ async function audit(deps: Pick<CadetsDeps, "audit" | "now">, entry: Omit<CadetA
   if (!written.ok) logServerError("cadets.audit.append", new Error(`audit entry missing for ${entry.targetUid}`));
 }
 
+/** Text folded for a search: lowercase, without accents, with single spaces. */
+export const foldForSearch = (text: string) =>
+  text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Whether a folded search appears anywhere in the cadet's alias, sign-in name, email or squad (its name or id). */
+export function matchesCadet(
+  search: string,
+  fields: { alias: string; displayName?: string | null; email?: string | null; squadId?: string | null; squadName?: string | null },
+): boolean {
+  return [fields.alias, fields.displayName, fields.email, fields.squadId, fields.squadName].some((field) => typeof field === "string" && foldForSearch(field).includes(search));
+}
+
+/** The name and email of each cadet, by uid; when the accounts cannot be read the list still shows, without them. */
+async function identitiesOf(deps: Pick<CadetsDeps, "accounts">, cadets: readonly CadetSummary[]): Promise<ReadonlyMap<string, CadetIdentity>> {
+  const identities = await deps.accounts.lookupMany(cadets.map((cadet) => cadet.uid));
+  if (identities.ok) return identities.value;
+  logServerError("cadets.list.accounts", new Error(identities.error.code));
+  return new Map();
+}
+
+/** A search match as a list item, without the alias key it was ordered by. */
+const withIdentity = (cadet: IndexedCadet, identities: ReadonlyMap<string, CadetIdentity>): CadetListItem => ({
+  uid: cadet.uid,
+  alias: cadet.alias,
+  squad: cadet.squad,
+  xp: cadet.xp,
+  credits: cadet.credits,
+  createdAt: cadet.createdAt,
+  attendedAt: cadet.attendedAt,
+  banned: cadet.banned,
+  ticket: cadet.ticket,
+  identity: identities.get(cadet.uid) ?? null,
+});
+
 /**
- * One page of the edition's cadets, by alias; `search` keeps those whose alias starts with it. Each cadet comes with the
- * name and email of their account; if the accounts cannot be read the list still shows, without them.
+ * One page of the edition's cadets, by alias, each with the name and email of their account. With a search it keeps
+ * those where the text appears in the alias, the account's name or email, or the squad: the edition has a few hundred
+ * cadets, so they are read whole and matched here, then paged by alias like the plain list.
  */
 export async function listCadets(
-  deps: Pick<CadetsDeps, "store" | "accounts">,
+  deps: Pick<CadetsDeps, "store" | "accounts" | "squads">,
   actor: CadetsActor,
   query: { search?: string; after?: string | null },
 ): Promise<Result<CadetListPage, CadetsError>> {
   if (forbidden(actor)) return err(cadetsError("forbidden"));
-  const search = (query.search ?? "").normalize("NFC").trim().toLowerCase().slice(0, 40);
-  const listed = await deps.store.list({ search, after: query.after && query.after.length <= 80 ? query.after : null, limit: CADETS_PAGE_SIZE });
-  if (!listed.ok) return err(cadetsError("unknown"));
+  const search = foldForSearch((query.search ?? "").slice(0, CADETS_SEARCH_MAX));
+  const after = query.after && query.after.length <= 80 ? query.after : null;
 
-  const identities = await deps.accounts.lookupMany(listed.value.cadets.map((cadet) => cadet.uid));
-  if (!identities.ok) logServerError("cadets.list.accounts", new Error(identities.error.code));
-  const cadets = listed.value.cadets.map((cadet) => ({ ...cadet, identity: identities.ok ? (identities.value.get(cadet.uid) ?? null) : null }));
-  return ok({ cadets, next: listed.value.next, total: listed.value.total });
+  if (!search) {
+    const listed = await deps.store.list({ after, limit: CADETS_PAGE_SIZE });
+    if (!listed.ok) return err(cadetsError("unknown"));
+    const identities = await identitiesOf(deps, listed.value.cadets);
+    const cadets = listed.value.cadets.map((cadet) => ({ ...cadet, identity: identities.get(cadet.uid) ?? null }));
+    return ok({ cadets, next: listed.value.next, total: listed.value.total });
+  }
+
+  const all = await deps.store.listAll();
+  if (!all.ok) return err(cadetsError("unknown"));
+  // The accounts and the squads' names only widen the search: without them it still finds by alias and squad id.
+  const [identities, squadNames] = await Promise.all([identitiesOf(deps, all.value.cadets), deps.squads.names()]);
+  const squadName = (id: string | null) => (id && squadNames.ok ? squadNames.value.get(id) : null);
+
+  const matches = all.value.cadets
+    .filter((cadet) => matchesCadet(search, { alias: cadet.alias, ...identities.get(cadet.uid), squadId: cadet.squad, squadName: squadName(cadet.squad) }))
+    .filter((cadet) => after === null || cadet.aliasKey > after)
+    .sort((a, b) => (a.aliasKey < b.aliasKey ? -1 : a.aliasKey > b.aliasKey ? 1 : 0));
+  const page = matches.slice(0, CADETS_PAGE_SIZE);
+  const last = page.at(-1);
+  return ok({
+    cadets: page.map((cadet) => withIdentity(cadet, identities)),
+    next: matches.length > CADETS_PAGE_SIZE && last ? last.aliasKey : null,
+    total: all.value.total,
+  });
 }
 
 /** A cadet's record with the account behind it (email, whether it is disabled). */

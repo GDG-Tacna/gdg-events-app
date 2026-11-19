@@ -23,6 +23,8 @@ export const ROUTES = {
   network: "/red",
   /** The stage screen for the projector (phase 6). Admins only. */
   stage: "/escenario",
+  /** The stage console: the running order, what is on the screen, the controls and the quick scenes. Admins only. */
+  stageConsole: "/escenario/consola",
   /** The live poll, to vote in it. Attendees only. */
   poll: "/encuesta",
   /** The avatar editor ("Mi avatar"). Attendees only. */
@@ -33,6 +35,8 @@ export const ROUTES = {
   speaker: "/speaker",
   /** Staff area: pick a serving point and hand out rations. Staff and admin. */
   staff: "/staff",
+  /** «Mi código»: a team member's rotating code for cadets to scan («Conoce a un organizador / voluntario»). Staff and admin. */
+  teamCode: "/staff/mi-codigo",
   /** An entrance's or a stand's code on a screen (`/staff/qr/{checkpointId}`), for cadets to scan. Staff and admin. */
   staffQr: "/staff/qr",
   /** Where staff change a cadet's ticket by scanning their pass. Staff and admin. */
