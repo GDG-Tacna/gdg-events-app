@@ -19,7 +19,7 @@ const editSchema = z.object({
   imagePath: imagePathSchema,
   kind: z.string().max(20).optional(),
   newId: z.string().max(100).optional(),
-  requirements: z.object({ minLevel: z.number().nullable(), minTalks: z.number().nullable() }).optional(),
+  requirements: z.object({ minLevel: z.number().nullable(), minTalks: z.number().nullable(), minTicket: z.string().max(20).nullable().optional() }).optional(),
 });
 const activeSchema = z.object({ id: z.string().max(100), active: z.boolean() });
 
@@ -61,7 +61,7 @@ export async function editCheckpointAction(input: {
   imagePath?: string | null;
   kind?: string;
   newId?: string;
-  requirements?: { minLevel: number | null; minTalks: number | null };
+  requirements?: { minLevel: number | null; minTalks: number | null; minTicket?: string | null };
 }): Promise<ManageActionResult> {
   const actor = await adminActor();
   if (isResult(actor)) return actor;

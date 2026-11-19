@@ -32,9 +32,13 @@ const RECORD: CadetRecord = {
   createdAt: new Date("2026-11-01T00:00:00Z"),
   attendedAt: null,
   banned: false,
+  ticket: "general",
   activity: { checkIns: 2, missions: 1, badges: 0, contacts: 0 },
   bannedAt: null,
   banReason: null,
+  ticketSource: "default",
+  ticketSetBy: null,
+  ticketSetAt: null,
 };
 const ACCOUNT: CadetAccount = { email: "nova@example.com", displayName: "Nova Cadet", role: "attendee", disabled: false };
 const REMOVAL: CadetRemoval = { alias: "Nova", checkIns: 2, missions: 1, badges: 0, contacts: 0 };

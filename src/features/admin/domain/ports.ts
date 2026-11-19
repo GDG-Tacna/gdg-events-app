@@ -131,7 +131,9 @@ export interface AuditEntry {
     | "cadet.squad"
     | "cadet.banned"
     | "cadet.unbanned"
-    | "cadet.deleted";
+    | "cadet.deleted"
+    | "cadet.ticket"
+    | "tickets.imported";
   actorUid: string;
   targetUid: string;
   /** Small, non-secret facts about the change (for example the new role). */

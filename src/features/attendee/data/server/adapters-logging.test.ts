@@ -24,7 +24,7 @@ const brokenDb = () => {
   throw credentialsError;
 };
 const NOW = new Date("2026-10-04T12:00:00Z");
-const attendee = { uid: "u1", alias: "Nova_7", role: "attendee" as const, squad: null, xp: 0, credits: 0, createdAt: NOW };
+const attendee = { uid: "u1", alias: "Nova_7", role: "attendee" as const, squad: null, xp: 0, credits: 0, ticket: { type: "general" as const, source: "default" as const }, createdAt: NOW };
 const alias = { display: "Nova_7", key: "nova_7" };
 
 describe("server adapters report unexpected failures instead of swallowing them", () => {

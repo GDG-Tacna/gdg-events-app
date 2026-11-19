@@ -1,3 +1,4 @@
+import type { TicketType } from "@/features/tickets";
 import type { Result } from "@/shared/lib/result";
 
 /** A checkpoint as this feature needs it. The check-ins catalog satisfies it (structurally). */
@@ -25,6 +26,8 @@ export interface PassCheck {
 export interface AttendeeSummary {
   alias: string;
   squadId: string | null;
+  /** The ticket of the cadet, for the verdict the staff see. */
+  ticket: TicketType;
 }
 
 export interface AttendeeLookup {
@@ -54,13 +57,15 @@ export interface ServeLimiter {
 export interface GateShortfall {
   level: number | null;
   talks: number | null;
+  /** The minimum ticket the meal asks for, when the person has a lower one. */
+  ticket: TicketType | null;
 }
 
 export type GateVerdict = { allowed: true } | { allowed: false; missing: GateShortfall };
 
 /**
  * Decides whether an attendee may receive this meal: the food gate of the catering checkpoint (minimum
- * level, talks attended). A failed read is an error, so the staff scans again instead of a wrong answer.
+ * level, talks attended, ticket). A failed read is an error, so the staff scans again instead of a wrong answer.
  */
 export interface ServeGate {
   check(input: { uid: string; checkpoint: ServeCheckpoint }): Promise<Result<GateVerdict, { code: string }>>;

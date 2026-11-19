@@ -14,11 +14,15 @@ export const metadata: Metadata = { title: copy.staff.title };
 export default async function StaffHomePage() {
   const session = await requireRole(["staff"]);
 
-  const points = await listServePoints(serveDeps, { uid: session.uid, role: session.role, kinds: session.role === "staff" ? await staffStations() : undefined, checkpointIds: await staffCheckpoints(session) });
+  const kinds = session.role === "staff" ? await staffStations() : undefined;
+  const checkpointIds = await staffCheckpoints(session);
+  const points = await listServePoints(serveDeps, { uid: session.uid, role: session.role, kinds, checkpointIds });
   // A failed read goes to the route error boundary instead of claiming there is nothing to operate.
   if (!points.ok) throw new Error("Could not read the stations");
 
   // The use case already orders them entrance, catering, stand; each kind with stations gets its own group.
+  // Changing a ticket needs a station to operate, like serving: staff the organizer limited to none do not get the card.
+  const mayChangeTickets = kinds === undefined || (kinds.length > 0 && (checkpointIds === undefined || checkpointIds.length > 0));
   const groups = STATION_KINDS.map((kind) => ({ kind, points: points.value.filter((point) => point.kind === kind) })).filter((group) => group.points.length > 0);
 
   return (
@@ -72,6 +76,18 @@ export default async function StaffHomePage() {
             ))}
           </div>
         )}
+
+        {mayChangeTickets ? (
+          <Card className="gap-space-3 flex flex-col">
+            <div className="gap-space-1 flex flex-col">
+              <h2 className="type-title text-foreground">{copy.staff.tickets.card.title}</h2>
+              <p className="type-body-sm text-muted-foreground">{copy.staff.tickets.card.body}</p>
+            </div>
+            <ButtonLink href={ROUTES.staffTickets} variant="secondary">
+              {copy.staff.tickets.card.title}
+            </ButtonLink>
+          </Card>
+        ) : null}
       </div>
     </ScreenEnter>
   );

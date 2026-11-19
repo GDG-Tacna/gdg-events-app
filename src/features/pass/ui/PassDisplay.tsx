@@ -1,6 +1,7 @@
 "use client";
 
 import { QrCodeSvg, useRenewingCode } from "@/features/ephemeral-qr";
+import { TicketBadge, type TicketType } from "@/features/tickets";
 import { copy } from "@/shared/copy/es";
 import { Button, Card, InlineAlert, Skeleton } from "@/shared/ui";
 import type { PassErrorCode } from "../domain/pass-error";
@@ -9,6 +10,8 @@ import { useCallback } from "react";
 
 export interface PassDisplayProps {
   issue: IssuePassAction;
+  /** The cadet's ticket, shown under the code so the staff see it on the cadet's phone. Absent when it could not be read. */
+  ticket?: TicketType | null;
 }
 
 /**
@@ -16,7 +19,7 @@ export interface PassDisplayProps {
  * the code comes from the server (who it is for, how long it lasts); this only draws it. It never shows a
  * dead code: when one ends without a new one it says so.
  */
-export function PassDisplay({ issue }: PassDisplayProps) {
+export function PassDisplay({ issue, ticket }: PassDisplayProps) {
   const request = useCallback(async () => {
     const result = await issue();
     return result.ok ? ({ ok: true, value: result.pass } as const) : result;
@@ -34,6 +37,7 @@ export function PassDisplay({ issue }: PassDisplayProps) {
         {state.status === "showing" ? (
           <>
             <QrCodeSvg cells={state.code.cells} label={copy.pass.codeLabel} className="aspect-square w-full max-w-[420px] rounded-md" />
+            {ticket ? <TicketBadge type={ticket} align="center" /> : null}
             <p className="type-body-sm text-text-subtle">{copy.pass.renews}</p>
             {state.reconnecting ? <InlineAlert>{copy.pass.reconnecting}</InlineAlert> : null}
           </>

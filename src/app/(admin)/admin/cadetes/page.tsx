@@ -41,11 +41,12 @@ export default async function AdminCadetsPage({ searchParams }: PageProps<"/admi
           credits: cadet.credits,
           attended: cadet.attendedAt !== null,
           banned: cadet.banned,
+          ticket: cadet.ticket,
         }))}
         total={page.value.total}
         search={search}
         nextHref={nextHref}
-        hrefs={{ list: ROUTES.adminCadets, detailBase: ROUTES.adminCadets }}
+        hrefs={{ list: ROUTES.adminCadets, detailBase: ROUTES.adminCadets, tickets: ROUTES.adminCadetTickets }}
       />
     </ScreenEnter>
   );

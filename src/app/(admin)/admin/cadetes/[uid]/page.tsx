@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { banCadetAction, changeCadetSquadAction, deleteCadetAction, renameCadetAction, unbanCadetAction } from "@/app-shell/cadets/manage.actions";
 import { cadetsDeps } from "@/app-shell/composition/cadets.server";
 import { squadStore } from "@/app-shell/composition/squads.server";
+import { changeCadetTicketAction } from "@/app-shell/tickets/tickets.actions";
 import { requireRole } from "@/app-shell/guards";
 import { mayEdit, requireSection } from "@/app-shell/permissions.server";
 import { CadetDetailView } from "@/features/cadets";
@@ -24,6 +25,8 @@ export default async function AdminCadetPage({ params }: PageProps<"/admin/cadet
     throw new Error("Could not read the cadet");
   }
   const { cadet, account } = found.value;
+  // Who set the ticket by hand, by name: it only decorates the page, so an account that cannot be read leaves it out.
+  const setter = cadet.ticketSource === "manual" && cadet.ticketSetBy ? await cadetsDeps.accounts.lookup(cadet.ticketSetBy) : null;
   const squadOptions = squads.ok ? squads.value.map((squad) => ({ id: squad.id, name: squad.name })) : [];
 
   return (
@@ -40,6 +43,9 @@ export default async function AdminCadetPage({ params }: PageProps<"/admin/cadet
           credits: cadet.credits,
           attended: cadet.attendedAt !== null,
           banned: cadet.banned,
+          ticket: cadet.ticket,
+          ticketSource: cadet.ticketSource,
+          ticketSetByName: setter?.ok && setter.value ? (setter.value.displayName ?? setter.value.email) : null,
           createdAt: cadet.createdAt?.toISOString() ?? null,
           attendedAt: cadet.attendedAt?.toISOString() ?? null,
           activity: cadet.activity,
@@ -50,6 +56,7 @@ export default async function AdminCadetPage({ params }: PageProps<"/admin/cadet
         squads={squadOptions}
         rename={renameCadetAction}
         changeSquad={changeCadetSquadAction}
+        changeTicket={changeCadetTicketAction}
         ban={banCadetAction}
         unban={unbanCadetAction}
         remove={deleteCadetAction}

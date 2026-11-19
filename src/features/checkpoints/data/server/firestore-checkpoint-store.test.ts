@@ -9,7 +9,7 @@ vi.mock("firebase-admin/firestore", () => ({ FieldValue: { delete: () => "__dele
 const { FirestoreCheckpointStore } = await import("./firestore-checkpoint-store");
 
 type Doc = Record<string, unknown>;
-const NONE = { minLevel: null, minTalks: null };
+const NONE = { minLevel: null, minTalks: null, minTicket: null };
 /** What every checkpoint without a description or an image reads as. */
 const PLAIN = { description: "", image: null };
 
@@ -138,7 +138,7 @@ describe("FirestoreCheckpointStore", () => {
   });
 
   describe("food gate", () => {
-    const LUNCH = { minLevel: 2, minTalks: 3 };
+    const LUNCH = { minLevel: 2, minTalks: 3, minTicket: null };
 
     it("saves a meal's requirements and reads them back", async () => {
       const result = await store.update("lunch-1", { requirements: LUNCH });
@@ -242,7 +242,7 @@ describe("FirestoreCheckpointStore description, image and kind", () => {
   beforeEach(() => {
     fake = fakeFirestore({
       "events/e1/checkpoints/louis-3d": { kind: "stand", name: "Louis 3D", active: true },
-      "events/e1/checkpoints/lunch-1": { kind: "catering", name: "Almuerzo", active: true, requirements: { minLevel: 2, minTalks: null } },
+      "events/e1/checkpoints/lunch-1": { kind: "catering", name: "Almuerzo", active: true, requirements: { minLevel: 2, minTalks: null, minTicket: null } },
     });
     store = new FirestoreCheckpointStore(() => fake.db, testEventResolver);
     vi.spyOn(console, "error").mockImplementation(() => undefined);

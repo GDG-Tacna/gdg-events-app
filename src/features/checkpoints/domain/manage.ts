@@ -224,11 +224,12 @@ export async function listIdentityLocks(
   return ok(locks);
 }
 
-const sameRequirements = (a: FoodRequirements, b: FoodRequirements) => a.minLevel === b.minLevel && a.minTalks === b.minTalks;
+const sameRequirements = (a: FoodRequirements, b: FoodRequirements) => a.minLevel === b.minLevel && a.minTalks === b.minTalks && a.minTicket === b.minTicket;
 
 const describeRequirements = (requirements: FoodRequirements) => ({
   minLevel: requirements.minLevel === null ? null : String(requirements.minLevel),
   minTalks: requirements.minTalks === null ? null : String(requirements.minTalks),
+  minTicket: requirements.minTicket,
 });
 
 export interface EditCheckpointInput {
@@ -242,7 +243,7 @@ export interface EditCheckpointInput {
   /** A new id. Absent keeps it. */
   newId?: string;
   /** The food gate, for a puesto that is (or becomes) a catering one. Absent keeps it. */
-  requirements?: { minLevel: number | null; minTalks: number | null };
+  requirements?: { minLevel: number | null; minTalks: number | null; minTicket?: string | null };
 }
 
 /**

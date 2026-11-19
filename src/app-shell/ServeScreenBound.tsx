@@ -36,6 +36,7 @@ export function ServeScreenBound({
       image={image}
       initialCount={initialCount}
       backHref={ROUTES.staff}
+      changeTicketHref={ROUTES.staffTickets}
     />
   );
 }

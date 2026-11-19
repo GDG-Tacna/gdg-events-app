@@ -9,6 +9,8 @@ export type ManageErrorCode =
   /** A food gate level outside 1..10, or talks outside 0..50. */
   | "invalid-level"
   | "invalid-talks"
+  /** A minimum ticket that is not general, pro or premium. */
+  | "invalid-ticket"
   /** Only catering checkpoints have a food gate. */
   | "not-catering"
   | "already-exists"

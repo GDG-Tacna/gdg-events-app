@@ -44,6 +44,19 @@ describe("PassDisplay", () => {
     expect(screen.getByText(copy.pass.brightness)).toBeInTheDocument();
   });
 
+  it("shows the cadet's ticket under the code for the staff, and nothing when it is not known", async () => {
+    const { unmount } = render(<PassDisplay issue={vi.fn(async () => issued())} ticket="premium" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByText("Entrada Premium")).toBeInTheDocument();
+    expect(screen.getByText(copy.tickets.includes.premium)).toBeInTheDocument();
+    unmount();
+
+    await renderDisplay(vi.fn(async () => issued()));
+    expect(screen.queryByText(/Entrada /)).not.toBeInTheDocument();
+  });
+
   it("renews the pass before it ends, so the staff never scan a dead one", async () => {
     const issue = vi.fn<IssuePassAction>(async () => issued(60));
     await renderDisplay(issue);

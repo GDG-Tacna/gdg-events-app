@@ -1,7 +1,7 @@
 import type { Analytics } from "@/shared/lib/analytics/analytics";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { createAlias } from "./alias";
-import { createNewAttendee, type Attendee } from "./attendee";
+import { createNewAttendee, type Attendee, type AttendeeTicket } from "./attendee";
 import { attendeeError, type AttendeeError } from "./attendee-error";
 import type { AttendeeRepository, RoleGranter } from "./ports";
 
@@ -25,12 +25,12 @@ export interface RegisterAttendeeResult {
  */
 export async function registerAttendee(
   deps: RegisterAttendeeDeps,
-  input: { uid: string; rawAlias: string },
+  input: { uid: string; rawAlias: string; ticket?: AttendeeTicket },
 ): Promise<Result<RegisterAttendeeResult, AttendeeError>> {
   const alias = createAlias(input.rawAlias);
   if (!alias.ok) return err(attendeeError("alias-invalid", alias.error));
 
-  const attendee = createNewAttendee({ uid: input.uid, alias: alias.value, now: deps.now() });
+  const attendee = createNewAttendee({ uid: input.uid, alias: alias.value, now: deps.now(), ticket: input.ticket });
   const registered = await deps.attendees.register(attendee, alias.value);
   if (!registered.ok) return registered;
 

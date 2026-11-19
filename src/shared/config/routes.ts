@@ -35,11 +35,15 @@ export const ROUTES = {
   staff: "/staff",
   /** An entrance's or a stand's code on a screen (`/staff/qr/{checkpointId}`), for cadets to scan. Staff and admin. */
   staffQr: "/staff/qr",
+  /** Where staff change a cadet's ticket by scanning their pass. Staff and admin. */
+  staffTickets: "/staff/entradas",
   /** Admin area (Centro de control). Admin role only. */
   admin: "/admin",
   adminTeam: "/admin/team",
   /** The cadets registered in the edition, and each one's page (`/admin/cadetes/{uid}`). */
   adminCadets: "/admin/cadetes",
+  /** Where the edition's list of ticket holders is loaded. */
+  adminCadetTickets: "/admin/cadetes/entradas",
   /** Where a talk's QR is projected (`/admin/qr/{talkId}`); the list itself lives in Charlas. */
   adminQr: "/admin/qr",
   adminTalks: "/admin/charlas",

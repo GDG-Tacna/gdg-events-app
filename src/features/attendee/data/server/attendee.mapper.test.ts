@@ -20,8 +20,16 @@ describe("mapUserDoc", () => {
   it("maps a stored profile to the domain entity and converts the timestamp", () => {
     expect(mapUserDoc("u1", validDoc)).toEqual({
       ok: true,
-      value: { uid: "u1", alias: "Nova_7", role: "attendee", squad: null, xp: 120, credits: 3, createdAt: CREATED },
+      value: { uid: "u1", alias: "Nova_7", role: "attendee", squad: null, xp: 120, credits: 3, ticket: { type: "general", source: "default" }, createdAt: CREATED },
     });
+  });
+
+  it("reads the ticket fields, and a profile from before tickets existed as a general ticket by default", () => {
+    const stored = mapUserDoc("u1", { ...validDoc, ticketType: "premium", ticketSource: "manual", ticketSetBy: "staff-1", ticketSetAt: timestamp });
+
+    expect(stored.ok && stored.value.ticket).toEqual({ type: "premium", source: "manual" });
+    const old = mapUserDoc("u1", validDoc);
+    expect(old.ok && old.value.ticket).toEqual({ type: "general", source: "default" });
   });
 
   it("accepts an assigned squad", () => {
@@ -48,6 +56,8 @@ describe("mapUserDoc", () => {
     ["fractional credits", { ...validDoc, credits: 1.5 }],
     ["string xp", { ...validDoc, xp: "10" }],
     ["createdAt without toDate", { ...validDoc, createdAt: "yesterday" }],
+    ["unknown ticket", { ...validDoc, ticketType: "vip" }],
+    ["unknown ticket source", { ...validDoc, ticketSource: "guess" }],
   ])("rejects a document with %s instead of guessing", (_label, doc) => {
     expect(mapUserDoc("u1", doc)).toEqual({ ok: false, error: "invalid-document" });
   });
@@ -61,6 +71,7 @@ describe("toUserDoc / toAliasDoc", () => {
     squad: null,
     xp: 0,
     credits: 0,
+    ticket: { type: "premium" as const, source: "list" as const },
     createdAt: CREATED,
   };
   const alias = { display: "Nova_7", key: "nova_7" };
@@ -73,6 +84,8 @@ describe("toUserDoc / toAliasDoc", () => {
       squad: null,
       xp: 0,
       credits: 0,
+      ticketType: "premium",
+      ticketSource: "list",
       createdAt: CREATED,
       schemaVersion: USER_SCHEMA_VERSION,
     });

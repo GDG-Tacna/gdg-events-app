@@ -1,3 +1,4 @@
+import type { TicketSource, TicketType } from "@/features/tickets";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 
@@ -12,6 +13,8 @@ export interface CadetSummary {
   /** When their first entrance was scanned; `null` while they have not come in. */
   attendedAt: Date | null;
   banned: boolean;
+  /** Their ticket (General, Pro or Premium); a profile from before tickets existed is general. */
+  ticket: TicketType;
 }
 
 /** What a cadet has done in the edition, as counts. */
@@ -27,6 +30,11 @@ export interface CadetRecord extends CadetSummary {
   activity: CadetActivity;
   bannedAt: Date | null;
   banReason: string | null;
+  /** Where the ticket came from: the list, the default (not on the list) or a person who set it by hand. */
+  ticketSource: TicketSource;
+  /** The uid of whoever set it by hand, or `null`. */
+  ticketSetBy: string | null;
+  ticketSetAt: Date | null;
 }
 
 /** Who a cadet is outside the edition: the sign-in account. */
@@ -126,7 +134,7 @@ export interface AccountDirectory {
 }
 
 export interface CadetAuditEntry {
-  action: "cadet.renamed" | "cadet.squad" | "cadet.banned" | "cadet.unbanned" | "cadet.deleted";
+  action: "cadet.renamed" | "cadet.squad" | "cadet.banned" | "cadet.unbanned" | "cadet.deleted" | "cadet.ticket";
   actorUid: string;
   targetUid: string;
   details: Record<string, string | null>;

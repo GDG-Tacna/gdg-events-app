@@ -118,6 +118,7 @@ Adoptamos la temática de **"Exploración Galáctica"**.
   - Cada cadete ve en la app su puesto ("Vas #23 de 280") y el top 10.
   - Sorteo en la app y en la pantalla grande: cada G-Credit ganado en la edición es un boleto (no se gastan), con un mínimo para participar que define el admin (1 por defecto). El admin define los premios y lanza cada sorteo; un ganador no repite y todo queda registrado.
   - Carga esperada: hasta 300 asistentes (se prueba con el doble). El despliegue (Firebase App Hosting o Vercel) se decide al final de la fase.
+  - **Tipos de entrada** (2026-11-19): cada cadete tiene una entrada General, Pro o Premium. El organizador carga la lista de correos con su entrada (Admin › Cadetes › Cargar entradas); quien no está en la lista tiene General. El staff puede cambiar la entrada escaneando el pase (/staff/entradas) y el admin desde la ficha del cadete; todo queda auditado. La entrada se ve en el pase y en la tarjeta del cadete, y el catering puede pedir una entrada mínima (por ejemplo, almuerzo solo para Premium).
 - 🔧 La fase 5.5 (pruebas y ajustes con la bitácora) sigue abierta en paralelo.
 - ✅ Construida en código el 2026-10-11: ranking (en la app y en el escenario), control "Escenario", pantalla del escenario en tiempo real, sorteo y preparación para el despliegue (`docs/deploy.md`). Pendiente: correr la prueba de carga en un proyecto de prueba y elegir entre Firebase App Hosting y Vercel.
 

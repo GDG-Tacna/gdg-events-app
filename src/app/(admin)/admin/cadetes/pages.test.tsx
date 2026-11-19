@@ -2,8 +2,10 @@ import { isValidElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/app-shell/composition/cadets.server", () => ({ cadetsDeps: { marker: "cadets" } }));
+const cadetsDepsAccounts = vi.hoisted(() => ({ lookup: vi.fn() }));
+vi.mock("@/app-shell/composition/cadets.server", () => ({ cadetsDeps: { marker: "cadets", accounts: cadetsDepsAccounts } }));
 vi.mock("@/app-shell/composition/squads.server", () => ({ squadStore: { list: async () => squads.list() } }));
+vi.mock("@/app-shell/tickets/tickets.actions", () => ({ changeCadetTicketAction: async () => ({ ok: true }) }));
 vi.mock("@/app-shell/cadets/manage.actions", () => ({
   renameCadetAction: async () => ({ ok: true }),
   changeCadetSquadAction: async () => ({ ok: true }),
@@ -30,6 +32,7 @@ vi.mock("@/features/cadets/server", () => server);
 
 const { CadetDetailView, CadetsListView } = await import("@/features/cadets");
 const actions = await import("@/app-shell/cadets/manage.actions");
+const tickets = await import("@/app-shell/tickets/tickets.actions");
 const { default: AdminCadetsPage } = await import("./page");
 const { default: AdminCadetPage } = await import("./[uid]/page");
 
@@ -58,9 +61,13 @@ const CADET = {
   createdAt: AT,
   attendedAt: AT,
   banned: false,
+  ticket: "premium",
   activity: { checkIns: 1, missions: 0, badges: 0, contacts: 0 },
   bannedAt: null,
   banReason: null,
+  ticketSource: "list",
+  ticketSetBy: null,
+  ticketSetAt: null,
 };
 const page = (params: Record<string, string | string[]> = {}) => AdminCadetsPage({ searchParams: Promise.resolve(params) } as never);
 const detail = (uid = "cadet-0001") => AdminCadetPage({ params: Promise.resolve({ uid }) } as never);
@@ -91,13 +98,13 @@ describe("admin cadets list page", () => {
   it("lists the cadets as plain rows with their squad's name, with a link to the next page", async () => {
     const view = findElement(await page({ q: "no" }), CadetsListView);
 
-    expect(server.listCadets).toHaveBeenCalledWith({ marker: "cadets" }, { uid: "a1", role: "admin" }, { search: "no", after: null });
+    expect(server.listCadets).toHaveBeenCalledWith({ marker: "cadets", accounts: cadetsDepsAccounts }, { uid: "a1", role: "admin" }, { search: "no", after: null });
     expect(view?.props).toEqual({
-      cadets: [{ uid: "cadet-0001", alias: "Nova", name: "Nova Real", email: "nova@example.com", squadName: "Firebase", xp: 120, credits: 30, attended: true, banned: false }],
+      cadets: [{ uid: "cadet-0001", alias: "Nova", name: "Nova Real", email: "nova@example.com", squadName: "Firebase", xp: 120, credits: 30, attended: true, banned: false, ticket: "premium" }],
       total: 40,
       search: "no",
       nextHref: "/admin/cadetes?q=no&despues=nova",
-      hrefs: { list: "/admin/cadetes", detailBase: "/admin/cadetes" },
+      hrefs: { list: "/admin/cadetes", detailBase: "/admin/cadetes", tickets: "/admin/cadetes/entradas" },
     });
   });
 
@@ -106,7 +113,7 @@ describe("admin cadets list page", () => {
 
     const view = findElement(await page({ despues: "mia" }), CadetsListView);
 
-    expect(server.listCadets).toHaveBeenCalledWith({ marker: "cadets" }, { uid: "a1", role: "admin" }, { search: "", after: "mia" });
+    expect(server.listCadets).toHaveBeenCalledWith({ marker: "cadets", accounts: cadetsDepsAccounts }, { uid: "a1", role: "admin" }, { search: "", after: "mia" });
     expect(view?.props.nextHref).toBeNull();
   });
 
@@ -133,7 +140,7 @@ describe("admin cadet page", () => {
   it("hands the view the cadet as plain data, the actions, and what the session may do", async () => {
     const view = findElement(await detail(), CadetDetailView);
 
-    expect(server.getCadet).toHaveBeenCalledWith({ marker: "cadets" }, { uid: "a1", role: "admin" }, { uid: "cadet-0001" });
+    expect(server.getCadet).toHaveBeenCalledWith({ marker: "cadets", accounts: cadetsDepsAccounts }, { uid: "a1", role: "admin" }, { uid: "cadet-0001" });
     expect(view?.props).toMatchObject({
       cadet: {
         uid: "cadet-0001",
@@ -147,6 +154,7 @@ describe("admin cadet page", () => {
       squads: [{ id: "firebase", name: "Firebase" }],
       rename: actions.renameCadetAction,
       changeSquad: actions.changeCadetSquadAction,
+      changeTicket: tickets.changeCadetTicketAction,
       ban: actions.banCadetAction,
       unban: actions.unbanCadetAction,
       remove: actions.deleteCadetAction,
@@ -155,6 +163,28 @@ describe("admin cadet page", () => {
       isSelf: false,
       listHref: "/admin/cadetes",
     });
+  });
+
+  it("hands the view the ticket and where it came from, with the name of whoever set it by hand", async () => {
+    server.getCadet.mockResolvedValue({
+      ok: true,
+      value: { cadet: { ...CADET, ticket: "premium", ticketSource: "manual", ticketSetBy: "staff-0001" }, account: null },
+    });
+    (cadetsDepsAccounts.lookup as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, value: { email: "luis@example.com", displayName: "Luis Staff", role: "staff", disabled: false } });
+
+    const view = findElement(await detail(), CadetDetailView);
+
+    expect(cadetsDepsAccounts.lookup).toHaveBeenCalledWith("staff-0001");
+    expect(view?.props.cadet).toMatchObject({ ticket: "premium", ticketSource: "manual", ticketSetByName: "Luis Staff" });
+  });
+
+  it("does not look anyone up for a ticket that came from the list, and leaves the name out when the account cannot be read", async () => {
+    await detail();
+    expect(cadetsDepsAccounts.lookup).not.toHaveBeenCalled();
+
+    server.getCadet.mockResolvedValue({ ok: true, value: { cadet: { ...CADET, ticketSource: "manual", ticketSetBy: "staff-0001" }, account: null } });
+    (cadetsDepsAccounts.lookup as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, error: { code: "unknown" } });
+    expect(findElement(await detail(), CadetDetailView)?.props.cadet).toMatchObject({ ticketSetByName: null });
   });
 
   it("lets only an admin of every edition delete, and marks the session's own cadet", async () => {

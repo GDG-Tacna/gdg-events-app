@@ -663,6 +663,31 @@ export const copy = {
     },
     unlocked: { label: "Logros desbloqueados", title: "¡Logro desbloqueado!", see: "Ver mis logros" },
   },
+  /** The ticket each cadet has (General, Pro, Premium): the chip on the cadet card and on the pass, and the staff and admin screens that change it. */
+  tickets: {
+    /** The name of each ticket. */
+    names: { general: "General", pro: "Pro", premium: "Premium" },
+    /** The chip. Placeholder: {name}. */
+    chip: "Entrada {name}",
+    /** What each ticket includes; General includes nothing extra, so it has no line. */
+    includes: { general: null, pro: "Incluye certificado", premium: "Incluye certificado y almuerzo" },
+    /** Where a ticket came from. Placeholder: {name}. */
+    sources: { list: "De la lista de entradas", default: "Por defecto: su correo no está en la lista", manual: "Asignada por {name}", manualUnknown: "Asignada a mano" },
+    errors: {
+      "invalid-ticket": "Esa entrada no existe. Elige General, Pro o Premium.",
+      "invalid-rows": "La lista tiene filas que no son válidas. Revisa los correos y los tipos.",
+      "too-many-rows": "La lista es demasiado larga: se importan hasta 2000 filas a la vez.",
+      "not-found": "Ese cadete no está registrado en esta edición.",
+      "invalid-code": "QR no válido. Pídele que abra su QR en la app y vuelve a escanear.",
+      "expired-code": "El QR venció. Pídele que vuelva a abrir su QR.",
+      "attendee-not-found": "No está registrado: debe completar su perfil en la app.",
+      "rate-limited": "Escaneando muy rápido. Espera un momento.",
+      unauthenticated: "Tu sesión terminó. Vuelve a entrar.",
+      forbidden: "No tienes permiso para cambiar entradas.",
+      disabled: "Las entradas no están disponibles por ahora.",
+      unknown: "No pudimos aplicar el cambio. Inténtalo de nuevo.",
+    },
+  },
   pass: {
     title: "Tu QR",
     subtitle: "Muéstraselo al staff en la entrada, el catering y los stands. Se renueva solo.",
@@ -715,7 +740,35 @@ export const copy = {
     /** Missions a stand visit completed, read out to the cadet. Placeholder: {xp}. */
     missions: { label: "Misiones completadas", xp: "+{xp} XP" },
     /** What a person lacks for the meal. Placeholders: {rank}, {n}. */
-    missing: { level: "Le falta llegar a {rank}", talksOne: "Le falta asistir a 1 charla más", talksMany: "Le faltan {n} charlas más" },
+    missing: {
+      level: "Le falta llegar a {rank}",
+      talksOne: "Le falta asistir a 1 charla más",
+      talksMany: "Le faltan {n} charlas más",
+      /** The ticket the meal asks for at least. */
+      ticket: { pro: "Necesita entrada Pro o Premium", premium: "Necesita entrada Premium" },
+    },
+    /** Shown on the verdict of a scan, next to the cadet's alias. Placeholder: {name}. */
+    ticket: "Entrada {name}",
+    /** The link on a refused meal that sends the staff to change the cadet's ticket. */
+    changeTicketLink: "Cambiar entrada",
+    /** The staff screen that changes a cadet's ticket (`/staff/entradas`). */
+    tickets: {
+      card: { title: "Cambiar entrada", body: "Escanea el QR de un cadete para ver su entrada y cambiarla, por ejemplo si la compra en el momento." },
+      title: "Cambiar entrada",
+      subtitle: "Escanea el QR del cadete, elige su entrada nueva y confirma. Cada cambio queda registrado.",
+      hint: "Pídele al cadete que abra su QR y escanéalo.",
+      sending: "Verificando el QR…",
+      /** Placeholder: {name}. */
+      current: "Entrada actual: {name}",
+      pickLegend: "Entrada nueva",
+      /** Placeholder: {name}. */
+      confirm: "Poner entrada {name}",
+      cancel: "Escanear a otro cadete",
+      /** Placeholders: {alias}, {name}. */
+      done: "{alias} ahora tiene entrada {name}.",
+      unchanged: "{alias} ya tenía entrada {name}.",
+      back: "Volver a los puestos",
+    },
     errors: {
       "invalid-code": { title: "QR no válido", body: "Pídele que abra su QR en la app y vuelve a escanear." },
       "expired-code": { title: "El QR venció", body: "Pídele que vuelva a abrir su QR." },
@@ -1468,6 +1521,50 @@ export const copy = {
       bannedReason: "Motivo: {reason}",
       unban: "Desbloquear cadete",
       unbannedDone: "{alias} puede entrar otra vez.",
+      ticketTitle: "Entrada",
+      ticketLabel: "Entrada del cadete",
+      ticketHint: "La ve el cadete en su tarjeta y en su QR, y el catering puede pedir una mínima. Un cambio a mano no lo pisa la lista.",
+      saveTicket: "Guardar entrada",
+      ticketDone: "Entrada actualizada.",
+      /** The link from the list to the import page. */
+      ticketsLink: "Cargar entradas",
+      tickets: {
+        title: "Entradas",
+        subtitle: "Carga la lista de quienes compraron entrada. Cada cadete recibe la suya al registrarse según el correo con el que entra; si su correo no está en la lista queda con entrada General y el staff puede corregirla.",
+        back: "Volver a cadetes",
+        summaryTitle: "Lista cargada",
+        /** Placeholder: {n}. */
+        summaryTotal: "{n} correos en la lista",
+        summaryEmpty: "Todavía no hay una lista cargada en esta edición.",
+        pasteLabel: "Pega las columnas copiadas desde Excel",
+        pasteHint: "Columnas: correo, nombre y tipo (General, Pro o Premium; vacío es General). También sirve texto separado por comas o punto y coma.",
+        pastePlaceholder: "correo, nombre, tipo",
+        fileLabel: "O sube un archivo .csv",
+        fileError: "No pudimos leer ese archivo. Pega las columnas en el cuadro.",
+        previewTitle: "Vista previa",
+        /** Placeholder: {n}. */
+        previewRows: "{n} filas válidas",
+        previewNothing: "Todavía no hay filas válidas para importar.",
+        invalidTitle: "Filas que no se pueden leer",
+        /** Placeholders: {line}, {value}. */
+        invalidEmail: "Línea {line}: el correo «{value}» no es válido.",
+        invalidType: "Línea {line}: «{value}» no es una entrada. Usa General, Pro o Premium.",
+        duplicatesTitle: "Correos repetidos",
+        /** Placeholders: {email}, {lines}, {name}. */
+        duplicateSame: "{email} (líneas {lines}): se cuenta una vez.",
+        duplicateConflict: "{email} (líneas {lines}): con entradas distintas; se queda la más alta, {name}.",
+        import: "Importar lista",
+        importing: "Importando…",
+        /** Placeholders: {total}, {applied}, {kept}. */
+        done: "Lista importada: {total} correos. Se actualizó la entrada de {applied} cadetes ya registrados.",
+        doneKept: "{kept} cadetes con entrada puesta a mano se quedaron como estaban.",
+        /** Placeholder: {n}. */
+        doneFailed: "No se pudo revisar a {n} cuentas: vuelve a importar para reintentar.",
+        errors: {
+          "invalid-rows": "La lista tiene filas que no son válidas. Revisa los correos y los tipos.",
+          "too-many-rows": "La lista es demasiado larga: se importan hasta 2000 filas a la vez.",
+        },
+      },
       deleteTitle: "Eliminar registro",
       deleteHelp: "Borra a este cadete de la edición: su perfil, su alias y todo lo que hizo (asistencias, misiones, insignias, contactos y votos), junto con el XP y los G-Credits que ganó aquí. Su cuenta se queda, así que puede registrarse de nuevo. No se puede deshacer.",
       /** Placeholder: {alias}. */
@@ -2159,6 +2256,11 @@ export const copy = {
         levelHint: "El rango que debe tener el cadete al momento de escanear.",
         talksLabel: "Charlas asistidas mínimas",
         talksHint: "Vacío o 0 es sin requisito. Cuentan las charlas registradas hasta ese momento.",
+        ticketLabel: "Entrada mínima",
+        ticketHint: "La entrada que tiene el cadete al momento de escanear. Por ejemplo, el almuerzo solo para Premium.",
+        ticketOptions: { general: "Cualquier entrada", pro: "Pro o Premium", premium: "Solo Premium" },
+        /** The ticket the meal asks for, in the list's summary. */
+        ticketMin: { pro: "Entrada Pro o Premium", premium: "Solo entrada Premium" },
       },
       /** Placeholder: {name}. */
       closedDone: "«{name}» está cerrado: ya no acepta escaneos.",
@@ -2181,6 +2283,7 @@ export const copy = {
         "invalid-image": "La imagen no es válida. Súbela de nuevo.",
         "invalid-level": "Elige un nivel del 1 al 10.",
         "invalid-talks": "Las charlas mínimas son un entero entre 0 y 50.",
+        "invalid-ticket": "Elige una entrada mínima: cualquiera, Pro o Premium.",
         "not-catering": "Solo los puestos de catering tienen requisitos.",
         "already-exists": "Ya existe un puesto con ese identificador.",
         "has-check-ins": "No se puede eliminar: ya hay cadetes que hicieron check-in aquí. Ciérralo para que no acepte más escaneos.",

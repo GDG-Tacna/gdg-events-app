@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { TICKET_TYPES, TicketChip, ticketName, type ChangeCadetTicketAction, type TicketActionResult, type TicketsErrorCode, type TicketType } from "@/features/tickets";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { Button, ButtonLink, Card, InlineAlert, SelectField, TextAreaField, TextField, useConfirm } from "@/shared/ui";
-import { BAN_REASON_MAX } from "../domain/manage";
+import { BAN_REASON_MAX, type CadetsErrorCode } from "../domain/manage";
 import type { BanCadetAction, CadetActionResult, CadetDetailData, ChangeCadetSquadAction, DeleteCadetAction, RenameCadetAction, UnbanCadetAction } from "./actions";
 
 export interface CadetDetailViewProps {
@@ -14,6 +15,8 @@ export interface CadetDetailViewProps {
   squads: ReadonlyArray<{ id: string; name: string }>;
   rename: RenameCadetAction;
   changeSquad: ChangeCadetSquadAction;
+  /** Sets the cadet's ticket by hand. */
+  changeTicket: ChangeCadetTicketAction;
   ban: BanCadetAction;
   unban: UnbanCadetAction;
   remove: DeleteCadetAction;
@@ -38,21 +41,22 @@ const when = (value: string | null) => (value ? date.format(new Date(value)) : n
  * alias or squad, block them (their account is disabled and their sessions end) and, for an admin of every edition,
  * delete them. Every change is a server command; this screen shows the answer.
  */
-export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban, remove, canDelete, canEdit, isSelf, listHref }: CadetDetailViewProps) {
+export function CadetDetailView({ cadet, squads, rename, changeSquad, changeTicket, ban, unban, remove, canDelete, canEdit, isSelf, listHref }: CadetDetailViewProps) {
   const t = copy.admin.cadets;
   const router = useRouter();
   const [alias, setAlias] = useState(cadet.alias);
   const [squad, setSquad] = useState(cadet.squad ?? NO_SQUAD);
+  const [ticket, setTicket] = useState<TicketType>(cadet.ticket);
   const [reason, setReason] = useState("");
   const [confirmAlias, setConfirmAlias] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const { confirm, dialog } = useConfirm();
   const [notice, setNotice] = useState<Notice>(null);
 
-  async function run(key: string, action: () => Promise<CadetActionResult>, success: string): Promise<boolean> {
+  async function run(key: string, action: () => Promise<CadetActionResult | TicketActionResult>, success: string): Promise<boolean> {
     setBusy(key);
     setNotice(null);
-    let result: CadetActionResult;
+    let result: CadetActionResult | TicketActionResult;
     try {
       result = await action();
     } catch {
@@ -60,7 +64,8 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban
     }
     setBusy(null);
     if (!result.ok) {
-      setNotice({ kind: "error", text: t.errors[result.code] });
+      // The ticket and the cadet commands share some codes (forbidden, not-found...): each has its own wording.
+      setNotice({ kind: "error", text: key === "ticket" ? copy.tickets.errors[result.code as TicketsErrorCode] : t.errors[result.code as CadetsErrorCode] });
       return false;
     }
     setNotice({ kind: "success", text: success });
@@ -75,6 +80,10 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban
   const saveSquad = (event: FormEvent) => {
     event.preventDefault();
     if (busy === null) void run("squad", () => changeSquad({ uid: cadet.uid, squad: squad === NO_SQUAD ? null : squad }), t.squadDone);
+  };
+  const saveTicket = (event: FormEvent) => {
+    event.preventDefault();
+    if (busy === null) void run("ticket", () => changeTicket({ uid: cadet.uid, type: ticket }), t.ticketDone);
   };
   const submitBan = async (event: FormEvent) => {
     event.preventDefault();
@@ -105,6 +114,10 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban
   if (cadet.squad && !squads.some((option) => option.id === cadet.squad)) squadOptions.push({ value: cadet.squad, label: cadet.squad });
   const aliasChanged = alias.trim() !== cadet.alias;
   const squadChanged = squad !== (cadet.squad ?? NO_SQUAD);
+  const ticketChanged = ticket !== cadet.ticket;
+  const ticketOptions = TICKET_TYPES.map((value) => ({ value, label: ticketName(value) }));
+  const ticketSource =
+    cadet.ticketSource === "manual" ? (cadet.ticketSetByName ? interpolate(copy.tickets.sources.manual, { name: cadet.ticketSetByName }) : copy.tickets.sources.manualUnknown) : copy.tickets.sources[cadet.ticketSource];
   const mayDeleteNow = canDelete && !isSelf;
 
   return (
@@ -120,6 +133,9 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban
         <p className="type-body text-muted-foreground">
           {cadet.squadName ?? t.noSquad} · {interpolate(t.xp, { xp: formatNumber(cadet.xp) })} · {interpolate(t.credits, { n: formatNumber(cadet.credits) })}
         </p>
+        <div className="mt-space-1 flex">
+          <TicketChip type={cadet.ticket} />
+        </div>
         {cadet.banned ? <p className="type-label text-danger">{t.banned}</p> : null}
       </header>
 
@@ -173,6 +189,17 @@ export function CadetDetailView({ cadet, squads, rename, changeSquad, ban, unban
               <SelectField label={t.squadLabel} hint={t.squadHint} options={squadOptions} value={squad} disabled={busy !== null} onChange={(event) => setSquad(event.target.value)} />
               <Button type="submit" loading={busy === "squad"} disabled={busy !== null || !squadChanged}>
                 {t.saveSquad}
+              </Button>
+            </form>
+          </Card>
+
+          <Card>
+            <form onSubmit={saveTicket} noValidate className="gap-space-3 flex flex-col">
+              <h2 className="type-heading text-foreground">{t.ticketTitle}</h2>
+              <SelectField label={t.ticketLabel} hint={t.ticketHint} options={ticketOptions} value={ticket} disabled={busy !== null} onChange={(event) => setTicket(event.target.value as TicketType)} />
+              <p className="type-caption text-text-subtle">{ticketSource}</p>
+              <Button type="submit" loading={busy === "ticket"} disabled={busy !== null || !ticketChanged}>
+                {t.saveTicket}
               </Button>
             </form>
           </Card>

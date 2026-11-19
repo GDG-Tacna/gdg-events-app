@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isRole, type Role } from "@/features/auth/server";
+import { isTicketSource, isTicketType } from "@/features/tickets";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { isSquadId, type SquadId } from "@/shared/types/squad";
 import type { Alias } from "../../domain/alias";
@@ -19,6 +20,11 @@ const userDocSchema = z.object({
   xp: z.number().int().nonnegative(),
   credits: z.number().int().nonnegative(),
   createdAt: timestampSchema,
+  // Ticket fields (owned by the tickets feature): optional, a profile from before tickets existed has none.
+  ticketType: z.custom<string>(isTicketType).optional(),
+  ticketSource: z.custom<string>(isTicketSource).optional(),
+  ticketSetBy: z.string().nullable().optional(),
+  ticketSetAt: timestampSchema.nullable().optional(),
 });
 
 export type DocumentError = "invalid-document";
@@ -36,6 +42,10 @@ export function mapUserDoc(uid: string, data: unknown): Result<Attendee, Documen
     squad: doc.squad,
     xp: doc.xp,
     credits: doc.credits,
+    ticket: {
+      type: doc.ticketType !== undefined && isTicketType(doc.ticketType) ? doc.ticketType : "general",
+      source: doc.ticketSource !== undefined && isTicketSource(doc.ticketSource) ? doc.ticketSource : "default",
+    },
     createdAt: doc.createdAt.toDate(),
   });
 }
@@ -49,6 +59,8 @@ export function toUserDoc(attendee: Attendee, alias: Alias) {
     squad: attendee.squad,
     xp: attendee.xp,
     credits: attendee.credits,
+    ticketType: attendee.ticket.type,
+    ticketSource: attendee.ticket.source,
     createdAt: attendee.createdAt,
     schemaVersion: USER_SCHEMA_VERSION,
   };

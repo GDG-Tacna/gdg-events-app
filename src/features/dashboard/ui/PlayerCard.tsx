@@ -4,6 +4,7 @@ import { copy } from "@/shared/copy/es";
 import { rankName } from "@/shared/copy/rank-name";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
+import { TicketBadge } from "@/features/tickets";
 import { Icon, PixelAvatar, PixelCoin, PixelStar, ProgressBar, Thumbnail, type AvatarLook } from "@/shared/ui";
 import type { DashboardOverview } from "../domain/overview";
 
@@ -98,6 +99,7 @@ export function PlayerCard({ overview, squadSlot, qrHref, networkHref, avatarLoo
             <span className="type-pixel-tag text-primary text-[14px] leading-5">{`NV ${overview.rank.level}`}</span>
             <span className="type-caption text-foreground truncate font-semibold tracking-wider uppercase">{name}</span>
           </span>
+          <TicketBadge type={overview.ticket} />
         </div>
       </div>
 

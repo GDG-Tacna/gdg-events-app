@@ -12,7 +12,7 @@ import type { CheckpointLockReason, CheckpointView, CreateCheckpointAction, Dele
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
-const NONE = { minLevel: null, minTalks: null };
+const NONE = { minLevel: null, minTalks: null, minTicket: null };
 const PLAIN = { description: "", image: null };
 const LUNCH: CheckpointView = { id: "lunch-1", kind: "catering", name: "Almuerzo", active: true, ...PLAIN, requirements: NONE };
 const STAND: CheckpointView = { id: "stand-cloud", kind: "stand", name: "Stand Cloud", active: true, ...PLAIN, requirements: NONE };
@@ -425,8 +425,8 @@ describe("CheckpointsAdminView food gates", () => {
 
   it("shows what each meal asks for", () => {
     const coffee: CheckpointView = { ...LUNCH, id: "coffee-1", name: "Coffee break" };
-    const gated: CheckpointView = { ...LUNCH, requirements: { minLevel: 2, minTalks: 3 } };
-    const talksOnly: CheckpointView = { ...LUNCH, id: "dinner-1", name: "Cena", requirements: { minLevel: null, minTalks: 1 } };
+    const gated: CheckpointView = { ...LUNCH, requirements: { minLevel: 2, minTalks: 3, minTicket: null } };
+    const talksOnly: CheckpointView = { ...LUNCH, id: "dinner-1", name: "Cena", requirements: { minLevel: null, minTalks: 1, minTicket: null } };
     setup([gated, coffee, talksOnly, STAND]);
 
     expect(row("Almuerzo")).toHaveTextContent("Desde Piloto (NV 2) · 3 charlas asistidas");
@@ -434,6 +434,31 @@ describe("CheckpointsAdminView food gates", () => {
     expect(row("Cena")).toHaveTextContent(r.talksOne);
     expect(row("Cena")).not.toHaveTextContent("Desde");
     expect(row("Stand Cloud")).not.toHaveTextContent(r.none);
+  });
+
+  it("shows and edits the minimum ticket of a meal: general means no condition", async () => {
+    const premiumOnly: CheckpointView = { ...LUNCH, requirements: { minLevel: null, minTalks: null, minTicket: "premium" } };
+    const { user, edit } = setup([premiumOnly, { ...LUNCH, id: "coffee-1", name: "Coffee break" }]);
+
+    expect(row("Almuerzo")).toHaveTextContent(r.ticketMin.premium);
+    expect(row("Coffee break")).toHaveTextContent(r.none);
+    await open(user);
+    expect(editor().getByLabelText(r.ticketLabel)).toHaveValue("premium");
+    expect(within(editor().getByLabelText(r.ticketLabel)).getAllByRole("option").map((option) => option.textContent)).toEqual([r.ticketOptions.general, r.ticketOptions.pro, r.ticketOptions.premium]);
+
+    await user.selectOptions(editor().getByLabelText(r.ticketLabel), "pro");
+    await user.click(save());
+    expect(edit).toHaveBeenCalledWith(expect.objectContaining({ requirements: { minLevel: null, minTalks: null, minTicket: "pro" } }));
+  });
+
+  it("sends no condition when the ticket goes back to general", async () => {
+    const { user, edit } = setup([{ ...LUNCH, requirements: { minLevel: null, minTalks: null, minTicket: "premium" } }]);
+    await open(user);
+
+    await user.selectOptions(editor().getByLabelText(r.ticketLabel), "general");
+    await user.click(save());
+
+    expect(edit).toHaveBeenCalledWith(expect.objectContaining({ requirements: { minLevel: null, minTalks: null, minTicket: null } }));
   });
 
   it("edits a meal's minimum level from the ladder and a minimum of talks in the edit dialog", async () => {
@@ -446,12 +471,12 @@ describe("CheckpointsAdminView food gates", () => {
     await user.type(editor().getByLabelText(r.talksLabel), "3x");
     await user.click(save());
 
-    expect(edit).toHaveBeenCalledWith({ id: "lunch-1", name: "Almuerzo", description: "", requirements: { minLevel: 2, minTalks: 3 } });
+    expect(edit).toHaveBeenCalledWith({ id: "lunch-1", name: "Almuerzo", description: "", requirements: { minLevel: 2, minTalks: 3, minTicket: null } });
     expect(router.refresh).toHaveBeenCalled();
   });
 
   it("opens with the saved values, and clears them as no condition", async () => {
-    const { user, edit } = setup([{ ...LUNCH, requirements: { minLevel: 3, minTalks: 2 } }]);
+    const { user, edit } = setup([{ ...LUNCH, requirements: { minLevel: 3, minTalks: 2, minTicket: null } }]);
     await open(user);
 
     expect(editor().getByLabelText(r.levelLabel)).toHaveValue("3");
@@ -460,11 +485,11 @@ describe("CheckpointsAdminView food gates", () => {
     await user.clear(editor().getByLabelText(r.talksLabel));
     await user.click(save());
 
-    expect(edit).toHaveBeenCalledWith(expect.objectContaining({ requirements: { minLevel: null, minTalks: null } }));
+    expect(edit).toHaveBeenCalledWith(expect.objectContaining({ requirements: { minLevel: null, minTalks: null, minTicket: null } }));
   });
 
   it("keeps a saved level the ladder no longer has", async () => {
-    const { user } = setup([{ ...LUNCH, requirements: { minLevel: 5, minTalks: null } }]);
+    const { user } = setup([{ ...LUNCH, requirements: { minLevel: 5, minTalks: null, minTicket: null } }]);
 
     expect(row("Almuerzo")).toHaveTextContent("Desde NV 5");
     await open(user);
@@ -483,7 +508,7 @@ describe("CheckpointsAdminView food gates", () => {
   });
 
   it("drops the requirements when the meal becomes another kind, and says so", async () => {
-    const { user, edit } = setup([{ ...LUNCH, requirements: { minLevel: 2, minTalks: null } }]);
+    const { user, edit } = setup([{ ...LUNCH, requirements: { minLevel: 2, minTalks: null, minTicket: null } }]);
     await open(user);
 
     await user.click(within(screen.getByRole("dialog")).getByRole("radio", { name: new RegExp(t.kinds.stand) }));
