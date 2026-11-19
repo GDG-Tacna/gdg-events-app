@@ -1,4 +1,4 @@
-import type { Firestore } from "firebase-admin/firestore";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ok } from "@/shared/lib/result";
 import { testEventResolver, withEventScope } from "@/test-utils/firestore-paths";
@@ -26,7 +26,9 @@ function fakeFirestore(initial: Record<string, Record<string, unknown>> = {}) {
           const key = `${name}/${id}`;
           const before = options?.merge ? (store.get(key) ?? {}) : {};
           const items = { ...((before.items as object | undefined) ?? {}), ...((data.items as object | undefined) ?? {}) };
-          store.set(key, { ...before, ...data, items });
+          // The minutes merge key by key, and a key set to the delete marker is taken out, like Firestore does.
+          const minutes = Object.fromEntries(Object.entries({ ...((before.minutes as object | undefined) ?? {}), ...((data.minutes as object | undefined) ?? {}) }).filter(([, value]) => !FieldValue.delete().isEqual(value as FieldValue)));
+          store.set(key, { ...before, ...data, items, ...(before.minutes || data.minutes ? { minutes } : {}) });
         },
       }),
     })),
@@ -76,6 +78,35 @@ describe("FirestoreRundownStore", () => {
 
     expect(fake.store.get("events/e1/config/rundown")?.items).toEqual({ keynote: [SLIDES, deck] });
     expect(await store.read()).toEqual(ok({ keynote: [SLIDES, deck] }));
+  });
+
+  it("keeps the seconds of a piece, and only when it has them", async () => {
+    await store.saveItem("keynote", [{ ...SLIDES, seconds: 15 }, VIDEO]);
+
+    expect(fake.store.get("events/e1/config/rundown")?.items).toEqual({ keynote: [{ ...SLIDES, seconds: 15 }, VIDEO] });
+    expect(await store.read()).toEqual(ok({ keynote: [{ ...SLIDES, seconds: 15 }, VIDEO] }));
+  });
+
+  it("stores the points made in the console as a whole and reads them back with the minutes planned", async () => {
+    const cafe = { id: "cafe", title: "Café", who: "", time: "10:40" };
+    const welcome = { id: "bienvenida", title: "Bienvenida", who: "GDG Tacna", time: "" };
+    await store.savePoints([cafe, welcome]);
+    await store.saveMinutes("keynote", 20);
+    await store.saveMinutes("cafe", 15);
+
+    expect(await store.readPlan()).toEqual(ok({ points: [cafe, welcome], minutes: { keynote: 20, cafe: 15 } }));
+
+    await store.savePoints([welcome]);
+    await store.saveMinutes("cafe", null);
+    expect(await store.readPlan()).toEqual(ok({ points: [welcome], minutes: { keynote: 20 } }));
+  });
+
+  it("reads an edition with nothing planned as empty, and leaves out what breaks the rules", async () => {
+    expect(await store.readPlan()).toEqual(ok({ points: [], minutes: {} }));
+
+    fake.store.set("events/e1/config/rundown", { points: [{ id: "BAD", title: "x" }], minutes: { keynote: 20, cafe: -5, foo: "3" } });
+    expect(await store.readPlan()).toEqual(ok({ points: [], minutes: { keynote: 20 } }));
+    expect(console.error).toHaveBeenCalled();
   });
 
   it("reports a failed read or write", async () => {

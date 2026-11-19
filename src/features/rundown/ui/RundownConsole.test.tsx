@@ -119,12 +119,12 @@ describe("RundownConsole", () => {
 
     fireEvent.click(screen.getByRole("button", { name: t.transport.forward }));
     await settle();
-    expect(heard.at(-1)).toEqual({ type: "transport", slide: 2, playing: false });
+    expect(heard.at(-1)).toEqual({ type: "transport", slide: 2, playing: false, loop: false, volume: 1, muted: false });
     expect(screen.getByTestId("slide")).toHaveAttribute("data-page", "2");
 
     fireEvent.click(screen.getByRole("button", { name: "Ir a la lámina 3" }));
     await settle();
-    expect(heard.at(-1)).toEqual({ type: "transport", slide: 3, playing: false });
+    expect(heard.at(-1)).toEqual({ type: "transport", slide: 3, playing: false, loop: false, volume: 1, muted: false });
 
     // On the last slide the next press takes the waiting piece: the video, playing.
     fireEvent.click(screen.getByRole("button", { name: t.transport.forward }));
@@ -143,14 +143,14 @@ describe("RundownConsole", () => {
 
     fireEvent.click(screen.getByRole("button", { name: t.transport.back }));
     await settle();
-    expect(heard.at(-1)).toEqual({ type: "transport", slide: 2, playing: false });
+    expect(heard.at(-1)).toEqual({ type: "transport", slide: 2, playing: false, loop: false, volume: 1, muted: false });
 
     take();
     await settle();
     expect(screen.getByRole("button", { name: t.transport.pause })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: t.transport.pause }));
     await settle();
-    expect(heard.at(-1)).toEqual({ type: "transport", slide: 1, playing: false });
+    expect(heard.at(-1)).toEqual({ type: "transport", slide: 1, playing: false, loop: false, volume: 1, muted: false });
     expect(screen.getByRole("button", { name: t.transport.play })).toBeInTheDocument();
   });
 
@@ -349,13 +349,13 @@ describe("RundownConsole", () => {
     await stageSays({ type: "loaded", cueId: "deck-1", slides: 5 });
     fireEvent.keyDown(window, { key: "ArrowRight" });
     await settle();
-    expect(heard.at(-1)).toEqual({ type: "transport", slide: 2, playing: false });
+    expect(heard.at(-1)).toEqual({ type: "transport", slide: 2, playing: false, loop: false, volume: 1, muted: false });
     fireEvent.keyDown(window, { key: "ArrowLeft" });
     await settle();
-    expect(heard.at(-1)).toEqual({ type: "transport", slide: 1, playing: false });
+    expect(heard.at(-1)).toEqual({ type: "transport", slide: 1, playing: false, loop: false, volume: 1, muted: false });
     fireEvent.keyDown(window, { key: "4" });
     await settle();
-    expect(heard.at(-1)).toEqual({ type: "transport", slide: 4, playing: false });
+    expect(heard.at(-1)).toEqual({ type: "transport", slide: 4, playing: false, loop: false, volume: 1, muted: false });
 
     fireEvent.keyDown(window, { key: "F1" });
     await settle();

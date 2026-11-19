@@ -2607,8 +2607,45 @@ export const copy = {
       kinds: { video: "Video", slides: "Diapositivas", image: "Imagen", gslides: "Google Slides", qr: "QR de la charla" },
       gslidesMeta: "Google Slides · se pasa en la pantalla",
       expand: "Mostrar las piezas de {title}",
+      addPoint: "+ Añadir punto",
+      /** Placeholders: {who}, {n}, {minutes}. */
+      itemLineMinutes: "{who} · {n} archivos · {minutes} min",
+      /** Placeholder: {title}. */
+      editPoint: "Editar el punto {title}",
+      removePoint: "Quitar el punto {title}",
+      custom: "Solo en la consola",
+      editPointLabel: "Editar punto",
+      removePointLabel: "Quitar punto",
+      /** Placeholders: {name}. */
+      secondsLabel: "Segundos en pantalla: {name}",
+      secondsHint: "s",
+      /** Placeholder: {n}. */
+      secondsOnce: "{n} s en pantalla",
+      secondsEach: "{n} s por lámina",
+    },
+    point: {
+      newTitle: "Añadir punto a la agenda",
+      editTitle: "Editar punto",
+      hint: "Un punto que solo existe en la consola (un descanso, una bienvenida, un sorteo). No aparece en la agenda de los cadetes.",
+      talkHint: "La charla se edita en Charlas; aquí solo se planea su tiempo.",
+      title: "Nombre",
+      who: "Quién lo lleva (opcional)",
+      time: "Hora (opcional)",
+      timeHint: "Con el formato 10:40. Sin hora, va al final del orden.",
+      minutes: "Minutos planeados (opcional)",
+      minutesHint: "De 1 a 600. Solo es una guía: no corta nada.",
+      save: "Guardar punto",
+      saving: "Guardando…",
+      removeTitle: "¿Quitar este punto?",
+      /** Placeholders: {title}, {n}. */
+      removeBody: "Se quita «{title}» del orden, con los {n} archivos que le agregaste. Los archivos siguen en tu carpeta.",
+      removeBodyEmpty: "Se quita «{title}» del orden.",
+      removeConfirm: "Quitar punto",
+      errors: { title: "Escribe un nombre para el punto.", time: "La hora debe verse así: 10:40.", minutes: "Los minutos deben ser un número entero de 1 a 600.", save: "No se pudo guardar el punto. Inténtalo otra vez." },
     },
     program: {
+      /** Placeholder: {n}. The time left before the next piece is taken by itself. */
+      autoIn: "pasa en {n} s",
       label: "En pantalla",
       next: "Siguiente",
       nothing: "Nada todavía",
@@ -2636,6 +2673,17 @@ export const copy = {
       take: "TOMAR · Enter",
       ready: "Siguiente pieza lista:",
       nothing: "Nada en espera",
+    },
+    video: {
+      label: "Controles del video",
+      restart: "Reiniciar",
+      loop: "Repetir",
+      mute: "Silenciar",
+      unmute: "Activar sonido",
+      volume: "Volumen",
+      position: "Posición del video",
+      /** Placeholders: {time}, {total}. */
+      timeOf: "{time} de {total}",
     },
     strip: { label: "Láminas", /** Placeholder: {n}. */ go: "Ir a la lámina {n}" },
     deck: {
@@ -2706,6 +2754,7 @@ export const copy = {
       /** Placeholder: {path}. */
       missingFile: "Falta {path}. Se saltará al pasar a la siguiente pieza.",
       saveFailed: "No pudimos guardar el orden. Inténtalo de nuevo.",
+      badSeconds: "Los segundos deben ser un número entero de 1 a 3600.",
       stageFailed: "No pudimos cambiar la pantalla. Inténtalo de nuevo.",
       noChannel: "Este navegador no puede hablar con la pantalla. Usa Chrome o Edge.",
       dismiss: "Cerrar aviso",

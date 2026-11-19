@@ -10,17 +10,19 @@ import type { MediaLibrary } from "../data/client/media-library";
 import { openStageChannel, type StageChannel } from "../data/client/stage-channel";
 import type { FailureReason } from "../domain/channel";
 import type { RundownErrorCode, StoredCues } from "../domain/manage";
-import { back, cueOf, forget, forward, goToSlide, mediaOnProgram, selectNext, showScene, startOf, stop, take, togglePlay, type DataScene, type PlayoutState } from "../domain/playout";
-import { buildRundown, cueFromPath, googleSlidesCueFromLink, isFileCue, moveCue, qrCueId, queueOf, type AgendaPoint, type StoredCue } from "../domain/rundown";
-import type { ProjectTalkRunner, SaveCuesAction, StageRunner } from "./actions";
+import { back, cueOf, forget, forward, goToSlide, mediaOnProgram, selectNext, setVolume, showScene, startOf, stop, take, toggleLoop, toggleMute, togglePlay, type DataScene, type PlayoutState } from "../domain/playout";
+import { buildRundown, cueFromPath, googleSlidesCueFromLink, isFileCue, isSeconds, mergeAgenda, moveCue, qrCueId, queueOf, withSeconds, type AgendaPoint, type ExtraPoint, type StoredCue } from "../domain/rundown";
+import type { ProjectTalkRunner, SaveCuesAction, SaveMinutesAction, SavePointsAction, StageRunner } from "./actions";
 import { ConsoleIcon } from "./ConsoleIcons";
 import { ConsoleMonitor } from "./ConsoleMonitor";
 import { actionForKey, CONFIRM_WINDOW_MS, DECK_KEYS, isTypingTarget, NEEDS_CONFIRMATION, nextView, slideWindow, type ConsoleAction, type DeckKeyId, type StageViewName } from "./console-model";
 import { FilePickerDialog } from "./FilePickerDialog";
+import { PointDialog, type PointDraft } from "./PointDialog";
 import { RundownPanel } from "./RundownPanel";
 import { SetupDialog } from "./SetupDialog";
 import { SlideCanvas } from "./SlideCanvas";
 import { StageThumbnail } from "./StageThumbnail";
+import { VideoControls } from "./VideoControls";
 import { useMediaLibrary } from "./use-library";
 import { useObjectUrl, useResolvedFile } from "./use-media";
 
@@ -42,6 +44,9 @@ export interface RundownConsoleProps {
   /** The polls that can go on the screen: opened at some point. */
   polls: ReadonlyArray<{ id: string; status: "open" | "closed" }>;
   saveCues: SaveCuesAction;
+  /** Saves the points made in the console and the minutes planned; without them the console cannot add or plan points. */
+  savePoints?: SavePointsAction;
+  saveMinutes?: SaveMinutesAction;
   runStage: StageRunner;
   projectTalk: ProjectTalkRunner;
   hrefs: { screen: string; settings: string; raffle: string; back: string };
@@ -61,12 +66,33 @@ const newCueId = () => `c${Date.now().toString(36)}${Math.random().toString(36).
  * The files are read from the folder the operator connects on this computer and shown in the projector's window, which is
  * another window of this same browser; nothing is uploaded. Data scenes (ranking, poll, winners, QR) are the stage's own.
  */
-export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initialFrozen, view: initialView, squadsOn, polls, saveCues, runStage, projectTalk, hrefs, library: injectedLibrary, openChannel = openStageChannel }: RundownConsoleProps) {
+/** The agenda split into the talks, the points made here and the minutes planned (what the store keeps apart). */
+function splitAgenda(agenda: readonly AgendaPoint[]) {
+  const talks: AgendaPoint[] = [];
+  const extras: ExtraPoint[] = [];
+  const minutes: Record<string, number> = {};
+  for (const { minutes: planned, custom, ...point } of agenda) {
+    if (planned) minutes[point.id] = planned;
+    if (custom) extras.push({ id: point.id, title: point.title, who: point.who, time: point.time });
+    else talks.push(point);
+  }
+  return { talks, extras, minutes };
+}
+
+/** An id for a new point: its name as a slug and a short random tail, so two points never share one. */
+const newPointId = (title: string) => {
+  const slug = title.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30) || "punto";
+  return `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+};
+
+export function RundownConsole({ edition, agenda: initialAgenda, qrItems, stored, frozen: initialFrozen, view: initialView, squadsOn, polls, saveCues, savePoints, saveMinutes, runStage, projectTalk, hrefs, library: injectedLibrary, openChannel = openStageChannel }: RundownConsoleProps) {
   const router = useRouter();
   const media = useMediaLibrary(injectedLibrary);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   // --- the order -------------------------------------------------------------------------------------------------------
+  // The agenda can grow here: the points made in the console join the talks.
+  const [agenda, setAgenda] = useState(initialAgenda);
   const [cues, setCues] = useState<Readonly<Record<string, readonly StoredCue[]>>>(stored);
   const items = useMemo(() => buildRundown(agenda, cues, new Set(qrItems)), [agenda, cues, qrItems]);
   const queue = useMemo(() => queueOf(items), [items]);
@@ -75,9 +101,10 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
     queueRef.current = queue;
   }, [queue]);
 
-  const [playout, setPlayout] = useState<PlayoutState>(() => startOf(queueOf(buildRundown(agenda, stored, new Set(qrItems)))));
+  const [playout, setPlayout] = useState<PlayoutState>(() => startOf(queueOf(buildRundown(initialAgenda, stored, new Set(qrItems)))));
   const playoutRef = useRef(playout);
-  const [openItemId, setOpenItemId] = useState<string | null>(agenda[0]?.id ?? null);
+  const [openItemId, setOpenItemId] = useState<string | null>(initialAgenda[0]?.id ?? null);
+  const [pointDialog, setPointDialog] = useState<{ key: number; itemId: string | null } | null>(null);
   const [editing, setEditing] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFiles, setPickerFiles] = useState<readonly string[]>([]);
@@ -98,6 +125,8 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
   const lastAlive = useRef(0);
   const [slides, setSlides] = useState<ReadonlyMap<string, number>>(new Map());
   const [failures, setFailures] = useState<ReadonlyMap<string, FailureReason>>(new Map());
+  // Where the video on the air is, as the projector's window last said.
+  const [progress, setProgress] = useState<{ cueId: string; time: number; duration: number } | null>(null);
   const libraryRef = useRef(media.library);
   useEffect(() => {
     libraryRef.current = media.library;
@@ -115,7 +144,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
           const found = await library.resolve(file.path);
           if (found.ok) sent = found.value;
         }
-        channel.current?.post({ type: "program", cue: file, slide: state.slide, playing: state.playing, ...(sent ? { file: sent } : {}) });
+        channel.current?.post({ type: "program", cue: file, slide: state.slide, playing: state.playing, loop: state.loop, volume: state.volume, muted: state.muted, ...(sent ? { file: sent } : {}) });
         return;
       }
       channel.current?.post({ type: "program", cue: null, slide: 1, playing: false });
@@ -146,7 +175,9 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
       playoutRef.current = next;
       setPlayout(next);
       if (JSON.stringify(before.program) !== JSON.stringify(next.program)) void announce(next);
-      else if (before.slide !== next.slide || before.playing !== next.playing) channel.current?.post({ type: "transport", slide: next.slide, playing: next.playing });
+      else if (before.slide !== next.slide || before.playing !== next.playing || before.loop !== next.loop || before.volume !== next.volume || before.muted !== next.muted) {
+        channel.current?.post({ type: "transport", slide: next.slide, playing: next.playing, loop: next.loop, volume: next.volume, muted: next.muted });
+      }
       const onAir = next.program?.type === "cue" ? queueRef.current.find((entry) => entry.cue.id === (next.program as { cueId: string }).cueId) : null;
       if (onAir) setOpenItemId(onAir.itemId);
     },
@@ -171,6 +202,8 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
         setSlides((before) => new Map(before).set(message.cueId, message.slides as number));
       } else if (message.type === "failed") {
         setFailures((before) => new Map(before).set(message.cueId, message.reason));
+      } else if (message.type === "progress") {
+        setProgress({ cueId: message.cueId, time: message.time, duration: message.duration });
       }
     });
     line.post({ type: "ping" });
@@ -279,6 +312,16 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
         }
         case "deck":
           return pressKey(action.key);
+        case "toggleLoop":
+          return commit(toggleLoop(state, q));
+        case "mute":
+          return commit(toggleMute(state));
+        case "volume":
+          return commit(setVolume(state, action.volume));
+        case "restart":
+          return channel.current?.post({ type: "seek", seconds: 0 });
+        case "seek":
+          return channel.current?.post({ type: "seek", seconds: action.seconds });
       }
     },
     [commit, onAirFile, pressKey, total],
@@ -346,6 +389,66 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
     alert(t.changeFolder.done);
   }
 
+  /** Sets how long a piece stays on the air; once that time passes the console takes the next piece by itself. */
+  function setCueSeconds(itemId: string, cueId: string, seconds: number | null) {
+    const before = cues[itemId] ?? [];
+    const cue = before.find((entry) => entry.id === cueId);
+    if (!cue || (cue.seconds ?? null) === seconds) return;
+    if (seconds !== null && !isSeconds(seconds)) return alert(t.alerts.badSeconds);
+    void save(itemId, before.map((entry) => (entry.id === cueId ? withSeconds(entry, seconds) : entry)), before);
+  }
+
+  /** Saves a point from its dialog: a new one, one made here (everything), or a talk (only its minutes). */
+  async function savePoint(draft: PointDraft): Promise<string | null> {
+    if (!savePoints || !saveMinutes) return t.point.errors.save;
+    const { talks, extras, minutes } = splitAgenda(agenda);
+    const itemId = pointDialog?.itemId ?? null;
+    const current = itemId ? agenda.find((point) => point.id === itemId) : null;
+    let nextExtras = extras;
+    const id = current?.id ?? newPointId(draft.title);
+    if (!current || current.custom) {
+      const point: ExtraPoint = { id, title: draft.title, who: draft.who, time: draft.time };
+      nextExtras = current ? extras.map((entry) => (entry.id === id ? point : entry)) : [...extras, point];
+      const saved = await savePoints({ points: nextExtras });
+      if (!saved.ok) return t.point.errors.save;
+    }
+    const nextMinutes = { ...minutes };
+    if (draft.minutes === null) delete nextMinutes[id];
+    else nextMinutes[id] = draft.minutes;
+    if ((minutes[id] ?? null) !== draft.minutes) {
+      const planned = await saveMinutes({ itemId: id, minutes: draft.minutes });
+      if (!planned.ok) return t.point.errors.save;
+    }
+    setAgenda(mergeAgenda(talks, nextExtras, nextMinutes));
+    return null;
+  }
+
+  /** Takes a point made here out of the order, with its pieces; asks first. */
+  async function removePoint(itemId: string) {
+    const point = agenda.find((entry) => entry.id === itemId);
+    if (!point || !point.custom || !savePoints || !saveMinutes) return;
+    const files = (cues[itemId] ?? []).length;
+    const yes = await confirm({
+      title: t.point.removeTitle,
+      description: interpolate(files > 0 ? t.point.removeBody : t.point.removeBodyEmpty, { title: point.title, n: String(files) }),
+      confirmLabel: t.point.removeConfirm,
+      tone: "danger",
+    });
+    if (!yes) return;
+    const { talks, extras, minutes } = splitAgenda(agenda);
+    const nextExtras = extras.filter((entry) => entry.id !== itemId);
+    const saved = await savePoints({ points: nextExtras });
+    if (!saved.ok) return alert(t.point.errors.save);
+    // What was on the air or waiting from this point lets go of it, and its pieces and minutes are cleared with it.
+    for (const cue of cues[itemId] ?? []) commit(forget(playoutRef.current, queueRef.current, cue.id));
+    if (files > 0) await save(itemId, [], cues[itemId] ?? []);
+    if (minutes[itemId]) await saveMinutes({ itemId, minutes: null });
+    const rest = { ...minutes };
+    delete rest[itemId];
+    setAgenda(mergeAgenda(talks, nextExtras, rest));
+    setOpenItemId((open) => (open === itemId ? null : open));
+  }
+
   function removeCue(itemId: string, cueId: string) {
     const before = cues[itemId] ?? [];
     commit(forget(playoutRef.current, queueRef.current, cueId));
@@ -388,6 +491,26 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
   const liveTitle = onAirFile ? onAirFile.name : sceneOnAir ? t.program.scenes[sceneOnAir] : qrOnAir ? t.rundown.kinds.qr : t.program.nothing;
   const liveStatus = onAirFile?.kind === "video" ? (playout.playing ? t.program.playing : t.program.paused) : onAirFile?.kind === "gslides" ? t.program.googleSlides : onAirFile?.kind === "slides" && total > 0 ? interpolate(t.program.slide, { n: String(playout.slide), total: String(total) }) : onAirFile ? t.program.loading : sceneOnAir || qrOnAir ? t.program.sceneStatus : undefined;
   const videoPlaying = onAirFile?.kind === "video" && playout.playing;
+
+  // --- a piece with seconds takes the next one by itself ----------------------------------------------------------------------------
+  const secondsOnAir = onAirFile?.seconds ?? null;
+  const timerKey = onAirFile ? `${onAirFile.id}:${playout.slide}` : "";
+  const counting = secondsOnAir !== null && (onAirFile?.kind !== "video" || playout.playing);
+  const [tick, setTick] = useState<{ key: string; ms: number }>({ key: "", ms: 0 });
+  const firedFor = useRef("");
+  useEffect(() => {
+    if (!counting) return;
+    const timer = window.setInterval(() => setTick((before) => (before.key === timerKey ? { key: timerKey, ms: before.ms + 250 } : { key: timerKey, ms: 250 })), 250);
+    return () => window.clearInterval(timer);
+  }, [counting, timerKey]);
+  const elapsedMs = tick.key === timerKey ? tick.ms : 0;
+  const secondsLeft = secondsOnAir === null ? null : Math.max(0, Math.ceil((secondsOnAir * 1000 - elapsedMs) / 1000));
+  useEffect(() => {
+    if (secondsOnAir === null || elapsedMs < secondsOnAir * 1000 || firedFor.current === timerKey) return;
+    // Once per piece (and per slide): if there is nothing after it, it simply stays.
+    firedFor.current = timerKey;
+    run({ type: "forward" });
+  }, [elapsedMs, secondsOnAir, timerKey, run]);
   const failedOnAir = onAirFile && failures.has(onAirFile.id);
 
   const deckIcon = (key: DeckKeyId) =>
@@ -396,8 +519,8 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
   const firstSlides = onAirFile?.kind === "slides" && total > 1 ? slideWindow(playout.slide, total) : [];
 
   return (
-    <div className="bg-background text-foreground fixed inset-0 flex min-w-[1100px] flex-col overflow-auto">
-      <header className="bg-surface border-ink gap-space-4 flex h-16 shrink-0 items-center border-b-2 px-5">
+    <div className="bg-background text-foreground fixed inset-0 flex min-w-[320px] flex-col overflow-auto">
+      <header className="bg-surface border-ink gap-space-4 flex min-h-16 shrink-0 flex-wrap items-center border-b-2 px-5 py-2">
         <div className="gap-space-3 flex items-center">
           <span aria-hidden="true" className="font-mono text-2xl font-bold tracking-tighter">
             <span className="text-[#ea4335]">&lt;</span>
@@ -470,7 +593,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 gap-5 p-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5 lg:flex-row lg:overflow-hidden">
         <RundownPanel
           items={items}
           openItemId={openItemId}
@@ -485,17 +608,21 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
           onPick={(cueId) => commit(selectNext(playoutRef.current, queueRef.current, cueId))}
           onMove={moveCueBy}
           onRemove={removeCue}
+          onSeconds={setCueSeconds}
+          onAddPoint={savePoints && saveMinutes ? () => setPointDialog({ key: Date.now(), itemId: null }) : undefined}
+          onEditPoint={savePoints && saveMinutes ? (itemId) => setPointDialog({ key: Date.now(), itemId }) : undefined}
+          onRemovePoint={savePoints && saveMinutes ? (itemId) => void removePoint(itemId) : undefined}
         />
 
-        <div className="gap-space-4 flex min-w-0 flex-1 flex-col">
-          <div className="gap-space-4 flex">
+        <div className="gap-space-4 flex min-w-0 flex-1 flex-col lg:overflow-y-auto">
+          <div className="gap-space-4 flex flex-col md:flex-row">
             <ConsoleMonitor
               tone="live"
               tag={t.rundown.live}
               label={t.program.label}
               title={failedOnAir ? t.program.failed : liveTitle}
-              status={liveStatus}
-              className="flex-[1.5]"
+              status={secondsLeft !== null && counting ? `${liveStatus ? `${liveStatus} · ` : ""}${interpolate(t.program.autoIn, { n: String(secondsLeft) })}` : liveStatus}
+              className="md:flex-[1.5]"
               icon={sceneOnAir || qrOnAir || !onAirFile ? <Icon name={qrOnAir ? "qr" : "stage"} size={44} /> : onAirFile.kind === "video" ? <ConsoleIcon name="video" size={44} /> : <ConsoleIcon name="slides" size={44} />}
               preview={
                 onAirFile?.kind === "slides" && programFile.status === "ready" ? (
@@ -514,7 +641,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
               tag={t.rundown.next}
               label={t.program.next}
               title={nextCue ? nextCue.name : t.program.nothingNext}
-              className="flex-1 self-start"
+              className="md:flex-1 md:self-start"
               preview={
                 nextCue && isFileCue(nextCue) && nextCue.kind === "slides" && nextFile.status === "ready" ? (
                   <SlideCanvas file={nextFile.file} page={1} label={t.program.nextPreview} />
@@ -530,7 +657,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
             />
           </div>
 
-          <div className="bg-surface border-ink gap-space-3 flex shrink-0 items-center rounded-lg border-2 px-3.5 py-2.5">
+          <div className="bg-surface border-ink gap-space-3 flex shrink-0 flex-wrap items-center rounded-lg border-2 px-3.5 py-2.5">
             <button type="button" onClick={() => run({ type: "back" })} className="border-ink focus-visible:ring-ring inline-flex h-12 items-center gap-2 rounded-full border-2 px-4 text-sm font-semibold focus-visible:ring-[3px] focus-visible:outline-none">
               <ConsoleIcon name="previous" />
               {t.transport.back}
@@ -555,6 +682,20 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
             </button>
           </div>
 
+          {onAirFile?.kind === "video" ? (
+            <VideoControls
+              loop={playout.loop}
+              muted={playout.muted}
+              volume={playout.volume}
+              progress={progress && progress.cueId === onAirFile.id ? progress : null}
+              onRestart={() => run({ type: "restart" })}
+              onToggleLoop={() => run({ type: "toggleLoop" })}
+              onToggleMute={() => run({ type: "mute" })}
+              onVolume={(volume) => run({ type: "volume", volume })}
+              onSeek={(seconds) => run({ type: "seek", seconds })}
+            />
+          ) : null}
+
           {firstSlides.length > 0 ? (
             <div className="bg-surface border-ink gap-space-2 flex shrink-0 items-center rounded-lg border-2 px-3.5 py-2">
               <span className="type-pixel-heading text-text-subtle shrink-0">{t.strip.label}</span>
@@ -566,12 +707,12 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
             </div>
           ) : null}
 
-          <section aria-label={t.deck.title} className="gap-space-2 flex min-h-0 flex-1 flex-col">
+          <section aria-label={t.deck.title} className="gap-space-2 flex min-h-[13rem] flex-1 flex-col">
             <div className="flex items-baseline gap-3">
               <h2 className="type-pixel-heading text-text-subtle">{t.deck.title}</h2>
               <p className="type-caption text-text-subtle">{t.deck.hint}</p>
             </div>
-            <div className="grid min-h-0 flex-1 grid-cols-4 grid-rows-2 gap-3">
+            <div className="grid flex-1 grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] auto-rows-[minmax(5.5rem,1fr)] gap-3">
               {DECK_KEYS.map((key, index) => {
                 const copyKey = key === "freeze" && frozen ? "unfreeze" : key;
                 const label = t.deck.keys[copyKey];
@@ -583,7 +724,7 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
                 const disabled = noPoll || noQr || noView;
                 const sub = isArmed ? t.deck.confirm : noPoll ? t.deck.keys.poll.none : noQr ? t.deck.keys.qr.none : noView ? t.deck.keys.view.none : key === "view" ? t.deck.views[view] : isLive && key !== "freeze" ? t.deck.onAir : label.sub;
                 return (
-                  <button key={key} type="button" disabled={disabled} onClick={() => run({ type: "deck", key })} aria-pressed={isLive || isArmed} className={cn("bg-surface focus-visible:ring-ring flex min-h-0 flex-col justify-between rounded-lg border-2 p-3 text-left focus-visible:ring-[3px] focus-visible:outline-none", isLive ? "border-danger ring-danger ring-2" : isArmed ? "border-gold" : "border-ink", disabled && "opacity-55")}>
+                  <button key={key} type="button" disabled={disabled} onClick={() => run({ type: "deck", key })} aria-pressed={isLive || isArmed} className={cn("bg-surface focus-visible:ring-ring flex min-h-[5.5rem] flex-col justify-between gap-2 rounded-lg border-2 p-3 text-left focus-visible:ring-[3px] focus-visible:outline-none", isLive ? "border-danger ring-danger ring-2" : isArmed ? "border-gold" : "border-ink", disabled && "opacity-55")}>
                     <span className="flex items-center justify-between">
                       <span aria-hidden="true" className="bg-surface-raised text-cyan-ink grid size-10 place-items-center rounded-md">
                         {deckIcon(key)}
@@ -613,6 +754,20 @@ export function RundownConsole({ edition, agenda, qrItems, stored, frozen: initi
         onAdd={addFile}
         onAddGoogleSlides={addGoogleSlides}
       />
+      {pointDialog ? (
+        <PointDialog
+          key={pointDialog.key}
+          open
+          onOpenChange={(open) => {
+            if (!open) setPointDialog(null);
+          }}
+          point={(() => {
+            const found = pointDialog.itemId ? agenda.find((entry) => entry.id === pointDialog.itemId) : null;
+            return found ? { title: found.title, who: found.who, time: found.time, minutes: found.minutes ?? null, custom: found.custom === true } : null;
+          })()}
+          onSave={savePoint}
+        />
+      ) : null}
       {confirmDialog}
       <SetupDialog
         open={setupManual || (!setupDismissed && media.library !== null && media.status === "none")}

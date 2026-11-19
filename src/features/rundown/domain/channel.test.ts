@@ -11,6 +11,25 @@ describe("parseChannelMessage", () => {
     expect(parseChannelMessage({ type: "ping" })).toEqual({ type: "ping" });
   });
 
+  it("carries the repetition and the sound, and refuses a wrong one", () => {
+    const clip = { id: "cue-0001", kind: "video", name: "Video", path: "a/video.mp4" };
+    const heard = parseChannelMessage({ type: "program", cue: clip, slide: 1, playing: true, loop: true, volume: 0.5, muted: false });
+    expect(heard).toEqual({ type: "program", cue: clip, slide: 1, playing: true, loop: true, volume: 0.5, muted: false });
+    expect(parseChannelMessage({ type: "transport", slide: 1, playing: true, volume: 0.25 })).toEqual({ type: "transport", slide: 1, playing: true, volume: 0.25 });
+    expect(parseChannelMessage({ type: "transport", slide: 1, playing: true, volume: 2 })).toBeNull();
+    expect(parseChannelMessage({ type: "transport", slide: 1, playing: true, loop: "yes" })).toBeNull();
+    expect(parseChannelMessage({ type: "program", cue: clip, slide: 1, playing: true, muted: 1 })).toBeNull();
+  });
+
+  it("carries a jump to a second and the progress of the video", () => {
+    expect(parseChannelMessage({ type: "seek", seconds: 12.5 })).toEqual({ type: "seek", seconds: 12.5 });
+    expect(parseChannelMessage({ type: "seek", seconds: -1 })).toBeNull();
+    expect(parseChannelMessage({ type: "seek", seconds: Number.POSITIVE_INFINITY })).toBeNull();
+    expect(parseChannelMessage({ type: "progress", cueId: "cue-0001", time: 3, duration: 90 })).toEqual({ type: "progress", cueId: "cue-0001", time: 3, duration: 90 });
+    expect(parseChannelMessage({ type: "progress", cueId: "", time: 3, duration: 90 })).toBeNull();
+    expect(parseChannelMessage({ type: "progress", cueId: "cue-0001", time: Number.NaN, duration: 90 })).toBeNull();
+  });
+
   it("carries a Google Slides piece, and refuses one whose presentation id is not one", () => {
     const deck = { id: "cue-0009", kind: "gslides", name: "Keynote", deckId: "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", published: false };
 

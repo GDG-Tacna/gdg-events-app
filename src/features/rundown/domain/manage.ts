@@ -1,22 +1,34 @@
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
-import { parseCues, type StoredCue } from "./rundown";
+import { isMinutes, parseCues, parseExtraPoints, type ExtraPoint, type StoredCue } from "./rundown";
 
 /** The stored pieces of every point of the agenda, by the point's id (a talk's id). */
 export type StoredCues = Readonly<Record<string, readonly StoredCue[]>>;
+
+/** What is saved besides the pieces: the points made in the console and the minutes planned for each point. */
+export interface RundownPlan {
+  points: readonly ExtraPoint[];
+  minutes: Readonly<Record<string, number>>;
+}
 
 export interface RundownStore {
   /** Every point's pieces; an edition that has none saved reads as `{}`. */
   read(): Promise<Result<StoredCues, { code: string }>>;
   /** Replaces one point's pieces (an empty list clears them). */
   saveItem(itemId: string, cues: readonly StoredCue[]): Promise<Result<void, { code: string }>>;
+  /** The points made in the console and the minutes planned; an edition that has none reads as empty. */
+  readPlan(): Promise<Result<RundownPlan, { code: string }>>;
+  /** Replaces the points made in the console. */
+  savePoints(points: readonly ExtraPoint[]): Promise<Result<void, { code: string }>>;
+  /** Sets the minutes planned for a point, or clears them with `null`. */
+  saveMinutes(itemId: string, minutes: number | null): Promise<Result<void, { code: string }>>;
 }
 
 export interface RundownDeps {
   store: RundownStore;
 }
 
-export type RundownErrorCode = "invalid-item" | "invalid-cues" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
+export type RundownErrorCode = "invalid-item" | "invalid-cues" | "invalid-points" | "invalid-minutes" | "unauthenticated" | "forbidden" | "disabled" | "unknown";
 
 export interface RundownActor {
   uid: string;
@@ -33,6 +45,39 @@ export async function getStoredCues(deps: Pick<RundownDeps, "store">, actor: Run
   if (actor.role !== "admin") return err(rundownError("forbidden"));
   const read = await deps.store.read();
   return read.ok ? ok(read.value) : err(rundownError("unknown"));
+}
+
+/** The points made in the console and the minutes planned. Admin only. */
+export async function getRundownPlan(deps: Pick<RundownDeps, "store">, actor: RundownActor): Promise<Result<RundownPlan, { code: RundownErrorCode }>> {
+  if (actor.role !== "admin") return err(rundownError("forbidden"));
+  const read = await deps.store.readPlan();
+  return read.ok ? ok(read.value) : err(rundownError("unknown"));
+}
+
+/** Saves the points made in the console (a break, a welcome): they are not in the public agenda. */
+export async function saveExtraPoints(deps: Pick<RundownDeps, "store">, actor: RundownActor, input: { points: unknown }): Promise<Result<readonly ExtraPoint[], { code: RundownErrorCode }>> {
+  if (actor.role !== "admin") return err(rundownError("forbidden"));
+  const points = parseExtraPoints(input.points);
+  if (points === null) return err(rundownError("invalid-points"));
+  const saved = await deps.store.savePoints(points);
+  if (!saved.ok) {
+    logServerError("rundown.points", new Error(saved.error.code));
+    return err(rundownError("unknown"));
+  }
+  return ok(points);
+}
+
+/** Sets the minutes planned for a point of the agenda (a talk or one made here), or clears them with `null`. */
+export async function saveItemMinutes(deps: Pick<RundownDeps, "store">, actor: RundownActor, input: { itemId: unknown; minutes: unknown }): Promise<Result<number | null, { code: RundownErrorCode }>> {
+  if (actor.role !== "admin") return err(rundownError("forbidden"));
+  if (!isItemId(input.itemId)) return err(rundownError("invalid-item"));
+  if (input.minutes !== null && !isMinutes(input.minutes)) return err(rundownError("invalid-minutes"));
+  const saved = await deps.store.saveMinutes(input.itemId, input.minutes);
+  if (!saved.ok) {
+    logServerError("rundown.minutes", new Error(saved.error.code));
+    return err(rundownError("unknown"));
+  }
+  return ok(input.minutes);
 }
 
 /**

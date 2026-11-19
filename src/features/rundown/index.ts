@@ -1,8 +1,8 @@
 // Public API (client-safe). Server-only exports live in `./server`.
 export { RundownConsole, SCREEN_LOST_AFTER_MS, type RundownConsoleProps } from "./ui/RundownConsole";
 export { MediaProgram, type MediaProgramProps } from "./ui/MediaProgram";
-export type { ProjectTalkRunner, SaveCuesAction, SaveCuesResult, StageRunner, StageRunnerCommand, StageRunnerResult } from "./ui/actions";
+export type { ProjectTalkRunner, SaveCuesAction, SaveCuesResult, SaveMinutesAction, SavePointsAction, StageRunner, StageRunnerCommand, StageRunnerResult } from "./ui/actions";
 export type { StageViewName } from "./ui/console-model";
-export { MEDIA_EXTENSIONS, buildRundown, cueFromPath, isMediaPath, kindOfPath, qrCueId, queueOf } from "./domain/rundown";
-export type { AgendaPoint, MediaCue, MediaKind, RundownItem } from "./domain/rundown";
+export { MEDIA_EXTENSIONS, buildRundown, cueFromPath, isMediaPath, kindOfPath, mergeAgenda, qrCueId, queueOf } from "./domain/rundown";
+export type { AgendaPoint, ExtraPoint, MediaCue, MediaKind, RundownItem } from "./domain/rundown";
 export type { RundownErrorCode, StoredCues } from "./domain/manage";

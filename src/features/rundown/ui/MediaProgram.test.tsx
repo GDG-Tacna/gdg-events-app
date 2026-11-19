@@ -81,6 +81,32 @@ describe("MediaProgram", () => {
     expect(heard).toEqual([]);
   });
 
+  it("plays the video on repeat, at the volume and mute the console says, and reports where it is", async () => {
+    const { heard, say, view } = setup();
+    await say({ type: "program", cue: VIDEO, slide: 1, playing: true, loop: true, volume: 0.4, muted: false });
+    const video = view.container.querySelector("video") as HTMLVideoElement;
+
+    expect(video.loop).toBe(true);
+    expect(video.volume).toBeCloseTo(0.4);
+    await say({ type: "transport", slide: 1, playing: true, loop: false, muted: true });
+    expect(video.loop).toBe(false);
+    expect(video.muted).toBe(true);
+
+    Object.defineProperty(video, "duration", { configurable: true, value: 90 });
+    video.currentTime = 12;
+    fireEvent.timeUpdate(video);
+    expect(heard).toContainEqual({ type: "progress", cueId: "cue-video", time: 12, duration: 90 });
+  });
+
+  it("jumps the video to the second the console asks for", async () => {
+    const { say, view } = setup();
+    await say({ type: "program", cue: VIDEO, slide: 1, playing: true });
+    const video = view.container.querySelector("video") as HTMLVideoElement;
+
+    await say({ type: "seek", seconds: 33 });
+    expect(video.currentTime).toBe(33);
+  });
+
   it("badges a video as live, with no slide number", async () => {
     const { say, view } = setup();
     await say({ type: "program", cue: VIDEO, slide: 1, playing: true });

@@ -26,6 +26,14 @@ export interface RundownPanelProps {
   onPick: (cueId: string) => void;
   onMove: (itemId: string, cueId: string, delta: -1 | 1) => void;
   onRemove: (itemId: string, cueId: string) => void;
+  /** Sets (or clears, with `null`) how many seconds a piece stays on the air. */
+  onSeconds: (itemId: string, cueId: string, seconds: number | null) => void;
+  /** Opens «Añadir punto»; without it the panel cannot add points. */
+  onAddPoint?: () => void;
+  /** Opens the dialog to edit a point (its minutes, and the rest for one made in the console). */
+  onEditPoint?: (itemId: string) => void;
+  /** Removes a point made in the console. */
+  onRemovePoint?: (itemId: string) => void;
 }
 
 const TINT: Record<RundownCue["kind"], string> = { video: "text-magenta-ink", slides: "text-cyan-ink", gslides: "text-cyan-ink", image: "text-cyan-ink", qr: "text-lime-ink" };
@@ -39,9 +47,10 @@ function KindIcon({ kind }: { kind: RundownCue["kind"] }) {
 
 function metaOf(cue: RundownCue, slides: ReadonlyMap<string, number>): string {
   if (cue.kind === "qr") return t.qrMeta;
-  if (cue.kind === "gslides") return t.gslidesMeta;
+  const time = cue.seconds ? ` · ${interpolate(cue.kind === "slides" ? t.secondsEach : t.secondsOnce, { n: String(cue.seconds) })}` : "";
+  if (cue.kind === "gslides") return t.gslidesMeta + time;
   const known = cue.kind === "slides" ? slides.get(cue.id) : undefined;
-  return known ? `${t.kinds.slides} · ${interpolate(t.slidesCount, { total: String(known) })}` : t.kinds[cue.kind];
+  return (known ? `${t.kinds.slides} · ${interpolate(t.slidesCount, { total: String(known) })}` : t.kinds[cue.kind]) + time;
 }
 
 /**
@@ -49,10 +58,10 @@ function metaOf(cue: RundownCue, slides: ReadonlyMap<string, number>): string {
  * taken. A piece is picked to go next; in edit mode they can be moved or removed. Pieces whose file is not in the connected
  * folder say so.
  */
-export function RundownPanel({ items, openItemId, onToggleItem, liveCueId, nextCueId, missing, slides, editing, onToggleEditing, onAdd, onPick, onMove, onRemove }: RundownPanelProps) {
+export function RundownPanel({ items, openItemId, onToggleItem, liveCueId, nextCueId, missing, slides, editing, onToggleEditing, onAdd, onPick, onMove, onRemove, onSeconds, onAddPoint, onEditPoint, onRemovePoint }: RundownPanelProps) {
   const files = items.reduce((sum, item) => sum + item.cues.filter((cue) => cue.kind !== "qr").length, 0);
   return (
-    <section aria-label={t.title} className="bg-surface border-ink flex min-h-0 w-[420px] shrink-0 flex-col overflow-hidden rounded-lg border-2">
+    <section aria-label={t.title} className="bg-surface border-ink flex max-h-[60vh] min-h-0 w-full shrink-0 flex-col overflow-hidden lg:max-h-none lg:w-[420px] rounded-lg border-2">
       <div className="gap-space-3 border-line px-space-4 flex items-center border-b-2 py-3">
         <div className="min-w-0 flex-1">
           <h2 className="type-title text-foreground">{t.title}</h2>
@@ -66,6 +75,13 @@ export function RundownPanel({ items, openItemId, onToggleItem, liveCueId, nextC
         </button>
       </div>
 
+      {editing && onAddPoint ? (
+        <div className="border-line px-space-3 border-b-2 py-2">
+          <button type="button" onClick={onAddPoint} className="type-label border-ink text-foreground hover:bg-secondary focus-visible:ring-ring h-9 rounded-full border-2 px-3 focus-visible:ring-[3px] focus-visible:outline-none">
+            {t.addPoint}
+          </button>
+        </div>
+      ) : null}
       {items.length === 0 ? <p className="type-body-sm text-muted-foreground p-space-4">{t.empty}</p> : null}
       <ul className="gap-space-2 p-space-3 flex min-h-0 flex-1 flex-col overflow-y-auto">
         {items.map((item) => {
@@ -77,12 +93,28 @@ export function RundownPanel({ items, openItemId, onToggleItem, liveCueId, nextC
                 <span className="type-label text-gold-ink w-[52px] shrink-0 font-mono">{item.time}</span>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="type-label text-foreground leading-tight">{item.title}</span>
-                  <span className="type-caption text-text-subtle">{interpolate(t.itemLine, { who: item.who, n: String(item.cues.filter((cue) => cue.kind !== "qr").length) })}</span>
+                  <span className="type-caption text-text-subtle">
+                    {interpolate(item.minutes ? t.itemLineMinutes : t.itemLine, { who: item.who || (item.custom ? t.custom : ""), n: String(item.cues.filter((cue) => cue.kind !== "qr").length), minutes: String(item.minutes ?? "") })}
+                  </span>
                 </span>
                 <span aria-hidden="true" className="text-text-subtle shrink-0">
                   {open ? "▾" : "▸"}
                 </span>
               </button>
+              {open && editing && (onEditPoint || (item.custom && onRemovePoint)) ? (
+                <div className="gap-space-2 px-space-3 flex flex-wrap pb-2">
+                  {onEditPoint ? (
+                    <button type="button" aria-label={interpolate(t.editPoint, { title: item.title })} onClick={() => onEditPoint(item.id)} className="type-caption border-line-strong text-foreground hover:bg-secondary focus-visible:ring-ring h-8 rounded-full border-2 px-3 font-semibold focus-visible:ring-[3px] focus-visible:outline-none">
+                      {t.editPointLabel}
+                    </button>
+                  ) : null}
+                  {item.custom && onRemovePoint ? (
+                    <button type="button" aria-label={interpolate(t.removePoint, { title: item.title })} onClick={() => onRemovePoint(item.id)} className="type-caption border-danger-ink text-danger-ink hover:bg-secondary focus-visible:ring-ring h-8 rounded-full border-2 px-3 font-semibold focus-visible:ring-[3px] focus-visible:outline-none">
+                      {t.removePointLabel}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               {open ? (
                 <ul className="gap-space-2 px-space-2 pb-space-3 flex flex-col">
                   {item.cues.map((cue, index) => {
@@ -108,6 +140,25 @@ export function RundownPanel({ items, openItemId, onToggleItem, liveCueId, nextC
                             {isMissing ? <span className="border-danger-ink text-danger-ink inline-flex h-5 items-center rounded-full border-2 px-2 text-[10.5px] font-bold">{t.missing}</span> : null}
                           </span>
                         </button>
+                        {editing && media ? (
+                          <label className="flex shrink-0 flex-col items-center gap-0.5">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              aria-label={interpolate(t.secondsLabel, { name: cue.name })}
+                              placeholder={t.secondsHint}
+                              maxLength={4}
+                              defaultValue={cue.seconds ?? ""}
+                              key={`${cue.id}:${cue.seconds ?? ""}`}
+                              onBlur={(event) => {
+                                const text = event.target.value.trim();
+                                const value = text === "" ? null : Number(text);
+                                if (value === null || Number.isInteger(value)) onSeconds(item.id, cue.id, value);
+                              }}
+                              className="border-line-strong bg-surface text-foreground focus-visible:ring-ring h-9 w-14 rounded-md border-2 px-1 text-center font-mono text-sm focus-visible:ring-[3px] focus-visible:outline-none"
+                            />
+                          </label>
+                        ) : null}
                         {editing && media ? (
                           <span className="flex shrink-0 flex-col gap-0.5">
                             <button type="button" aria-label={`${t.moveUp}: ${cue.name}`} disabled={index === 0} onClick={() => onMove(item.id, cue.id, -1)} className="border-line-strong text-foreground hover:bg-secondary focus-visible:ring-ring grid size-7 place-items-center rounded-md border-2 focus-visible:ring-[3px] focus-visible:outline-none disabled:opacity-40">
