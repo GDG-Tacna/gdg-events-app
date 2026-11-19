@@ -258,6 +258,13 @@ export function moveCue<T extends { id: string }>(cues: readonly T[], id: string
   return moved;
 }
 
+/** The same piece with the seconds it stays on the air set, or cleared with `null`. */
+export function withSeconds<T extends StoredCue>(cue: T, seconds: number | null): T {
+  const { seconds: _before, ...rest } = cue;
+  void _before;
+  return (seconds === null ? rest : { ...rest, seconds }) as T;
+}
+
 /** Whether a piece is a file of the connected folder (a video, a deck of slides or a picture). */
 export const isFileCue = (cue: RundownCue): cue is MediaCue => cue.kind !== "qr" && cue.kind !== "gslides";
 

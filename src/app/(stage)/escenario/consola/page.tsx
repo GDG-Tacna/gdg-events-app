@@ -9,13 +9,13 @@ import { updateStageAction } from "@/app-shell/leaderboard/stage.actions";
 import { moduleOn } from "@/app-shell/modules.server";
 import { requireSection } from "@/app-shell/permissions.server";
 import { loadConsoleAgenda } from "@/app-shell/rundown/agenda.server";
-import { saveCuesAction } from "@/app-shell/rundown/rundown.actions";
+import { saveCuesAction, saveMinutesAction, savePointsAction } from "@/app-shell/rundown/rundown.actions";
 import { projectTalkAction } from "@/app-shell/talks/project.action";
 import { listTalks } from "@/features/ephemeral-qr/server";
 import { currentEditionId, getStage } from "@/features/leaderboard/server";
 import { comparePolls } from "@/features/polls/server";
-import { RundownConsole } from "@/features/rundown";
-import { getStoredCues } from "@/features/rundown/server";
+import { RundownConsole, mergeAgenda } from "@/features/rundown";
+import { getRundownPlan, getStoredCues } from "@/features/rundown/server";
 import { FEATURES } from "@/shared/config/features";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
@@ -33,18 +33,22 @@ export default async function StageConsolePage() {
   if (!(await moduleOn("leaderboard"))) notFound();
 
   const actor = { uid: session.uid, role: session.role };
-  const [edition, agenda, stored, stage, squadsOn, polls, openTalks] = await Promise.all([
+  const [edition, talks, stored, plan, stage, squadsOn, polls, openTalks] = await Promise.all([
     currentEditionId(),
     loadConsoleAgenda(actor),
     getStoredCues(rundownDeps, actor),
+    getRundownPlan(rundownDeps, actor),
     getStage(stageDeps),
     moduleOn("squads"),
     showablePolls(),
     FEATURES.checkins ? listTalks(ephemeralQrDeps, actor) : null,
   ]);
   // A failed read goes to the route's error boundary instead of showing an agenda or a stage that is not real.
-  if (!agenda) throw new Error("Could not read the agenda");
+  if (!talks) throw new Error("Could not read the agenda");
   if (!stage.ok) throw new Error("Could not read the stage");
+
+  // The points made in the console and the minutes planned are extras: a failed read shows the agenda of the talks alone.
+  const agenda = mergeAgenda(talks, plan.ok ? [...plan.value.points] : [], plan.ok ? plan.value.minutes : {});
 
   return (
     <RundownConsole
@@ -58,6 +62,8 @@ export default async function StageConsolePage() {
       squadsOn={squadsOn}
       polls={polls}
       saveCues={saveCuesAction}
+      savePoints={savePointsAction}
+      saveMinutes={saveMinutesAction}
       runStage={updateStageAction}
       projectTalk={projectTalkAction}
       hrefs={{ screen: ROUTES.stage, settings: ROUTES.adminStage, raffle: ROUTES.adminRaffle, back: ROUTES.admin }}
