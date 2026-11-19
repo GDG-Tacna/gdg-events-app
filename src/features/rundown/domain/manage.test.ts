@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { err, ok } from "@/shared/lib/result";
-import { getRundownPlan, getStoredCues, saveExtraPoints, saveItemCues, saveItemMinutes, saveMusicPlaylist, type RundownStore } from "./manage";
+import { getRundownPlan, getStoredCues, saveExtraPoints, saveItemCues, saveItemMinutes, saveLayerCards, saveMusicPlaylist, type RundownStore } from "./manage";
 
 const ADMIN = { uid: "a1", role: "admin" as const };
 const SLIDES = { id: "cue-0001", kind: "slides" as const, name: "Keynote", path: "apertura/keynote.pdf" };
@@ -10,8 +10,9 @@ function setup(overrides: Partial<RundownStore> = {}) {
   const savePoints = vi.fn(async () => ok(undefined));
   const saveMinutes = vi.fn(async () => ok(undefined));
   const savePlaylist = vi.fn(async () => ok(undefined));
-  const store: RundownStore = { read: async () => ok({ keynote: [SLIDES] }), saveItem, readPlan: async () => ok({ points: [], minutes: {}, playlist: [] }), savePoints, saveMinutes, savePlaylist, ...overrides };
-  return { store, saveItem, savePoints, saveMinutes, savePlaylist };
+  const saveCards = vi.fn(async () => ok(undefined));
+  const store: RundownStore = { read: async () => ok({ keynote: [SLIDES] }), saveItem, readPlan: async () => ok({ points: [], minutes: {}, playlist: [], cards: [] }), savePoints, saveMinutes, savePlaylist, saveCards, ...overrides };
+  return { store, saveItem, savePoints, saveMinutes, savePlaylist, saveCards };
 }
 
 describe("getStoredCues", () => {
@@ -58,7 +59,7 @@ describe("saveItemCues", () => {
 
 describe("getRundownPlan", () => {
   it("gives the points made in the console and the minutes planned to an admin and to nobody else", async () => {
-    const plan = { points: [{ id: "cafe", title: "Café", who: "", time: "10:40" }], minutes: { keynote: 20 }, playlist: [] };
+    const plan = { points: [{ id: "cafe", title: "Café", who: "", time: "10:40" }], minutes: { keynote: 20 }, playlist: [], cards: [] };
     const { store } = setup({ readPlan: async () => ok(plan) });
 
     expect(await getRundownPlan({ store }, ADMIN)).toEqual(ok(plan));
@@ -147,5 +148,34 @@ describe("saveMusicPlaylist", () => {
     const { store } = setup({ savePlaylist: async () => err({ code: "down" }) });
 
     expect(await saveMusicPlaylist({ store }, ADMIN, { tracks: [SONG] })).toEqual(err({ code: "unknown" }));
+  });
+});
+
+describe("saveLayerCards", () => {
+  const CARD = { id: "card-0001", kind: "speaker", title: " Luis Eduardo ", text: "Genkit", link: "", x: 4, y: 90, hideAfter: 10 };
+
+  it("saves the checked cards with their place and answers them", async () => {
+    const { store, saveCards } = setup();
+
+    expect(await saveLayerCards({ store }, ADMIN, { cards: [CARD] })).toEqual(ok([{ ...CARD, title: "Luis Eduardo" }]));
+    expect(saveCards).toHaveBeenCalledWith([{ ...CARD, title: "Luis Eduardo" }]);
+    expect(await saveLayerCards({ store }, ADMIN, { cards: [] })).toEqual(ok([]));
+  });
+
+  it("refuses a non-admin, a place off the screen, a bad kind, an empty title and a repeated id, saving nothing", async () => {
+    const { store, saveCards } = setup();
+
+    expect(await saveLayerCards({ store }, { uid: "s", role: "staff" }, { cards: [] })).toEqual(err({ code: "forbidden" }));
+    for (const cards of ["x", [{ ...CARD, x: 120 }], [{ ...CARD, y: -1 }], [{ ...CARD, kind: "banner" }], [{ ...CARD, title: " " }], [{ ...CARD, hideAfter: 0 }], [{ ...CARD, hideAfter: 601 }], [CARD, CARD]]) {
+      expect(await saveLayerCards({ store }, ADMIN, { cards })).toEqual(err({ code: "invalid-cards" }));
+    }
+    expect(saveCards).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed save", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { store } = setup({ saveCards: async () => err({ code: "down" }) });
+
+    expect(await saveLayerCards({ store }, ADMIN, { cards: [CARD] })).toEqual(err({ code: "unknown" }));
   });
 });

@@ -94,11 +94,11 @@ describe("FirestoreRundownStore", () => {
     await store.saveMinutes("keynote", 20);
     await store.saveMinutes("cafe", 15);
 
-    expect(await store.readPlan()).toEqual(ok({ points: [cafe, welcome], minutes: { keynote: 20, cafe: 15 }, playlist: [] }));
+    expect(await store.readPlan()).toEqual(ok({ points: [cafe, welcome], minutes: { keynote: 20, cafe: 15 }, playlist: [], cards: [] }));
 
     await store.savePoints([welcome]);
     await store.saveMinutes("cafe", null);
-    expect(await store.readPlan()).toEqual(ok({ points: [welcome], minutes: { keynote: 20 }, playlist: [] }));
+    expect(await store.readPlan()).toEqual(ok({ points: [welcome], minutes: { keynote: 20 }, playlist: [], cards: [] }));
   });
 
   it("stores the playlist as a whole and reads it back, and reads a broken one as empty", async () => {
@@ -115,11 +115,25 @@ describe("FirestoreRundownStore", () => {
     expect(console.error).toHaveBeenCalled();
   });
 
+  it("stores the cards as a whole with their place, and reads them back, and a broken list as none", async () => {
+    const card = { id: "card-0001", kind: "speaker", title: "Luis Eduardo", text: "Genkit", link: "", x: 4, y: 90, hideAfter: 10 } as const;
+    const notice = { id: "card-0002", kind: "notice", title: "Almuerzo", text: "", link: "gdgtacna.com/menu", x: 98, y: 3, hideAfter: null } as const;
+    await store.saveCards([card, notice]);
+    expect(await store.readPlan()).toMatchObject({ value: { cards: [card, notice] } });
+
+    await store.saveCards([notice]);
+    expect(await store.readPlan()).toMatchObject({ value: { cards: [notice] } });
+
+    fake.store.set("events/e1/config/rundown", { cards: [{ ...card, x: 500 }] });
+    expect(await store.readPlan()).toMatchObject({ value: { cards: [] } });
+    expect(console.error).toHaveBeenCalled();
+  });
+
   it("reads an edition with nothing planned as empty, and leaves out what breaks the rules", async () => {
-    expect(await store.readPlan()).toEqual(ok({ points: [], minutes: {}, playlist: [] }));
+    expect(await store.readPlan()).toEqual(ok({ points: [], minutes: {}, playlist: [], cards: [] }));
 
     fake.store.set("events/e1/config/rundown", { points: [{ id: "BAD", title: "x" }], minutes: { keynote: 20, cafe: -5, foo: "3" } });
-    expect(await store.readPlan()).toEqual(ok({ points: [], minutes: { keynote: 20 }, playlist: [] }));
+    expect(await store.readPlan()).toEqual(ok({ points: [], minutes: { keynote: 20 }, playlist: [], cards: [] }));
     expect(console.error).toHaveBeenCalled();
   });
 

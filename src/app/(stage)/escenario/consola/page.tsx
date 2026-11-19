@@ -9,7 +9,7 @@ import { updateStageAction } from "@/app-shell/leaderboard/stage.actions";
 import { moduleOn } from "@/app-shell/modules.server";
 import { requireSection } from "@/app-shell/permissions.server";
 import { loadConsoleAgenda } from "@/app-shell/rundown/agenda.server";
-import { saveCuesAction, saveMinutesAction, savePlaylistAction, savePointsAction } from "@/app-shell/rundown/rundown.actions";
+import { saveCardsAction, saveCuesAction, saveMinutesAction, savePlaylistAction, savePointsAction } from "@/app-shell/rundown/rundown.actions";
 import { projectTalkAction } from "@/app-shell/talks/project.action";
 import { listTalks } from "@/features/ephemeral-qr/server";
 import { currentEditionId, getStage } from "@/features/leaderboard/server";
@@ -64,6 +64,8 @@ export default async function StageConsolePage() {
       saveCues={saveCuesAction}
       savePoints={savePointsAction}
       savePlaylist={savePlaylistAction}
+      saveCards={saveCardsAction}
+      cards={plan.ok ? [...plan.value.cards] : []}
       playlist={plan.ok ? [...plan.value.playlist] : []}
       saveMinutes={saveMinutesAction}
       runStage={updateStageAction}
