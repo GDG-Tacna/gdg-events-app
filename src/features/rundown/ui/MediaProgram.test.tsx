@@ -62,6 +62,25 @@ describe("MediaProgram", () => {
     expect(badges()).not.toBe(before);
   });
 
+  it("as the console's small copy, shows the piece muted and says nothing back (it is not a second projector)", async () => {
+    const lines = channelPair();
+    const heard: ChannelMessage[] = [];
+    lines.console.subscribe((message) => heard.push(message));
+    const { library } = fakeLibrary({ "apertura/video.mp4": mp4() });
+    const { container } = render(<MediaProgram preview library={library} openChannel={() => lines.stage} />);
+    await act(async () => {
+      lines.console.post({ type: "program", cue: VIDEO, slide: 1, playing: true });
+      for (let round = 0; round < 4; round += 1) await Promise.resolve();
+      vi.advanceTimersByTime(ALIVE_EVERY_MS * 3);
+    });
+
+    const video = container.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video?.muted).toBe(true);
+    expect(screen.queryByText("Haz clic en la pantalla para activar el sonido")).not.toBeInTheDocument();
+    expect(heard).toEqual([]);
+  });
+
   it("badges a video as live, with no slide number", async () => {
     const { say, view } = setup();
     await say({ type: "program", cue: VIDEO, slide: 1, playing: true });

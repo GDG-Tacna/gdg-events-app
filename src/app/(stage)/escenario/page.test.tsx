@@ -73,8 +73,15 @@ describe("stage page", () => {
       initialBoard: BOARD,
       pollsOn: false,
       agenda: [{ id: "keynote", time: "09:00", title: "Keynote", who: "Equipo GDG" }],
+      preview: false,
     });
     expect(agenda.loadConsoleAgenda).toHaveBeenCalledWith({ uid: "a1", role: "admin" });
+  });
+
+  it("opens as the console's small copy only with ?vista=previa", async () => {
+    expect(findElement(await StagePage(), StageScreenBound)?.props.preview).toBe(false);
+    expect(findElement(await StagePage({ searchParams: Promise.resolve({ vista: "previa" }) }), StageScreenBound)?.props.preview).toBe(true);
+    expect(findElement(await StagePage({ searchParams: Promise.resolve({ vista: "otra" }) }), StageScreenBound)?.props.preview).toBe(false);
   });
 
   it("opens without the agenda when it cannot be read (the waiting screen then shows the event's name)", async () => {

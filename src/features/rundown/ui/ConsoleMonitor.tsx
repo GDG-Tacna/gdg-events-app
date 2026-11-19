@@ -19,9 +19,9 @@ export interface ConsoleMonitorProps {
 }
 
 /**
- * A little screen of the console: the header (tag, name, state) and a 16:9 picture that shows what is on the big screen
- * (or will be). A slide or an image is the real thing; a video or a data scene is an icon with its name, so the console does
- * not play a second copy of the video or read the ranking twice.
+ * A little screen of the console: the header (tag, name, state) and a 16:9 picture of what is on the big screen (or
+ * will be). The picture is the real thing whenever the console can draw it; the icon with the name stands in only for a
+ * piece that has no picture (or while it is being read).
  */
 export function ConsoleMonitor({ tone, tag, title, status, preview, icon, label, className }: ConsoleMonitorProps) {
   const live = tone === "live";

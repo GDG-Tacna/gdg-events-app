@@ -34,6 +34,8 @@ export interface StageScreenProps {
   renderTalkQr?: (talk: { talkId: string; name: string; speaker: string }) => ReactNode;
   /** The day's talks in order, so the waiting screen can announce the next one and the QR can name the speaker. Without them it shows the event's name. */
   agenda?: readonly { id: string; time: string; title: string; who: string }[];
+  /** A small copy inside the console: the same scenes, without the button for full screen. */
+  preview?: boolean;
 }
 
 /** The scene's own colors: the waiting screen is dark and the raffle blue, the rest sit on the page's base. */
@@ -58,7 +60,7 @@ function StatusPill({ status }: { status: FeedStatus }) {
  * admin controls and to the edition's participants, and computes the ranking itself; it shows the live or frozen
  * ranking (cadets, squads, or both taking turns), a waiting screen, or the champions' reveal. It only reads.
  */
-export function StageScreen({ eventId, feed, squads, sprites, initialStage, initialBoard, alternateMs = 15_000, squadsOn = true, renderPoll, renderTalkQr, agenda = [] }: StageScreenProps) {
+export function StageScreen({ eventId, feed, squads, sprites, initialStage, initialBoard, alternateMs = 15_000, squadsOn = true, renderPoll, renderTalkQr, agenda = [], preview = false }: StageScreenProps) {
   const reduce = useReducedMotion();
   const [stage, setStage] = useState(initialStage);
   const [entries, setEntries] = useState<readonly RankingEntry[] | null>(null);
@@ -133,7 +135,7 @@ export function StageScreen({ eventId, feed, squads, sprites, initialStage, init
               <span className="border-gold text-gold-ink rounded-full border-2 px-4 py-1 text-[clamp(0.9rem,2vh,1.6rem)] font-bold">{t.frozen}</span>
             ) : null}
             <StatusPill status={status} />
-            {!fullscreen ? (
+            {!fullscreen && !preview ? (
               <button
                 type="button"
                 onClick={() => void document.documentElement.requestFullscreen?.().catch(() => undefined)}

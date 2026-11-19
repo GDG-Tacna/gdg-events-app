@@ -22,7 +22,9 @@ export const metadata: Metadata = {
 };
 
 /** The stage screen for the projector. Admins only: its live listeners read with the admin's own session. */
-export default async function StagePage() {
+export default async function StagePage({ searchParams }: { searchParams?: Promise<{ vista?: string | string[] }> } = {}) {
+  // `?vista=previa` is the console's small copy of this screen (it does not announce itself as a projector).
+  const preview = (await searchParams)?.vista === "previa";
   const admin = await requireRole(["admin"]);
   if (!(await moduleOn("leaderboard"))) notFound();
 
@@ -59,6 +61,7 @@ export default async function StagePage() {
         pollsOn={FEATURES.polls && pollsOn}
         talkQrOn={FEATURES.checkins}
         agenda={agenda ?? []}
+        preview={preview}
       />
     </>
   );
