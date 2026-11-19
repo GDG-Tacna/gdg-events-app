@@ -6,7 +6,7 @@ import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
 import { answerConfirm } from "@/test-utils/confirm";
 import type { ChangeCadetTicketAction } from "@/features/tickets";
-import type { BanCadetAction, CadetDetailData, CadetRow, CadetTeamControls, GiveTeamRoleAction, TakeTeamRoleAction, ChangeCadetSquadAction, DeleteCadetAction, RenameCadetAction, UnbanCadetAction } from "./actions";
+import type { BanCadetAction, CadetDetailData, CadetRow, CadetSpeakerControls, CadetTeamControls, GiveTeamRoleAction, TakeTeamRoleAction, ChangeCadetSquadAction, DeleteCadetAction, RenameCadetAction, UnbanCadetAction } from "./actions";
 import { CadetDetailView } from "./CadetDetailView";
 import { CadetsListView } from "./CadetsListView";
 
@@ -477,6 +477,115 @@ describe("the team role on a cadet's page", () => {
 
   it("has no accessibility violations", async () => {
     const { container } = renderRole({ role: "staff", assignable: ["staff", "organizer", "admin"] });
+    expect((await axe(container)).violations).toEqual([]);
+  });
+});
+
+describe("the speaker link on a cadet's page", () => {
+  const ok = { ok: true as const };
+  const ts = t.speaker;
+
+  function renderSpeaker(speaker: Partial<CadetSpeakerControls> = {}, extra: Partial<Parameters<typeof CadetDetailView>[0]> = {}) {
+    const link = vi.fn<CadetSpeakerControls["link"]>(async () => ok);
+    const unlink = vi.fn<CadetSpeakerControls["unlink"]>(async () => ok);
+    const controls: CadetSpeakerControls = { linked: null, available: [{ id: "ana", name: "Ana Torres" }, { id: "luis", name: "Luis Eduardo" }], link, unlink, ...speaker };
+    const view = render(
+      <CadetDetailView
+        cadet={CADET}
+        squads={[]}
+        rename={vi.fn<RenameCadetAction>(async () => ok)}
+        changeSquad={vi.fn<ChangeCadetSquadAction>(async () => ok)}
+        changeTicket={vi.fn<ChangeCadetTicketAction>(async () => ok)}
+        ban={vi.fn<BanCadetAction>(async () => ok)}
+        unban={vi.fn<UnbanCadetAction>(async () => ok)}
+        remove={vi.fn<DeleteCadetAction>(async () => ({ ok: true, alias: "Nova" }))}
+        speaker={controls}
+        canDelete={false}
+        canEdit
+        isSelf={false}
+        listHref="/admin/cadetes"
+        {...extra}
+      />,
+    );
+    return { ...view, link, unlink, user: userEvent.setup() };
+  }
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("says the cadet is no speaker and links the one chosen, after asking, with their account's uid", async () => {
+    const { link, user } = renderSpeaker();
+    expect(screen.getByText(ts.none)).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(ts.label), "luis");
+    await user.click(screen.getByRole("button", { name: ts.link }));
+    expect(await screen.findByRole("dialog", { name: "¿Vincular a Nova con Luis Eduardo?" })).toBeInTheDocument();
+    await answerConfirm("confirm");
+
+    await waitFor(() => expect(link).toHaveBeenCalledWith({ speakerId: "luis", uid: "cadet-0001" }));
+    expect(await screen.findByText("Nova ahora es Luis Eduardo.")).toBeInTheDocument();
+    expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("links nothing when the person backs out of the question", async () => {
+    const { link, user } = renderSpeaker();
+
+    await user.click(screen.getByRole("button", { name: ts.link }));
+    await answerConfirm("cancel");
+
+    expect(link).not.toHaveBeenCalled();
+  });
+
+  it("shows the speaker they are linked to, and unlinks after asking", async () => {
+    const { unlink, user } = renderSpeaker({ linked: { id: "ana", name: "Ana Torres", active: true } });
+
+    expect(screen.getByText("Vinculado a Ana Torres")).toBeInTheDocument();
+    expect(screen.queryByLabelText(ts.label)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: ts.unlink }));
+    expect(await screen.findByRole("dialog", { name: "¿Desvincular a Nova de Ana Torres?" })).toBeInTheDocument();
+    await answerConfirm("confirm");
+
+    await waitFor(() => expect(unlink).toHaveBeenCalledWith({ speakerId: "ana" }));
+    expect(await screen.findByText("Nova ya no está vinculado a Ana Torres.")).toBeInTheDocument();
+  });
+
+  it("says when the speaker they are linked to is switched off", () => {
+    renderSpeaker({ linked: { id: "ana", name: "Ana Torres", active: false } });
+
+    expect(screen.getByText("Vinculado a Ana Torres (el speaker está desactivado)")).toBeInTheDocument();
+  });
+
+  it("explains there is nobody to link when every active speaker already has an account", () => {
+    renderSpeaker({ available: [] });
+
+    expect(screen.getByText(ts.noneAvailable)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: ts.link })).not.toBeInTheDocument();
+  });
+
+  it("shows the Speakers screen's wording for a refusal, and the generic one for a code it does not know", async () => {
+    const { user, link } = renderSpeaker();
+    link.mockResolvedValueOnce({ ok: false, code: "taken" });
+    await user.click(screen.getByRole("button", { name: ts.link }));
+    await answerConfirm("confirm");
+    expect(await screen.findByText(copy.admin.speakers.access.errors.taken)).toBeInTheDocument();
+
+    link.mockResolvedValueOnce({ ok: false, code: "something-new" });
+    await user.click(screen.getByRole("button", { name: ts.link }));
+    await answerConfirm("confirm");
+    expect(await screen.findByText(copy.admin.speakers.access.errors.unknown)).toBeInTheDocument();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it("is not there without the speaker controls, nor for a page that is only shown", () => {
+    const first = renderSpeaker({}, { speaker: undefined });
+    expect(screen.queryByRole("heading", { name: ts.title })).not.toBeInTheDocument();
+    first.unmount();
+
+    renderSpeaker({}, { canEdit: false });
+    expect(screen.queryByRole("heading", { name: ts.title })).not.toBeInTheDocument();
+  });
+
+  it("has no accessibility violations", async () => {
+    const { container } = renderSpeaker({ linked: { id: "ana", name: "Ana Torres", active: true } });
     expect((await axe(container)).violations).toEqual([]);
   });
 });
