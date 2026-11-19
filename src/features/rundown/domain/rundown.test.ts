@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRundown, cueFromPath, googleSlidesCueFromLink, googleSlidesEmbedUrl, googleSlidesPdfUrl, isFileCue, isMediaPath, kindOfPath, moveCue, nameFromPath, parseCue, parseCues, parseGoogleSlidesLink, qrCueId, queueOf } from "./rundown";
+import { buildRundown, cueFromPath, isMinutes, isSeconds, mergeAgenda, parseExtraPoint, parseExtraPoints, googleSlidesCueFromLink, googleSlidesEmbedUrl, googleSlidesPdfUrl, isFileCue, isMediaPath, kindOfPath, moveCue, nameFromPath, parseCue, parseCues, parseGoogleSlidesLink, qrCueId, queueOf } from "./rundown";
 
 const SLIDES = { id: "cue-0001", kind: "slides", name: "Keynote", path: "apertura/keynote.pdf" } as const;
 
@@ -159,5 +159,55 @@ describe("buildRundown and queueOf", () => {
     const items = buildRundown(agenda, {}, new Set(["keynote"]));
 
     expect(items[1].cues).toEqual([]);
+  });
+});
+
+describe("time on the pieces", () => {
+  const slides = { id: "cue-0001", kind: "slides", name: "Deck", path: "a/deck.pdf" };
+
+  it("keeps the seconds a piece stays on the air, between 1 second and an hour, and only when it has them", () => {
+    expect(parseCue({ ...slides, seconds: 15 })).toEqual({ ...slides, seconds: 15 });
+    expect(parseCue(slides)).toEqual(slides);
+    expect(parseCue({ id: "cue-0009", kind: "gslides", name: "G", deckId: "1AbCdEfGhIjKlMnOpQrStUvWxYz0123456789", published: false, seconds: 30 })).toMatchObject({ seconds: 30 });
+    for (const seconds of [0, -1, 3601, 1.5, "10", null]) expect(parseCue({ ...slides, seconds })).toBeNull();
+  });
+
+  it("tells whole seconds and minutes from anything else", () => {
+    expect([isSeconds(1), isSeconds(3600), isSeconds(0), isSeconds(3601), isSeconds(2.5)]).toEqual([true, true, false, false, false]);
+    expect([isMinutes(1), isMinutes(600), isMinutes(0), isMinutes(601), isMinutes("5")]).toEqual([true, true, false, false, false]);
+  });
+});
+
+describe("points made in the console", () => {
+  const cafe = { id: "cafe", title: "Café", who: "", time: "10:40" };
+
+  it("reads a point, trimming its text, and refuses a bad id, an empty or long title and a time that is not a clock", () => {
+    expect(parseExtraPoint({ id: "cafe", title: "  Café ", time: "10:40" })).toEqual(cafe);
+    expect(parseExtraPoint({ id: "bienvenida", title: "Bienvenida", who: "GDG", time: "" })).toEqual({ id: "bienvenida", title: "Bienvenida", who: "GDG", time: "" });
+    for (const bad of [null, "x", { id: "A", title: "x" }, { id: "c", title: "x" }, { id: "cafe", title: "  " }, { id: "cafe", title: "x".repeat(81) }, { id: "cafe", title: "x", time: "9:5" }, { id: "cafe", title: "x", time: "24:00" }, { id: "cafe", title: "x", who: 3 }]) {
+      expect(parseExtraPoint(bad)).toBeNull();
+    }
+  });
+
+  it("reads a list of up to 40, none repeating an id", () => {
+    expect(parseExtraPoints([cafe])).toEqual([cafe]);
+    expect(parseExtraPoints([cafe, cafe])).toBeNull();
+    expect(parseExtraPoints(Array.from({ length: 41 }, (_, index) => ({ ...cafe, id: `punto-${index}` })))).toBeNull();
+    expect(parseExtraPoints("x")).toBeNull();
+  });
+
+  it("puts them in the agenda where their time falls, the ones with no time last, and carries the minutes planned", () => {
+    const talks = [
+      { id: "keynote", time: "09:00", title: "Keynote", who: "GDG" },
+      { id: "genkit", time: "11:00", title: "Genkit", who: "Luis" },
+    ];
+    const extras = [cafe, { id: "cierre", title: "Cierre", who: "", time: "" }, { id: "bienvenida", title: "Bienvenida", who: "", time: "08:30" }];
+
+    const merged = mergeAgenda(talks, extras, { keynote: 20, cafe: 15 });
+    expect(merged.map((point) => point.id)).toEqual(["bienvenida", "keynote", "cafe", "genkit", "cierre"]);
+    expect(merged.find((point) => point.id === "cafe")).toMatchObject({ custom: true, minutes: 15 });
+    expect(merged.find((point) => point.id === "keynote")).toMatchObject({ minutes: 20 });
+    expect(merged.find((point) => point.id === "keynote")?.custom).toBeUndefined();
+    expect(merged.find((point) => point.id === "genkit")?.minutes).toBeUndefined();
   });
 });
