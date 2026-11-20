@@ -52,6 +52,8 @@ export const ROUTES = {
   adminQr: "/admin/qr",
   adminTalks: "/admin/charlas",
   adminCheckpoints: "/admin/puestos",
+  /** Where an admin scans cadets' passes at one puesto (`/admin/puestos/escanear/{checkpointId}`). Admin only. */
+  adminCheckpointScan: "/admin/puestos/escanear",
   adminSquads: "/admin/escuadrones",
   adminMissions: "/admin/misiones",
   /** The edition's zones (the code calls them quadrants): themes of the missions and areas of the venue. */

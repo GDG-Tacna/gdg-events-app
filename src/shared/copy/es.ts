@@ -784,7 +784,9 @@ export const copy = {
     entranceQrBack: "Volver a los puestos",
     /** How many cadets a station has scanned. Placeholder: {count}. */
     servedCount: { entrance: "{count} ingresos", catering: "{count} raciones entregadas", stand: "{count} visitas" },
-    serve: "Escanear aquí",
+    serve: "Escanear cadetes",
+    /** The name of each puesto card's «⋯» menu button; the puesto's name follows it. */
+    moreActions: "Más acciones",
     back: "Cambiar de puesto",
     counterLabel: { entrance: "Ingresos", catering: "Raciones entregadas", stand: "Visitas" },
     hint: "Pídele al cadete que abra su QR y escanéalo.",
@@ -2428,6 +2430,17 @@ export const copy = {
       showQr: "Mostrar QR de ingreso",
       /** A stand's code, on the stand's tablet for cadets to scan. */
       showStandQr: "Mostrar QR del stand",
+      /** The main button of an open puesto: opens its scanner, to scan cadets' passes from the admin panel. */
+      scan: "Escanear cadetes",
+      /** The main button of a closed puesto: a closed one accepts no scans until it is opened. */
+      openAction: "Abrir puesto",
+      /** The menu entry that closes an open puesto. */
+      closeAction: "Cerrar puesto",
+      /** The name of each puesto's «⋯» menu button; the puesto's name follows it. */
+      moreActions: "Más acciones",
+      closedHint: "Cerrado: no acepta escaneos hasta que lo abras.",
+      /** The scanner's back button when it was opened from Puestos. */
+      scanBack: "Volver a Puestos",
       /** Placeholder: {name}. */
       confirmDeleteTitle: "¿Eliminar el puesto «{name}»?",
       confirmDelete: "Se borra para siempre. Solo se puede si nadie hizo check-in allí y ninguna misión lo usa.",

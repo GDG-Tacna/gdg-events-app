@@ -46,7 +46,7 @@ export { PixelShip, type PixelShipProps } from "./pixel/PixelShip";
 export { PixelSprite, type PixelSpriteProps } from "./pixel/PixelSprite";
 export { PixelStar, type PixelStarProps } from "./pixel/PixelStar";
 export { TerminalCard, type TerminalCardProps } from "./TerminalCard";
-export { ActionMenu, type ActionMenuProps } from "./ActionMenu";
+export { ActionMenu, type ActionMenuItem, type ActionMenuProps } from "./ActionMenu";
 export { RouteModal, type RouteModalProps } from "./RouteModal";
 export { FormDialog, type FormDialogProps } from "./FormDialog";
 export { ConfirmDialog, useConfirm, type ConfirmDialogProps, type ConfirmOptions } from "./ConfirmDialog";

@@ -4,7 +4,7 @@ import { ServeScreenBound } from "@/app-shell/ServeScreenBound";
 import { serveDeps } from "@/app-shell/composition/checkpoints.server";
 import { staffCheckpoints, staffStations } from "@/app-shell/permissions.server";
 import { requireRole } from "@/app-shell/guards";
-import { getServePoint } from "@/features/checkpoints/server";
+import { getServePoint, listServePoints } from "@/features/checkpoints/server";
 import { copy } from "@/shared/copy/es";
 import { ScreenEnter } from "@/shared/ui";
 
@@ -14,16 +14,27 @@ export default async function StaffServePage({ params }: PageProps<"/staff/serve
   const session = await requireRole(["staff"]);
   const { checkpointId } = await params;
 
-  const point = await getServePoint(serveDeps, { uid: session.uid, role: session.role, kinds: session.role === "staff" ? await staffStations() : undefined, checkpointIds: await staffCheckpoints(session) }, checkpointId);
+  const actor = { uid: session.uid, role: session.role, kinds: session.role === "staff" ? await staffStations() : undefined, checkpointIds: await staffCheckpoints(session) };
+  const point = await getServePoint(serveDeps, actor, checkpointId);
   if (!point.ok) {
     // Unknown, closed or non-station checkpoints are simply not found; a failed read is a real error.
     if (point.error.code === "unknown") throw new Error("Could not read the serving point");
     notFound();
   }
+  // The row that switches between the puestos this person may operate; the list only decorates, so a failed read just hides the row.
+  const open = await listServePoints(serveDeps, actor);
 
   return (
     <ScreenEnter>
-      <ServeScreenBound checkpointId={point.value.id} kind={point.value.kind} name={point.value.name} description={point.value.description} image={point.value.image} initialCount={point.value.servedCount} />
+      <ServeScreenBound
+        checkpointId={point.value.id}
+        kind={point.value.kind}
+        name={point.value.name}
+        description={point.value.description}
+        image={point.value.image}
+        initialCount={point.value.servedCount}
+        stations={open.ok ? open.value.map(({ id, name }) => ({ id, name })) : undefined}
+      />
     </ScreenEnter>
   );
 }

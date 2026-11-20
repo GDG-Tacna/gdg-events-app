@@ -7,7 +7,8 @@ import { requireRole } from "@/app-shell/guards";
 import { uploadImageAction } from "@/app-shell/media/upload.action";
 import { CheckpointsAdminView, type CheckpointLockReason } from "@/features/checkpoints";
 import { getEditionLadder } from "@/features/attendee/server";
-import { listCheckpoints, listIdentityLocks } from "@/features/checkpoints/server";
+import { listCheckpoints, listIdentityLocks, listServePoints } from "@/features/checkpoints/server";
+import { serveDeps } from "@/app-shell/composition/checkpoints.server";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { rankName } from "@/shared/copy/rank-name";
@@ -33,6 +34,10 @@ export default async function AdminCheckpointsPage() {
   const locks: Record<string, CheckpointLockReason | null> = {};
   for (const checkpoint of stations) locks[checkpoint.id] = identity.value[checkpoint.id] ?? (canDelete ? null : "edition-locked");
 
+  // How many cadets each open puesto has scanned, for its card. The count only decorates: a failed read shows none instead of failing the page.
+  const served = await listServePoints(serveDeps, actor);
+  const counts = served.ok ? Object.fromEntries(served.value.map((point) => [point.id, point.servedCount])) : undefined;
+
   return (
     <ScreenEnter>
       <CheckpointsAdminView
@@ -44,6 +49,8 @@ export default async function AdminCheckpointsPage() {
         upload={uploadImageAction}
         locks={locks}
         qrBase={ROUTES.adminQr}
+        scanBase={ROUTES.adminCheckpointScan}
+        counts={counts}
         canDelete={canDelete}
         levels={ladder.map((rank) => ({ level: rank.level, name: rankName(rank.id, rank.level, rank.name) }))}
       />

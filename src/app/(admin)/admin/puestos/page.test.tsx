@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/composition/checkpoint-admin.server", () => ({ checkpointAdminDeps: { marker: "deps" } }));
+vi.mock("@/app-shell/composition/checkpoints.server", () => ({ serveDeps: { marker: "serve" } }));
 const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));
 vi.mock("@/app-shell/deletion.server", () => deletion);
 vi.mock("@/app-shell/checkpoints/manage.actions", () => ({
@@ -19,7 +20,7 @@ vi.mock("@/features/attendee/server", () => attendeeServer);
 const guards = { requireRole: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
-const server = { listCheckpoints: vi.fn(), listIdentityLocks: vi.fn() };
+const server = { listCheckpoints: vi.fn(), listIdentityLocks: vi.fn(), listServePoints: vi.fn() };
 vi.mock("@/features/checkpoints/server", () => server);
 
 const { CheckpointsAdminView } = await import("@/features/checkpoints");
@@ -50,6 +51,7 @@ describe("admin checkpoints page", () => {
     deletion.mayDeleteItems.mockResolvedValue(true);
     server.listCheckpoints.mockResolvedValue({ ok: true, value: LIST });
     server.listIdentityLocks.mockResolvedValue({ ok: true, value: { "lunch-1": null } });
+    server.listServePoints.mockResolvedValue({ ok: true, value: [{ id: "lunch-1", kind: "catering", name: "Almuerzo", description: "", image: null, servedCount: 61 }] });
     attendeeServer.getEditionLadder.mockResolvedValue([
       { id: "recruit", minXp: 0, level: 1 },
       { id: "cadete-pro", minXp: 80, level: 2, name: "Cadete Pro" },
@@ -85,8 +87,19 @@ describe("admin checkpoints page", () => {
       { level: 1, name: "Recluta" },
       { level: 2, name: "Cadete Pro" },
     ]);
-    // No codes to link: staff scan the cadet's QR at the stations.
+    // The scanner of each puesto lives under its own route.
+    expect(view?.props.scanBase).toBe("/admin/puestos/escanear");
     expect(view?.props).not.toHaveProperty("hrefs");
+  });
+
+  it("hands the view how many cadets each open puesto has scanned, and none when they cannot be read", async () => {
+    const view = findElement(await AdminCheckpointsPage(), CheckpointsAdminView);
+    expect(server.listServePoints).toHaveBeenCalledWith({ marker: "serve" }, { uid: "a1", role: "admin" });
+    expect(view?.props.counts).toEqual({ "lunch-1": 61 });
+
+    server.listServePoints.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+    const withoutCounts = findElement(await AdminCheckpointsPage(), CheckpointsAdminView);
+    expect(withoutCounts?.props.counts).toBeUndefined();
   });
 
   it("hides the delete buttons from a session that may not delete in this edition, and locks every kind and id there", async () => {

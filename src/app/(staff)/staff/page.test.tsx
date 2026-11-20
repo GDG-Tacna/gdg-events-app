@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
@@ -16,6 +17,9 @@ const server = { listServePoints: vi.fn() };
 vi.mock("@/features/checkpoints/server", () => server);
 
 const { default: StaffHomePage } = await import("./page");
+
+/** Opens a puesto's «⋯» menu. */
+const openMenu = (puesto: string) => userEvent.click(screen.getByRole("button", { name: `${copy.staff.moreActions}: ${puesto}` }));
 
 describe("staff home page", () => {
   beforeEach(() => {
@@ -57,21 +61,29 @@ describe("staff home page", () => {
     // The ticket change has no card of its own while an entrance is open: it is a button inside the entrance's card.
     expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([copy.staff.kinds.entrance, copy.staff.kinds.catering, copy.staff.kinds.stand]);
     const catering = screen.getByRole("region", { name: copy.staff.kinds.catering });
-    expect(within(catering).getByText("120 raciones entregadas")).toBeInTheDocument();
+    expect(within(catering).getByText("120")).toBeInTheDocument();
     // A count that could not be read is left out instead of showing a made-up number.
-    expect(within(catering).getAllByText(/raciones entregadas/)).toHaveLength(1);
-    expect(within(screen.getByRole("region", { name: copy.staff.kinds.entrance })).getByText("80 ingresos")).toBeInTheDocument();
-    expect(within(screen.getByRole("region", { name: copy.staff.kinds.stand })).getByText("12 visitas")).toBeInTheDocument();
+    expect(within(catering).getAllByText(copy.staff.counterLabel.catering)).toHaveLength(1);
+    expect(within(screen.getByRole("region", { name: copy.staff.kinds.entrance })).getByText("80")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: copy.staff.kinds.entrance })).getByText(copy.staff.counterLabel.entrance)).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: copy.staff.kinds.stand })).getByText("12")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: copy.staff.kinds.stand })).getByText(copy.staff.counterLabel.stand)).toBeInTheDocument();
   });
 
-  it("offers the code for a screen on the entrances and the stands, each with its own label, never on a meal", async () => {
+  it("puts the code for a screen in the menu of the entrances and the stands, each with its own label, and gives a meal no menu", async () => {
     render(await StaffHomePage());
 
-    const door = screen.getAllByRole("link", { name: copy.staff.showEntranceQr });
-    expect(door.map((link) => link.getAttribute("href"))).toEqual(["/staff/qr/entrance-main"]);
-    const stand = screen.getAllByRole("link", { name: copy.staff.showStandQr });
-    expect(stand.map((link) => link.getAttribute("href"))).toEqual(["/staff/qr/stand-cloud"]);
-    expect(within(screen.getByRole("region", { name: copy.staff.kinds.catering })).queryByRole("link", { name: /QR/ })).not.toBeInTheDocument();
+    await openMenu("Entrada principal");
+    expect(await screen.findByRole("menuitem", { name: copy.staff.showEntranceQr })).toHaveAttribute("href", "/staff/qr/entrance-main");
+    await userEvent.keyboard("{Escape}");
+
+    await openMenu("Stand Cloud");
+    expect(await screen.findByRole("menuitem", { name: copy.staff.showStandQr })).toHaveAttribute("href", "/staff/qr/stand-cloud");
+    await userEvent.keyboard("{Escape}");
+
+    // A meal has nothing but its scanner: no code on a screen and no ticket change.
+    expect(screen.queryByRole("button", { name: `${copy.staff.moreActions}: Almuerzo` })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: `${copy.staff.moreActions}: Coffee break` })).not.toBeInTheDocument();
   });
 
   it("lists the stations with the ones an admin limited the staff member to", async () => {
@@ -91,13 +103,13 @@ describe("staff home page", () => {
     expect(screen.getByRole("link", { name: copy.staff.tickets.card.title })).toHaveAttribute("href", "/staff/entradas");
   });
 
-  it("puts «Cambiar entrada» inside the check-in card, and not in a card of its own, while an entrance is open", async () => {
+  it("puts «Cambiar entrada» in the check-in card's menu, and not in a card of its own, while an entrance is open", async () => {
     render(await StaffHomePage());
 
-    const entrance = screen.getByRole("region", { name: copy.staff.kinds.entrance });
-    expect(within(entrance).getByRole("link", { name: copy.staff.tickets.card.title })).toHaveAttribute("href", "/staff/entradas");
-    expect(screen.getAllByRole("link", { name: copy.staff.tickets.card.title })).toHaveLength(1);
+    await openMenu("Entrada principal");
+    expect(await screen.findByRole("menuitem", { name: copy.staff.tickets.card.title })).toHaveAttribute("href", "/staff/entradas");
     expect(screen.queryByRole("heading", { level: 2, name: copy.staff.tickets.card.title })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: copy.staff.tickets.card.title })).not.toBeInTheDocument();
   });
 
   it("gives every open entrance its own «Cambiar entrada» button, all to the same screen", async () => {
@@ -111,8 +123,11 @@ describe("staff home page", () => {
 
     render(await StaffHomePage());
 
-    const links = screen.getAllByRole("link", { name: copy.staff.tickets.card.title });
-    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/staff/entradas", "/staff/entradas"]);
+    for (const door of ["Puerta A", "Puerta B"]) {
+      await openMenu(door);
+      expect(await screen.findByRole("menuitem", { name: copy.staff.tickets.card.title })).toHaveAttribute("href", "/staff/entradas");
+      await userEvent.keyboard("{Escape}");
+    }
   });
 
   it("keeps the card at the bottom when there is no open entrance", async () => {
@@ -124,12 +139,14 @@ describe("staff home page", () => {
     expect(within(screen.getByRole("region", { name: copy.staff.kinds.catering })).queryByRole("link", { name: copy.staff.tickets.card.title })).not.toBeInTheDocument();
   });
 
-  it("leaves «Cambiar entrada» out of the entrance's card for staff an organizer limited to no station", async () => {
+  it("leaves «Cambiar entrada» out of the entrance's menu for staff an organizer limited to no station", async () => {
     permissions.staffCheckpoints.mockResolvedValue([]);
 
     render(await StaffHomePage());
 
-    expect(screen.queryByRole("link", { name: copy.staff.tickets.card.title })).not.toBeInTheDocument();
+    await openMenu("Entrada principal");
+    expect(await screen.findByRole("menuitem", { name: copy.staff.showEntranceQr })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: copy.staff.tickets.card.title })).not.toBeInTheDocument();
   });
 
   it("leaves the card out for staff an organizer limited to no station, who cannot change tickets either", async () => {

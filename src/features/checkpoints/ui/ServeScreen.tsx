@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ScanReticle, useScanSession, type QrCamera } from "@/features/scanner";
 import { ticketName, type TicketType } from "@/features/tickets";
@@ -28,8 +29,14 @@ export interface ServeScreenProps {
   initialCount: number | null;
   /** Where "Cambiar de puesto" goes. */
   backHref: string;
+  /** The back button's text ("Cambiar de puesto" when absent). */
+  backLabel?: string;
   /** Where "Cambiar entrada" goes (staff change a cadet's ticket there). Absent hides the link. */
   changeTicketHref?: string;
+  /** The open puestos this person may operate, for the row that switches between them. Fewer than two hides the row. */
+  stations?: readonly { id: string; name: string }[];
+  /** Where each station's scanner lives (`${stationBase}/${id}`). Needed for the row to show. A plain path: a client component cannot receive functions from a server page. */
+  stationBase?: string;
 }
 
 const FAILED: ServeActionResult = { ok: false, code: "unknown" };
@@ -63,7 +70,7 @@ const VERDICT_CLASSES: Record<Verdict, string> = {
  * lists the missions it completed, to tell the cadet. It clears by itself after a moment or on a tap, and the
  * station's count stays on top. The server decides everything.
  */
-export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, description, image, initialCount, backHref, changeTicketHref }: ServeScreenProps) {
+export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, description, image, initialCount, backHref, backLabel, changeTicketHref, stations, stationBase }: ServeScreenProps) {
   const [count, setCount] = useState(initialCount);
 
   const submit = useCallback(
@@ -97,6 +104,23 @@ export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, d
 
   return (
     <div className="gap-space-4 mx-auto flex w-full max-w-[520px] flex-col">
+      {stationBase && stations && stations.length > 1 ? (
+        <nav aria-label={copy.staff.listLabel} className="gap-space-2 -mx-space-1 px-space-1 flex overflow-x-auto pb-1">
+          {stations.map((station) => (
+            <Link
+              key={station.id}
+              href={`${stationBase}/${station.id}`}
+              aria-current={station.id === checkpointId ? "page" : undefined}
+              className={cn(
+                "type-label border-ink px-space-4 focus-visible:ring-ring inline-flex h-10 shrink-0 items-center rounded-full border-2 whitespace-nowrap focus-visible:ring-[3px] focus-visible:outline-none",
+                station.id === checkpointId ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-pastel-blue hover:text-on-accent",
+              )}
+            >
+              {station.name}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
       <header className="gap-space-3 flex items-end justify-between">
         <div className="gap-space-3 flex min-w-0 items-center">
           {image ? <Thumbnail url={image} size={48} /> : null}
@@ -143,7 +167,7 @@ export function ServeScreen({ camera: Camera, serve, checkpointId, kind, name, d
       )}
 
       <ButtonLink href={backHref} variant="ghost">
-        {copy.staff.back}
+        {backLabel ?? copy.staff.back}
       </ButtonLink>
 
       {result && verdict ? (
