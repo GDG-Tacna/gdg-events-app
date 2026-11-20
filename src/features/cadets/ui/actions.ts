@@ -53,6 +53,16 @@ export interface CadetTeamControls {
   take: TakeTeamRoleAction;
 }
 
+/** What the cadet's page needs to link them to a speaker: who they are now, who is free, and the actions. */
+export interface CadetSpeakerControls {
+  /** The speaker this account is linked to, or `null`. */
+  linked: { id: string; name: string; active: boolean } | null;
+  /** The active speakers nobody holds yet. */
+  available: ReadonlyArray<{ id: string; name: string }>;
+  link: (input: { speakerId: string; uid: string }) => Promise<{ ok: true } | { ok: false; code: string }>;
+  unlink: (input: { speakerId: string }) => Promise<{ ok: true } | { ok: false; code: string }>;
+}
+
 /** What the cadet management actions answer. The screen refreshes after a success. */
 export type CadetActionResult = { ok: true } | { ok: false; code: CadetsErrorCode };
 export type RenameCadetAction = (input: { uid: string; alias: string }) => Promise<CadetActionResult>;

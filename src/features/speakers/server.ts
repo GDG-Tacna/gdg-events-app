@@ -23,8 +23,10 @@ export {
 export {
   acceptSpeakerInvite,
   inviteSpeaker,
+  linkSpeakerAccount,
   listSpeakerAccess,
   previewSpeakerInvite,
+  speakerLinksOf,
   speakerOfAccount,
   splitSpeakerToken,
   unlinkSpeaker,

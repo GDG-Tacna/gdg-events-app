@@ -6,11 +6,12 @@ import { getSession } from "@/app-shell/guards";
 import { mayEdit } from "@/app-shell/permissions.server";
 import { runInEdition } from "@/features/event/server";
 import type { SpeakerAccessActionResult } from "@/features/speakers";
-import { acceptSpeakerInvite, inviteSpeaker, splitSpeakerToken, unlinkSpeaker, type SpeakerAccessErrorCode } from "@/features/speakers/server";
+import { acceptSpeakerInvite, inviteSpeaker, linkSpeakerAccount, splitSpeakerToken, unlinkSpeaker, type SpeakerAccessErrorCode } from "@/features/speakers/server";
 import { FEATURES } from "@/shared/config/features";
 
 const inviteSchema = z.object({ speakerId: z.string().max(60), email: z.string().max(254) });
 const speakerSchema = z.object({ speakerId: z.string().max(60) });
+const linkSchema = z.object({ speakerId: z.string().max(60), uid: z.string().min(1).max(128) });
 const tokenSchema = z.object({ token: z.string().max(220) });
 
 type Refusal = { ok: false; code: SpeakerAccessErrorCode };
@@ -36,6 +37,18 @@ export async function inviteSpeakerAction(input: { speakerId: string; email: str
   // A new link unlinks any account: the guards must stop treating it as the speaker's at once.
   if (made.ok) keptSpeakerAccess.clear();
   return made.ok ? { ok: true, path: made.value.path } : { ok: false, code: made.error.code };
+}
+
+/** Links a cadet's account to a speaker straight away (an admin picked them), with no invitation. */
+export async function linkSpeakerAccountAction(input: { speakerId: string; uid: string }): Promise<SpeakerAccessActionResult> {
+  const actor = await admin();
+  if (refused(actor)) return actor;
+  const parsed = linkSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "not-found" };
+  const done = await linkSpeakerAccount(speakerAccessDeps, actor, parsed.data);
+  // The account is a speaker now: its next screens (the guards) must know it.
+  if (done.ok) keptSpeakerAccess.clear();
+  return done.ok ? { ok: true } : { ok: false, code: done.error.code };
 }
 
 /** Takes a speaker's access away: their link stops working and their account no longer gets their code. */

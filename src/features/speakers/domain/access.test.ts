@@ -4,9 +4,11 @@ import {
   SPEAKER_INVITE_TTL_MS,
   acceptSpeakerInvite,
   inviteSpeaker,
+  linkSpeakerAccount,
   listSpeakerAccess,
   maskSpeakerEmail,
   previewSpeakerInvite,
+  speakerLinksOf,
   speakerOfAccount,
   splitSpeakerToken,
   unlinkSpeaker,
@@ -38,6 +40,13 @@ function setup(initial: SpeakerAccessRow[]) {
         const found = rows.get(id);
         if (!found?.invite || found.invite.hash !== hash || found.invite.acceptedAt) return ok("gone" as const);
         rows.set(id, { ...found, accountUid: uid, invite: { ...found.invite, acceptedAt: at } });
+        return ok("linked" as const);
+      }),
+      link: vi.fn(async (id: string, uid: string) => {
+        const found = rows.get(id);
+        if (!found) return ok(null);
+        if (found.accountUid && found.accountUid !== uid) return ok("taken" as const);
+        rows.set(id, { ...found, accountUid: uid, invite: null });
         return ok("linked" as const);
       }),
       unlink: vi.fn(async (id: string) => {
@@ -156,5 +165,61 @@ describe("speaker access for the screens", () => {
     expect(t.deps.audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "speaker.unlinked" }));
     expect(await unlinkSpeaker(t.deps, ADMIN, { speakerId: "ghost" })).toEqual(err({ code: "not-found" }));
     expect(await unlinkSpeaker(t.deps, { uid: "u", role: "attendee" }, { speakerId: "ana" })).toEqual(err({ code: "forbidden" }));
+  });
+});
+
+describe("linkSpeakerAccount", () => {
+  it("links an account to an active speaker with no invitation, drops the old invitation and audits who did it", async () => {
+    const { deps, rows } = setup([row("ana", { invite: invite() })]);
+
+    expect(await linkSpeakerAccount(deps, ADMIN, { speakerId: "ana", uid: "u-nova" })).toEqual(ok(undefined));
+    expect(rows.get("ana")).toMatchObject({ accountUid: "u-nova", invite: null });
+    expect(deps.audit.append).toHaveBeenCalledWith({ action: "speaker.linked", actorUid: "admin-1", targetUid: "ana", details: { name: "Speaker ana", account: "u-nova", by: "admin" }, at: NOW });
+  });
+
+  it("does nothing, and writes no audit, when the account is already that speaker's", async () => {
+    const { deps } = setup([row("ana", { accountUid: "u-nova" })]);
+
+    expect(await linkSpeakerAccount(deps, ADMIN, { speakerId: "ana", uid: "u-nova" })).toEqual(ok(undefined));
+    expect(deps.access.link).not.toHaveBeenCalled();
+    expect(deps.audit.append).not.toHaveBeenCalled();
+  });
+
+  it("refuses a speaker that has another account, an account that is another speaker's, an inactive or unknown speaker, and anyone but an admin", async () => {
+    const { deps } = setup([row("ana", { accountUid: "u-other" }), row("luis", { accountUid: "u-nova" }), row("mia", { active: false }), row("eva")]);
+
+    expect(await linkSpeakerAccount(deps, ADMIN, { speakerId: "ana", uid: "u-new" })).toEqual(err({ code: "taken" }));
+    expect(await linkSpeakerAccount(deps, ADMIN, { speakerId: "eva", uid: "u-nova" })).toEqual(err({ code: "already-linked" }));
+    expect(await linkSpeakerAccount(deps, ADMIN, { speakerId: "mia", uid: "u-new" })).toEqual(err({ code: "inactive" }));
+    expect(await linkSpeakerAccount(deps, ADMIN, { speakerId: "ghost", uid: "u-new" })).toEqual(err({ code: "not-found" }));
+    expect(await linkSpeakerAccount(deps, { uid: "s", role: "staff" }, { speakerId: "eva", uid: "u-new" })).toEqual(err({ code: "forbidden" }));
+    expect(deps.audit.append).not.toHaveBeenCalled();
+  });
+
+  it("reports a store that fails, or that loses the speaker between the read and the write", async () => {
+    const { deps } = setup([row("ana")]);
+    deps.access.rows.mockResolvedValueOnce(err({ code: "down" }) as never);
+    expect(await linkSpeakerAccount(deps, ADMIN, { speakerId: "ana", uid: "u1" })).toEqual(err({ code: "unknown" }));
+
+    deps.access.link.mockResolvedValueOnce(err({ code: "down" }) as never);
+    expect(await linkSpeakerAccount(deps, ADMIN, { speakerId: "ana", uid: "u1" })).toEqual(err({ code: "unknown" }));
+    deps.access.link.mockResolvedValueOnce(ok(null) as never);
+    expect(await linkSpeakerAccount(deps, ADMIN, { speakerId: "ana", uid: "u1" })).toEqual(err({ code: "not-found" }));
+  });
+});
+
+describe("speakerLinksOf", () => {
+  it("gives the speaker the account is linked to and the active speakers nobody holds, by name", async () => {
+    const { deps } = setup([row("b", { name: "Beto" }), row("a", { name: "Ana" }), row("c", { name: "Cora", accountUid: "u-nova" }), row("d", { name: "Dani", active: false }), row("e", { name: "Eli", accountUid: "u-other" })]);
+
+    expect(await speakerLinksOf(deps, { role: "admin" }, "u-nova")).toEqual(ok({ linked: { id: "c", name: "Cora", active: true }, available: [{ id: "a", name: "Ana" }, { id: "b", name: "Beto" }] }));
+    expect(await speakerLinksOf(deps, { role: "admin" }, "u-free")).toMatchObject({ value: { linked: null } });
+  });
+
+  it("is only for an admin, and reports a failed read", async () => {
+    const { deps } = setup([row("a")]);
+    expect(await speakerLinksOf(deps, { role: "staff" }, "u1")).toEqual(err({ code: "forbidden" }));
+    deps.access.rows.mockResolvedValueOnce(err({ code: "down" }) as never);
+    expect(await speakerLinksOf(deps, { role: "admin" }, "u1")).toEqual(err({ code: "unknown" }));
   });
 });

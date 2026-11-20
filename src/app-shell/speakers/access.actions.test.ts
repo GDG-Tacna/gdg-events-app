@@ -10,7 +10,7 @@ vi.mock("@/app-shell/guards", () => guards);
 const event = vi.hoisted(() => ({ runInEdition: vi.fn(async (_eventId: string, work: () => Promise<unknown>) => work()) }));
 vi.mock("@/features/event/server", () => event);
 
-const server = vi.hoisted(() => ({ inviteSpeaker: vi.fn(), unlinkSpeaker: vi.fn(), acceptSpeakerInvite: vi.fn(), splitSpeakerToken: vi.fn() }));
+const server = vi.hoisted(() => ({ inviteSpeaker: vi.fn(), linkSpeakerAccount: vi.fn(), unlinkSpeaker: vi.fn(), acceptSpeakerInvite: vi.fn(), splitSpeakerToken: vi.fn() }));
 vi.mock("@/features/speakers/server", async (importOriginal) => ({
   ...server,
   splitSpeakerToken: (await importOriginal<typeof import("@/features/speakers/server")>()).splitSpeakerToken,
@@ -19,7 +19,7 @@ vi.mock("@/features/speakers/server", async (importOriginal) => ({
 const features = vi.hoisted(() => ({ FEATURES: { admin: true, checkins: true } }));
 vi.mock("@/shared/config/features", () => features);
 
-const { acceptSpeakerInviteAction, inviteSpeakerAction, unlinkSpeakerAction } = await import("./access.actions");
+const { acceptSpeakerInviteAction, inviteSpeakerAction, linkSpeakerAccountAction, unlinkSpeakerAction } = await import("./access.actions");
 
 const SECRET = "s".repeat(43);
 const session = (role: "attendee" | "staff" | "admin" | null, verifiedEmail: string | null = "ana@gmail.com") => ({ uid: "u1", role, displayName: null, photoUrl: null, verifiedEmail });
@@ -39,6 +39,26 @@ describe("speaker access actions", () => {
     expect(await inviteSpeakerAction({ speakerId: "ana", email: "ana@gmail.com" })).toEqual({ ok: true, path: "/invite/speaker/e1.x" });
     expect(server.inviteSpeaker).toHaveBeenCalledWith({ marker: "access" }, { uid: "u1", role: "admin" }, { speakerId: "ana", email: "ana@gmail.com" });
     expect(await unlinkSpeakerAction({ speakerId: "ana" })).toEqual({ ok: true });
+  });
+
+  it("link a cadet's account to a speaker for an admin, and make the guards forget what they kept", async () => {
+    server.linkSpeakerAccount.mockResolvedValue({ ok: true, value: undefined });
+
+    expect(await linkSpeakerAccountAction({ speakerId: "ana", uid: "cadet-1" })).toEqual({ ok: true });
+    expect(server.linkSpeakerAccount).toHaveBeenCalledWith({ marker: "access" }, { uid: "u1", role: "admin" }, { speakerId: "ana", uid: "cadet-1" });
+    expect(composition.keptSpeakerAccess.clear).toHaveBeenCalled();
+  });
+
+  it("refuse to link for anyone but an admin, a bad input and a refusal, passing the code through and keeping what the guards kept", async () => {
+    guards.getSession.mockResolvedValue(session("attendee"));
+    expect(await linkSpeakerAccountAction({ speakerId: "ana", uid: "cadet-1" })).toEqual({ ok: false, code: "forbidden" });
+    guards.getSession.mockResolvedValue(session("admin"));
+    expect(await linkSpeakerAccountAction({ speakerId: "ana", uid: "" })).toEqual({ ok: false, code: "not-found" });
+    expect(server.linkSpeakerAccount).not.toHaveBeenCalled();
+
+    server.linkSpeakerAccount.mockResolvedValue({ ok: false, error: { code: "taken" } });
+    expect(await linkSpeakerAccountAction({ speakerId: "ana", uid: "cadet-1" })).toEqual({ ok: false, code: "taken" });
+    expect(composition.keptSpeakerAccess.clear).not.toHaveBeenCalled();
   });
 
   it("refuse anyone but an admin, and pass a refusal's code through", async () => {

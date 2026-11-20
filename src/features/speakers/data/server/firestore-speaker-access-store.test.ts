@@ -84,6 +84,19 @@ describe("FirestoreSpeakerAccessStore", () => {
     expect(await store.claim("ana", "h1", "a2", new Date("2027-01-01"))).toEqual({ ok: true, value: "gone" });
   });
 
+  it("links an account straight away dropping the invitation, and refuses a speaker that has another account", async () => {
+    const fake = fakeFirestore({ [PATH]: { name: "Ana", invite: INVITE }, "events/e1/speakers/luis": { name: "Luis", accountUid: "u-other" } });
+    const store = new FirestoreSpeakerAccessStore(() => fake.db, testEventResolver);
+
+    expect(await store.link("ana", "u1")).toEqual({ ok: true, value: "linked" });
+    expect(fake.store.get(PATH)).toMatchObject({ accountUid: "u1", invite: null });
+    expect(await store.link("ana", "u1")).toEqual({ ok: true, value: "linked" });
+    expect(await store.link("ana", "u2")).toEqual({ ok: true, value: "taken" });
+    expect(fake.store.get(PATH)).toMatchObject({ accountUid: "u1" });
+    expect(await store.link("luis", "u1")).toEqual({ ok: true, value: "taken" });
+    expect(await store.link("ghost", "u1")).toEqual({ ok: true, value: null });
+  });
+
   it("refuses an expired invitation and unlinks", async () => {
     const fake = fakeFirestore({ [PATH]: { name: "Ana", invite: { ...INVITE, expiresAt: NOW } } });
     const store = new FirestoreSpeakerAccessStore(() => fake.db, testEventResolver);

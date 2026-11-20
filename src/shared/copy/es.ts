@@ -1023,6 +1023,7 @@ export const copy = {
           "wrong-account": "Esa cuenta no es la invitada.",
           "unverified-email": "La cuenta no tiene un correo verificado.",
           "already-linked": "Esa cuenta ya es de otro speaker.",
+          taken: "Ese speaker ya tiene otra cuenta: quítasela primero.",
           unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
           forbidden: "No tienes permiso para dar acceso a speakers.",
           disabled: "Esta sección no está disponible por ahora.",
@@ -1623,6 +1624,33 @@ export const copy = {
       deleteTitle: "Eliminar registro",
       deleteHelp: "Borra a este cadete de la edición: su perfil, su alias y todo lo que hizo (asistencias, misiones, insignias, contactos y votos), junto con el XP y los G-Credits que ganó aquí. Su cuenta se queda, así que puede registrarse de nuevo. No se puede deshacer.",
       /** Placeholder: {alias}. */
+      speaker: {
+        title: "Speaker",
+        help: "Ser speaker no es un rol del equipo: vincula esta cuenta a la ficha de un speaker y verá su código de «Conoce al speaker» en su pantalla. Sigue siendo cadete.",
+        /** Placeholder: {name}. */
+        linked: "Vinculado a {name}",
+        linkedInactive: "Vinculado a {name} (el speaker está desactivado)",
+        none: "No es speaker",
+        label: "Vincular al speaker",
+        pick: "Elige un speaker",
+        link: "Vincular",
+        linking: "Vinculando…",
+        unlink: "Desvincular",
+        unlinking: "Desvinculando…",
+        noneAvailable: "No hay speakers activos sin cuenta. Crea uno en Speakers o quita la cuenta de otro.",
+        /** Placeholders: {alias}, {name}. */
+        confirmLinkTitle: "¿Vincular a {alias} con {name}?",
+        confirmLink: "Verá el código de ese speaker en su pantalla. Puede cambiarse después.",
+        confirmLinkButton: "Sí, vincular",
+        /** Placeholders: {alias}, {name}. */
+        confirmUnlinkTitle: "¿Desvincular a {alias} de {name}?",
+        confirmUnlink: "Deja de ver el código del speaker. Sigue siendo cadete y el speaker queda sin cuenta.",
+        confirmUnlinkButton: "Sí, desvincular",
+        /** Placeholders: {alias}, {name}. */
+        linkedDone: "{alias} ahora es {name}.",
+        /** Placeholders: {alias}, {name}. */
+        unlinkedDone: "{alias} ya no está vinculado a {name}.",
+      },
       team: {
         title: "Rol en el equipo",
         help: "Una cuenta de cadete puede ayudar en el evento: dale un rol y aparece en Equipo, donde también se le puede quitar. Al quitárselo vuelve a jugar como cadete, con su XP y su avatar intactos.",
@@ -3130,6 +3158,7 @@ export const copy = {
       "wrong-account": "Entraste con otra cuenta. Usa la cuenta de Google del correo invitado.",
       "unverified-email": "Tu cuenta no tiene un correo verificado. Entra con tu cuenta de Google.",
       "already-linked": "Esta cuenta ya es de otro speaker del evento.",
+      taken: "Este speaker ya tiene otra cuenta.",
       "invalid-email": "El enlace no es válido.",
       inactive: "Este speaker ya no está activo en el evento.",
       unauthenticated: "Entra con tu cuenta de Google.",

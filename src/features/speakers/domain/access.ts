@@ -36,6 +36,12 @@ export interface SpeakerAccessStore {
    * transaction). Accepting again with the same account is fine.
    */
   claim(speakerId: string, hash: string, uid: string, at: Date): Promise<Result<"linked" | "gone", { code: string }>>;
+  /**
+   * Links the account straight away, with no invitation (an admin picked it): it drops any invitation, since the account
+   * is known. Refuses when the speaker already has another account (`"taken"`); the same account again is fine. `null`
+   * when there is no such speaker. One transaction, so two admins cannot both win.
+   */
+  link(speakerId: string, uid: string): Promise<Result<"linked" | "taken" | null, { code: string }>>;
   /** Drops the linked account and the invitation. False when there is no such speaker. */
   unlink(speakerId: string): Promise<Result<boolean, { code: string }>>;
 }
@@ -60,6 +66,8 @@ export type SpeakerAccessErrorCode =
   | "wrong-account"
   | "unverified-email"
   | "already-linked"
+  /** The speaker already has another account: take it away first. */
+  | "taken"
   | "unauthenticated"
   | "forbidden"
   | "disabled"
@@ -150,6 +158,48 @@ export async function inviteSpeaker(
   if (!saved.value) return fail("not-found");
   await audit(deps, { action: "speaker.invited", actorUid: actor.uid, targetUid: speaker.speakerId, details: { name: speaker.name } });
   return ok({ path: speakerInvitePath(await deps.editionId(), secret), expiresAt });
+}
+
+/**
+ * Links an account to an active speaker without an invitation: an admin picked a cadet who is that person. An account
+ * holds one speaker per edition, and a speaker one account (take the old one away first). Everything else about the
+ * speaker's access is as if they had accepted a link.
+ */
+export async function linkSpeakerAccount(
+  deps: Pick<SpeakerAccessDeps, "access" | "audit" | "now">,
+  actor: { uid: string; role: string | null },
+  input: { speakerId: string; uid: string },
+): Promise<Result<void, { code: SpeakerAccessErrorCode }>> {
+  if (actor.role !== "admin") return fail("forbidden");
+  const rows = await deps.access.rows();
+  if (!rows.ok) return fail("unknown");
+  const speaker = rows.value.find((row) => row.speakerId === input.speakerId);
+  if (!speaker) return fail("not-found");
+  if (!speaker.active) return fail("inactive");
+  if (rows.value.some((other) => other.speakerId !== speaker.speakerId && other.accountUid === input.uid)) return fail("already-linked");
+  if (speaker.accountUid === input.uid) return ok(undefined);
+  const linked = await deps.access.link(speaker.speakerId, input.uid);
+  if (!linked.ok) return fail("unknown");
+  if (linked.value === null) return fail("not-found");
+  if (linked.value === "taken") return fail("taken");
+  await audit(deps, { action: "speaker.linked", actorUid: actor.uid, targetUid: speaker.speakerId, details: { name: speaker.name, account: input.uid, by: "admin" } });
+  return ok(undefined);
+}
+
+/** What a cadet's page needs to link a speaker: the speaker they already are, and the active ones nobody holds yet. */
+export async function speakerLinksOf(
+  deps: Pick<SpeakerAccessDeps, "access">,
+  actor: { role: string | null },
+  uid: string,
+): Promise<Result<{ linked: { id: string; name: string; active: boolean } | null; available: ReadonlyArray<{ id: string; name: string }> }, { code: SpeakerAccessErrorCode }>> {
+  if (actor.role !== "admin") return fail("forbidden");
+  const rows = await deps.access.rows();
+  if (!rows.ok) return fail("unknown");
+  const mine = rows.value.find((row) => row.accountUid === uid);
+  return ok({
+    linked: mine ? { id: mine.speakerId, name: mine.name, active: mine.active } : null,
+    available: rows.value.filter((row) => row.active && row.accountUid === null).map((row) => ({ id: row.speakerId, name: row.name })).sort((a, b) => a.name.localeCompare(b.name, "es")),
+  });
 }
 
 /** Drops a speaker's linked account and invitation: their old link stops working and only an admin shows their code. */
