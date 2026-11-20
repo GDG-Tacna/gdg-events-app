@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/composition/squads.server", () => ({ squadDeps: { marker: "deps" } }));
 
-const guards = { getSession: vi.fn() };
+const guards = { getCadetSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 const squadsServer = { assignSquad: vi.fn() };
@@ -24,35 +24,35 @@ describe("assignSquadAction", () => {
 
   it("does nothing when the squads feature is switched off", async () => {
     features.FEATURES.squads = false;
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
 
     expect(await assignSquadAction()).toEqual({ ok: false, code: "disabled" });
     expect(squadsServer.assignSquad).not.toHaveBeenCalled();
   });
 
   it("refuses an anonymous caller", async () => {
-    guards.getSession.mockResolvedValue(null);
+    guards.getCadetSession.mockResolvedValue(null);
 
     expect(await assignSquadAction()).toEqual({ ok: false, code: "unauthenticated" });
     expect(squadsServer.assignSquad).not.toHaveBeenCalled();
   });
 
   it("sends a user without a profile back to onboarding", async () => {
-    guards.getSession.mockResolvedValue(session(null));
+    guards.getCadetSession.mockResolvedValue(session(null));
 
     expect(await assignSquadAction()).toEqual({ ok: false, code: "not-registered" });
     expect(squadsServer.assignSquad).not.toHaveBeenCalled();
   });
 
   it.each(["staff", "admin"] as const)("does not assign squads to %s accounts", async (role) => {
-    guards.getSession.mockResolvedValue(session(role));
+    guards.getCadetSession.mockResolvedValue(session(role));
 
     expect(await assignSquadAction()).toEqual({ ok: false, code: "forbidden" });
     expect(squadsServer.assignSquad).not.toHaveBeenCalled();
   });
 
   it("assigns using the uid of the verified session, with no input from the client", async () => {
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     squadsServer.assignSquad.mockResolvedValue({ ok: true, value: { squad: "cloud", assigned: true } });
 
     const result = await (assignSquadAction as (...args: unknown[]) => ReturnType<typeof assignSquadAction>)("firebase", "someone-else");
@@ -62,14 +62,14 @@ describe("assignSquadAction", () => {
   });
 
   it("returns the existing squad on a repeat call", async () => {
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     squadsServer.assignSquad.mockResolvedValue({ ok: true, value: { squad: "firebase", assigned: false } });
 
     expect(await assignSquadAction()).toEqual({ ok: true, squad: "firebase", assigned: false });
   });
 
   it("passes a failure code back to the screen", async () => {
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     squadsServer.assignSquad.mockResolvedValue({ ok: false, error: { code: "unknown" } });
 
     expect(await assignSquadAction()).toEqual({ ok: false, code: "unknown" });

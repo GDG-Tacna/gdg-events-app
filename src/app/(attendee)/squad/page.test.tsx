@@ -5,7 +5,7 @@ vi.mock("@/app-shell/composition/attendee.server", () => ({ attendeeDeps: { atte
 vi.mock("@/app-shell/composition/squads.server", () => ({ squadDeps: { catalog: { marker: "catalog" } } }));
 vi.mock("@/app-shell/squads/assign-squad.action", () => ({ assignSquadAction: async () => ({ ok: true }) }));
 
-const guards = { requireRole: vi.fn() };
+const guards = { requireAttendee: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 class Redirected extends Error {
@@ -42,7 +42,7 @@ describe("SquadPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     features.FEATURES.squads = true;
-    guards.requireRole.mockResolvedValue({ uid: "u1", role: "attendee" });
+    guards.requireAttendee.mockResolvedValue({ uid: "u1", role: "attendee" });
     attendeeServer.getAttendee.mockResolvedValue(ok(ATTENDEE));
     squadsServer.listSquads.mockResolvedValue(ok([SQUAD]));
   });

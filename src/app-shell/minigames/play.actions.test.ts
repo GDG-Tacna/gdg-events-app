@@ -7,7 +7,7 @@ vi.mock("@/app-shell/composition/achievements.server", () => achievements);
 const cache = { revalidatePath: vi.fn() };
 vi.mock("next/cache", () => cache);
 
-const guards = { getSession: vi.fn() };
+const guards = { getCadetSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 const server = { startMinigame: vi.fn(), finishMinigame: vi.fn() };
@@ -26,7 +26,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   features.FEATURES.missions = true;
   features.FEATURES.minigames = true;
-  guards.getSession.mockResolvedValue(session("attendee"));
+  guards.getCadetSession.mockResolvedValue(session("attendee"));
   server.startMinigame.mockResolvedValue({ ok: true, value: { gameId: "circuits", difficulty: "normal", expiresAt: EXPIRES, codeLanguages: ["javascript"] } });
   server.finishMinigame.mockResolvedValue({ ok: true, value: { status: "won", xpBonus: 40 } });
   achievements.unlockAchievements.mockResolvedValue(BADGES);
@@ -43,11 +43,11 @@ describe.each([
     features.FEATURES.missions = false;
     expect(await run()).toEqual({ ok: false, code: "disabled" });
     features.FEATURES.missions = true;
-    guards.getSession.mockResolvedValue(null);
+    guards.getCadetSession.mockResolvedValue(null);
     expect(await run()).toEqual({ ok: false, code: "unauthenticated" });
-    guards.getSession.mockResolvedValue(session(null));
+    guards.getCadetSession.mockResolvedValue(session(null));
     expect(await run()).toEqual({ ok: false, code: "not-registered" });
-    guards.getSession.mockResolvedValue(session("staff"));
+    guards.getCadetSession.mockResolvedValue(session("staff"));
     expect(await run()).toEqual({ ok: false, code: "forbidden" });
     expect(useCase).not.toHaveBeenCalled();
   });

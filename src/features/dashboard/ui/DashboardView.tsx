@@ -35,6 +35,8 @@ export interface DashboardViewProps {
   pollSlot?: ReactNode;
   /** For a cadet who is also a speaker: the way to their speaker code, built by the app shell; at the top. */
   speakerSlot?: ReactNode;
+  /** For a team account that plays as a cadet: the way back to its team screen, built by the app shell; at the top. */
+  teamSlot?: ReactNode;
 }
 
 /**
@@ -58,6 +60,7 @@ export function DashboardView({
   installSlot,
   pollSlot,
   speakerSlot,
+  teamSlot,
 }: DashboardViewProps) {
   const t = copy.dashboard;
   return (
@@ -66,6 +69,7 @@ export function DashboardView({
 
       <div className="gap-space-5 grid min-[760px]:grid-cols-2 min-[760px]:items-start">
         <div className="gap-space-4 flex flex-col">
+          {teamSlot}
           {speakerSlot}
           {pollSlot}
           <PlayerCard overview={overview} squadSlot={squadCallout === "badge" ? squadBadge : undefined} qrHref={qrHref} networkHref={networkHref} avatarLook={avatarLook} avatarHref={avatarHref} />

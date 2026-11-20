@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { unlockAchievements } from "@/app-shell/composition/achievements.server";
 import { minigameDeps } from "@/app-shell/composition/minigames.server";
-import { getSession } from "@/app-shell/guards";
+import { getCadetSession } from "@/app-shell/guards";
 import type { FinishMinigameActionResult, StartMinigameActionResult } from "@/features/minigames";
 import { finishMinigame, startMinigame } from "@/features/minigames/server";
 import { ROUTES } from "@/shared/config/routes";
@@ -16,7 +16,7 @@ const finishSchema = z.object({ missionId: z.string().min(1).max(60), won: z.boo
 /** Flags, session and role: a Server Action is a public endpoint, so each one checks them first. */
 async function attendee(): Promise<{ ok: true; uid: string } | { ok: false; code: "disabled" | "unauthenticated" | "forbidden" | "not-registered" }> {
   if (!(await moduleOn("missions")) || !(await moduleOn("minigames"))) return { ok: false, code: "disabled" };
-  const session = await getSession();
+  const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   if (session.role !== "attendee") return { ok: false, code: session.role === null ? "not-registered" : "forbidden" };
   return { ok: true, uid: session.uid };

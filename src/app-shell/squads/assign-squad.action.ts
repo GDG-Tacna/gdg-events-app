@@ -1,6 +1,6 @@
 "use server";
 
-import { getSession } from "@/app-shell/guards";
+import { getCadetSession } from "@/app-shell/guards";
 import { squadDeps } from "@/app-shell/composition/squads.server";
 import type { AssignSquadActionResult } from "@/features/squads";
 import { assignSquad } from "@/features/squads/server";
@@ -14,7 +14,7 @@ import { moduleOn } from "@/app-shell/modules.server";
 export async function assignSquadAction(): Promise<AssignSquadActionResult> {
   if (!(await moduleOn("squads"))) return { ok: false, code: "disabled" };
 
-  const session = await getSession();
+  const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   // Squads are for attendees; a user without a profile has not finished onboarding.
   if (session.role !== "attendee") return { ok: false, code: session.role === null ? "not-registered" : "forbidden" };

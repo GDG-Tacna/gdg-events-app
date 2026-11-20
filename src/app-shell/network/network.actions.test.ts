@@ -10,7 +10,7 @@ vi.mock("@/app-shell/composition/achievements.server", () => achievements);
 const cache = { revalidatePath: vi.fn() };
 vi.mock("next/cache", () => cache);
 
-const guards = { getSession: vi.fn() };
+const guards = { getCadetSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 const server = { issueContactCode: vi.fn(), connectCadets: vi.fn(), saveContactLinks: vi.fn(), verifyContactCode: vi.fn() };
@@ -31,7 +31,7 @@ describe("network actions", () => {
     vi.resetAllMocks();
     features.FEATURES.network = true;
     features.FEATURES.missions = true;
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     achievements.unlockAchievements.mockResolvedValue([]);
     server.verifyContactCode.mockReturnValue({ ok: true, value: "uid-bruno" });
     missionsServer.completeBySquads.mockResolvedValue({ ok: true, value: [] });
@@ -46,10 +46,10 @@ describe("network actions", () => {
   it.each(calls)("%s does nothing with the network switched off, or without a session", async (_, call) => {
     features.FEATURES.network = false;
     expect(await call()).toEqual({ ok: false, code: "disabled" });
-    expect(guards.getSession).not.toHaveBeenCalled();
+    expect(guards.getCadetSession).not.toHaveBeenCalled();
 
     features.FEATURES.network = true;
-    guards.getSession.mockResolvedValue(null);
+    guards.getCadetSession.mockResolvedValue(null);
     expect(await call()).toEqual({ ok: false, code: "unauthenticated" });
   });
 

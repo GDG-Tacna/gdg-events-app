@@ -11,7 +11,7 @@ const composition = vi.hoisted(() => ({
 }));
 vi.mock("@/app-shell/composition/polls.server", () => composition);
 
-const guards = { getSession: vi.fn() };
+const guards = { getSession: vi.fn(), getCadetSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 const server = vi.hoisted(() => ({
@@ -92,7 +92,7 @@ describe("vote action", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     features.FEATURES.polls = true;
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
   });
 
   it("votes as the session's cadet and answers what it earned with a fresh count", async () => {
@@ -112,11 +112,11 @@ describe("vote action", () => {
   });
 
   it("is for cadets only, with polls on and a sane input", async () => {
-    guards.getSession.mockResolvedValue(session("staff"));
+    guards.getCadetSession.mockResolvedValue(session("staff"));
     expect(await votePollAction({ pollId: "poll-1", optionId: "o1" })).toEqual({ ok: false, code: "forbidden" });
-    guards.getSession.mockResolvedValue(session(null));
+    guards.getCadetSession.mockResolvedValue(session(null));
     expect(await votePollAction({ pollId: "poll-1", optionId: "o1" })).toEqual({ ok: false, code: "not-registered" });
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     expect(await votePollAction({ pollId: "poll-1", optionId: "too-long" })).toEqual({ ok: false, code: "invalid-option" });
     features.FEATURES.polls = false;
     expect(await votePollAction({ pollId: "poll-1", optionId: "o1" })).toEqual({ ok: false, code: "disabled" });
@@ -128,7 +128,7 @@ describe("cadet tally action", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     features.FEATURES.polls = true;
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
   });
 
   it("answers how the open poll's votes stand, or why not", async () => {
@@ -141,13 +141,13 @@ describe("cadet tally action", () => {
   });
 
   it("is for cadets only, with polls on and a sane input", async () => {
-    guards.getSession.mockResolvedValue(session("staff"));
+    guards.getCadetSession.mockResolvedValue(session("staff"));
     expect(await pollTallyAction({ pollId: "poll-1" })).toEqual({ ok: false, code: "forbidden" });
-    guards.getSession.mockResolvedValue(session(null));
+    guards.getCadetSession.mockResolvedValue(session(null));
     expect(await pollTallyAction({ pollId: "poll-1" })).toEqual({ ok: false, code: "not-registered" });
-    guards.getSession.mockResolvedValue(null);
+    guards.getCadetSession.mockResolvedValue(null);
     expect(await pollTallyAction({ pollId: "poll-1" })).toEqual({ ok: false, code: "unauthenticated" });
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     expect(await pollTallyAction({ pollId: "" })).toEqual({ ok: false, code: "not-found" });
     features.FEATURES.polls = false;
     expect(await pollTallyAction({ pollId: "poll-1" })).toEqual({ ok: false, code: "disabled" });

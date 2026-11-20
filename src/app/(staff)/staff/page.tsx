@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { serveDeps } from "@/app-shell/composition/checkpoints.server";
-import { requireRole } from "@/app-shell/guards";
+import { requireRole, teamPlayState } from "@/app-shell/guards";
 import { staffCheckpoints, staffStations } from "@/app-shell/permissions.server";
+import { TeamPlayCallout } from "@/features/attendee";
 import { STATION_KINDS } from "@/features/checkpoints";
 import { listServePoints, type ServePoint } from "@/features/checkpoints/server";
 import { ROUTES } from "@/shared/config/routes";
@@ -26,6 +27,8 @@ function PointMenu({ point, mayChangeTickets }: { point: ServePoint; mayChangeTi
 
 export default async function StaffHomePage() {
   const session = await requireRole(["staff"]);
+  // Where «Staff como cadetes» is on, the way to the cadet panel (or to sign up as one).
+  const play = await teamPlayState(session.role, session.uid);
 
   const kinds = session.role === "staff" ? await staffStations() : undefined;
   const checkpointIds = await staffCheckpoints(session);
@@ -49,6 +52,8 @@ export default async function StaffHomePage() {
             {copy.teamCode.open}
           </ButtonLink>
         </header>
+
+        {play !== "off" ? <TeamPlayCallout kind={play === "play" ? "toCadet" : "join"} href={play === "play" ? ROUTES.dashboard : ROUTES.onboarding} /> : null}
 
         {groups.length === 0 ? (
           <Card>

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/app-shell/composition/avatar.server", () => ({ avatarDeps: { marker: "avatars" } }));
-const guards = { getSession: vi.fn() };
+const guards = { getCadetSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 const server = vi.hoisted(() => ({ saveAvatarLook: vi.fn(), resetAvatarLook: vi.fn() }));
 vi.mock("@/features/avatar/server", () => server);
@@ -16,7 +16,7 @@ const session = { uid: "u1", role: "attendee", displayName: null, photoUrl: null
 describe("avatar actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    guards.getSession.mockResolvedValue(session);
+    guards.getCadetSession.mockResolvedValue(session);
     server.saveAvatarLook.mockResolvedValue({ ok: true, value: LOOK });
     server.resetAvatarLook.mockResolvedValue({ ok: true, value: undefined });
   });
@@ -40,7 +40,7 @@ describe("avatar actions", () => {
     server.saveAvatarLook.mockResolvedValueOnce({ ok: false, error: { code: "forbidden" } });
     expect(await saveAvatarAction({ look: LOOK })).toEqual({ ok: false, code: "forbidden" });
 
-    guards.getSession.mockResolvedValue(null);
+    guards.getCadetSession.mockResolvedValue(null);
     expect(await saveAvatarAction({ look: LOOK })).toEqual({ ok: false, code: "unauthenticated" });
     expect(await resetAvatarAction()).toEqual({ ok: false, code: "unauthenticated" });
   });

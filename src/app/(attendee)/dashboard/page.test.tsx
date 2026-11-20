@@ -246,6 +246,19 @@ describe("DashboardPage", () => {
     features.FEATURES.network = true;
   });
 
+  it("hands a team account that plays as a cadet the way back to its team screen, and nobody else", async () => {
+    guards.requireAttendee.mockResolvedValue({ uid: "u1", role: "attendee", playsAs: "staff", displayName: null, photoUrl: null });
+    const staff = (await renderPage()).teamSlot as { props: { kind: string; href: string; role: string } };
+    expect(staff.props).toMatchObject({ kind: "toTeam", href: "/staff", role: "Staff" });
+
+    guards.requireAttendee.mockResolvedValue({ uid: "u1", role: "attendee", playsAs: "admin", displayName: null, photoUrl: null });
+    const admin = (await renderPage()).teamSlot as { props: { href: string; role: string } };
+    expect(admin.props).toMatchObject({ href: "/admin", role: "Admin" });
+
+    guards.requireAttendee.mockResolvedValue({ uid: "u1", role: "attendee", displayName: null, photoUrl: null });
+    expect((await renderPage()).teamSlot).toBeUndefined();
+  });
+
   it("hands a cadet who is also a speaker the way to their speaker code, and nobody else", async () => {
     speakers.linkedSpeaker.mockResolvedValueOnce({ id: "ana-torres", name: "Ana Torres" });
     expect((await renderPage()).speakerSlot).toBeTruthy();

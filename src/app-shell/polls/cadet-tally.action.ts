@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { voteDeps } from "@/app-shell/composition/polls.server";
-import { getSession } from "@/app-shell/guards";
+import { getCadetSession } from "@/app-shell/guards";
 import { moduleOn } from "@/app-shell/modules.server";
 import type { PollTallyAction } from "@/features/polls";
 import { getOpenPollTally } from "@/features/polls/server";
@@ -17,7 +17,7 @@ const inputSchema = z.object({ pollId: z.string().min(1).max(60) });
  */
 export async function pollTallyAction(input: { pollId: string }): ReturnType<PollTallyAction> {
   if (!FEATURES.polls || !(await moduleOn("polls"))) return { ok: false, code: "disabled" };
-  const session = await getSession();
+  const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   if (session.role !== "attendee") return { ok: false, code: session.role === null ? "not-registered" : "forbidden" };
   const parsed = inputSchema.safeParse(input);

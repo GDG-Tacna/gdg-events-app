@@ -19,7 +19,8 @@ import { InstallHint } from "@/features/pwa";
 import { SquadBadge, offeredSquads } from "@/features/squads";
 import { listSquads } from "@/features/squads/server";
 import { FEATURES } from "@/shared/config/features";
-import { ROUTES } from "@/shared/config/routes";
+import { ROUTES, homeFor } from "@/shared/config/routes";
+import { TeamPlayCallout } from "@/features/attendee";
 import { copy } from "@/shared/copy/es";
 import { ScreenEnter, SpaceBackground } from "@/shared/ui";
 import { moduleOn } from "@/app-shell/modules.server";
@@ -85,6 +86,7 @@ export default async function DashboardPage() {
             missionsSlot={missions ? <MissionsCard href={ROUTES.missions} xp={missions.xp} quadrants={missions.quadrants} /> : undefined}
             installSlot={<InstallHint />}
             pollSlot={poll ? <LivePollCard poll={poll} href={ROUTES.poll} /> : undefined}
+            teamSlot={session.playsAs ? <TeamPlayCallout kind="toTeam" href={homeFor(session.playsAs)} role={copy.admin.team.roles[session.playsAs === "admin" ? "admin" : "staff"]} /> : undefined}
             speakerSlot={speaker ? <SpeakerCallout name={speaker.name} href={ROUTES.speaker} /> : undefined}
           />
         </ScreenEnter>

@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { adminAreaCards } from "@/app-shell/admin-nav";
 import { insightsDeps } from "@/app-shell/composition/insights.server";
-import { requireRole } from "@/app-shell/guards";
+import { requireRole, teamPlayState } from "@/app-shell/guards";
 import { moduleSwitches } from "@/app-shell/modules.server";
 import { sectionLevels } from "@/app-shell/permissions.server";
+import { TeamPlayCallout } from "@/features/attendee";
 import { InsightsPanel } from "@/features/insights";
 import { getInsights } from "@/features/insights/server";
 import { ROUTES } from "@/shared/config/routes";
@@ -16,7 +17,7 @@ export const metadata: Metadata = { title: copy.admin.nav.home };
 export default async function AdminHomePage() {
   const session = await requireRole(["admin"]);
   // The numbers decorate the home: if they cannot be read, the shortcuts still work.
-  const [insights, modules, levels] = await Promise.all([getInsights(insightsDeps, { uid: session.uid, role: session.role }), moduleSwitches(), sectionLevels(session)]);
+  const [insights, modules, levels, play] = await Promise.all([getInsights(insightsDeps, { uid: session.uid, role: session.role }), moduleSwitches(), sectionLevels(session), teamPlayState(session.role, session.uid)]);
 
   return (
     <ScreenEnter>
@@ -28,6 +29,8 @@ export default async function AdminHomePage() {
             {copy.teamCode.open}
           </ButtonLink>
         </header>
+
+        {play !== "off" ? <TeamPlayCallout kind={play === "play" ? "toCadet" : "join"} href={play === "play" ? ROUTES.dashboard : ROUTES.onboarding} /> : null}
 
         {insights.ok ? <InsightsPanel overview={insights.value} cadetsHref={levels.cadets !== "none" ? ROUTES.adminCadets : undefined} /> : <InlineAlert>{copy.admin.home.error}</InlineAlert>}
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { attendeeDeps } from "@/app-shell/composition/attendee.server";
 import { squadDeps } from "@/app-shell/composition/squads.server";
-import { requireRole } from "@/app-shell/guards";
+import { requireAttendee } from "@/app-shell/guards";
 import { assignSquadAction } from "@/app-shell/squads/assign-squad.action";
 import { getAttendee } from "@/features/attendee/server";
 import { SquadReveal, offeredSquads } from "@/features/squads";
@@ -21,7 +21,7 @@ export default async function SquadPage() {
   if (!(await moduleOn("squads"))) notFound();
 
   // Visitors go to /login and users without a profile go to onboarding (inside the guard).
-  const session = await requireRole(["attendee"]);
+  const session = await requireAttendee();
 
   const [attendee, squads] = await Promise.all([
     getAttendee({ attendees: attendeeDeps.attendees }, session.uid),

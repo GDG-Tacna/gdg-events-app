@@ -14,6 +14,11 @@ export type AppSession = Omit<AuthSession, "role"> & {
   workingEdition?: string;
   /** For a staff or organizer with no place in the public edition: the editions where they do have one. */
   otherEditions?: ReadonlyArray<{ eventId: string; role: EditionTeamRole }>;
+  /**
+   * Set only on the cadet view of a team account that plays (`getCadetSession`): its real role, while `role` says
+   * `attendee` so the cadet screens and actions treat it as a cadet. Nothing that needs the team role reads this view.
+   */
+  playsAs?: AppRole;
 };
 
 /** What the guard needs to know about editions and teams. Failed reads are thrown (a role is never guessed). */

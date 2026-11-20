@@ -8,7 +8,7 @@ const UNLOCKED = [{ id: "primer-salto", name: "Primer salto", tone: "cyan" }];
 const cache = { revalidatePath: vi.fn() };
 vi.mock("next/cache", () => cache);
 
-const guards = { getSession: vi.fn() };
+const guards = { getCadetSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 const server = { submitMissionProof: vi.fn() };
@@ -26,7 +26,7 @@ describe("submitMissionAnswerAction", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     features.FEATURES.missions = true;
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     server.submitMissionProof.mockResolvedValue({ ok: true, value: { kind: "answered", status: "completed", xpEarned: 40, attemptsLeft: 0 } });
     achievements.unlockAchievements.mockResolvedValue(UNLOCKED);
   });
@@ -35,7 +35,7 @@ describe("submitMissionAnswerAction", () => {
     features.FEATURES.missions = false;
 
     expect(await submitMissionAnswerAction(QUIZ_ANSWER)).toEqual({ ok: false, code: "disabled" });
-    expect(guards.getSession).not.toHaveBeenCalled();
+    expect(guards.getCadetSession).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -44,7 +44,7 @@ describe("submitMissionAnswerAction", () => {
     [session("staff"), "forbidden"],
     [session("admin"), "forbidden"],
   ] as const)("refuses %j", async (who, code) => {
-    guards.getSession.mockResolvedValue(who);
+    guards.getCadetSession.mockResolvedValue(who);
 
     expect(await submitMissionAnswerAction(QUIZ_ANSWER)).toEqual({ ok: false, code });
     expect(server.submitMissionProof).not.toHaveBeenCalled();

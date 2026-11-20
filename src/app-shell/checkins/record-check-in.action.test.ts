@@ -22,7 +22,7 @@ vi.mock("@/features/economy/server", () => economyServer);
 const missionsServer = { completeByCheckpoint: vi.fn(), completeBySpeaker: vi.fn(), completeByTeam: vi.fn() };
 vi.mock("@/features/missions/server", () => missionsServer);
 
-const guards = { getSession: vi.fn() };
+const guards = { getCadetSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 const checkinsServer = { recordCheckIn: vi.fn() };
@@ -52,7 +52,7 @@ describe("recordCheckInAction", () => {
     features.FEATURES.network = true;
     economyServer.rewardTalk.mockResolvedValue({ ok: true, value: { credits: 10 } });
     achievements.unlockAchievements.mockResolvedValue([]);
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     // The cadet's profile after the scan: 120 XP, the second rank of the bundled ladder.
     attendee.attendeeDeps.attendees.findByUid.mockResolvedValue({ ok: true, value: { uid: "u1", xp: 120 } });
     dashboard.dashboardDeps.ranks.mockResolvedValue(RANKS);
@@ -62,26 +62,26 @@ describe("recordCheckInAction", () => {
     features.FEATURES.checkins = false;
 
     expect(await recordCheckInAction("devfest:cp:talk-1")).toEqual({ ok: false, code: "disabled" });
-    expect(guards.getSession).not.toHaveBeenCalled();
+    expect(guards.getCadetSession).not.toHaveBeenCalled();
     expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
   });
 
   it("refuses an anonymous caller", async () => {
-    guards.getSession.mockResolvedValue(null);
+    guards.getCadetSession.mockResolvedValue(null);
 
     expect(await recordCheckInAction("devfest:cp:talk-1")).toEqual({ ok: false, code: "unauthenticated" });
     expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
   });
 
   it("sends a user without a profile back to onboarding", async () => {
-    guards.getSession.mockResolvedValue(session(null));
+    guards.getCadetSession.mockResolvedValue(session(null));
 
     expect(await recordCheckInAction("devfest:cp:talk-1")).toEqual({ ok: false, code: "not-registered" });
     expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
   });
 
   it.each(["staff", "admin"] as const)("does not let %s accounts check in as attendees", async (role) => {
-    guards.getSession.mockResolvedValue(session(role));
+    guards.getCadetSession.mockResolvedValue(session(role));
 
     expect(await recordCheckInAction("devfest:cp:talk-1")).toEqual({ ok: false, code: "forbidden" });
     expect(checkinsServer.recordCheckIn).not.toHaveBeenCalled();
@@ -323,7 +323,7 @@ describe("recordCheckInAction with a speaker's code", () => {
     vi.resetAllMocks();
     features.FEATURES.checkins = true;
     achievements.unlockAchievements.mockResolvedValue([]);
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     checkIns.checkInDeps.limiter.consume.mockResolvedValue(true);
     speakersServer.verifySpeakerCode.mockReturnValue({ ok: true, speakerId: "ana-torres" });
     speakers.speakerCodeDeps.speakers.find.mockResolvedValue({ ok: true, value: ANA });
@@ -348,10 +348,10 @@ describe("recordCheckInAction with a speaker's code", () => {
   });
 
   it("is only for cadets, and goes through the scan limiter", async () => {
-    guards.getSession.mockResolvedValue(session("staff"));
+    guards.getCadetSession.mockResolvedValue(session("staff"));
     expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "forbidden" });
 
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     checkIns.checkInDeps.limiter.consume.mockResolvedValue(false);
     expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "rate-limited" });
     expect(speakersServer.verifySpeakerCode).not.toHaveBeenCalled();
@@ -395,7 +395,7 @@ describe("recordCheckInAction with a team member's code", () => {
     features.FEATURES.checkins = true;
     features.FEATURES.missions = true;
     achievements.unlockAchievements.mockResolvedValue([]);
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     checkIns.checkInDeps.limiter.consume.mockResolvedValue(true);
     teamServer.verifyTeamCode.mockReturnValue({ ok: true, uid: "uid-staff-123456", role: "volunteer" });
     missionsServer.completeByTeam.mockResolvedValue({ ok: true, value: [{ id: "meet-volunteer", title: "Conoce a un voluntario", xpEarned: 30, creditsEarned: 10, justCompleted: true }] });
@@ -427,10 +427,10 @@ describe("recordCheckInAction with a team member's code", () => {
   });
 
   it("is only for cadets, and goes through the scan limiter", async () => {
-    guards.getSession.mockResolvedValue(session("staff"));
+    guards.getCadetSession.mockResolvedValue(session("staff"));
     expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "forbidden" });
 
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
     checkIns.checkInDeps.limiter.consume.mockResolvedValue(false);
     expect(await recordCheckInAction(CODE)).toEqual({ ok: false, code: "rate-limited" });
     expect(teamServer.verifyTeamCode).not.toHaveBeenCalled();

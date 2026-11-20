@@ -5,6 +5,7 @@ vi.mock("./composition/auth.server", () => ({ authDeps: { sessions: {} } }));
 const team = vi.hoisted(() => ({
   editionRoleOf: vi.fn<(uid: string, eventId: string) => Promise<"staff" | "organizer" | null>>(async () => "staff"),
   editionRolesOf: vi.fn(async (): Promise<ReadonlyArray<{ eventId: string; role: "staff" | "organizer" }>> => []),
+  hasCadetProfile: vi.fn(async () => false),
 }));
 vi.mock("./composition/admin.server", () => team);
 const edition = vi.hoisted(() => ({ publicEditionId: vi.fn(async () => "devfest-2026"), registerRequestEdition: vi.fn() }));
@@ -41,7 +42,7 @@ vi.mock("@/features/auth/server", async () => {
   return { ...authServer, canAccess: roles.canAccess };
 });
 
-const { requireAttendee, requireOnboardingPending, requireRole, requireSession } = await import("./guards");
+const { getCadetSession, requireAttendee, requireOnboardingPending, requireRole, requireSession, teamPlayState } = await import("./guards");
 // Registered once, when the guard module loads.
 const requestEdition = edition.registerRequestEdition.mock.calls[0][0] as () => Promise<string | null>;
 
@@ -68,6 +69,7 @@ describe("guards", () => {
     authServer.readSessionCookie.mockResolvedValue("cookie");
     team.editionRoleOf.mockResolvedValue("staff");
     team.editionRolesOf.mockResolvedValue([]);
+    team.hasCadetProfile.mockResolvedValue(false);
     edition.publicEditionId.mockResolvedValue("devfest-2026");
     working.readWorkingEdition.mockResolvedValue(null);
     working.hasWorkingEditionCookie.mockResolvedValue(false);
@@ -227,10 +229,94 @@ describe("guards", () => {
       expect(await redirectTarget(requireOnboardingPending)).toBeNull();
     });
 
-    it.each(["attendee", "staff", "admin"] as const)("sends an existing %s to the dashboard", async (role) => {
-      signedIn(role);
+    it("sends an existing attendee to the dashboard", async () => {
+      signedIn("attendee");
 
       expect(await redirectTarget(requireOnboardingPending)).toBe("/dashboard");
+    });
+
+    it.each(["staff", "admin"] as const)("sends an existing %s to the dashboard when «Staff como cadetes» is off, or when they already are a cadet", async (role) => {
+      signedIn(role);
+      modules.moduleOn.mockImplementation((async (name: string) => name !== "staffPlay") as never);
+      expect(await redirectTarget(requireOnboardingPending)).toBe("/dashboard");
+
+      modules.moduleOn.mockResolvedValue(true);
+      team.hasCadetProfile.mockResolvedValue(true);
+      expect(await redirectTarget(requireOnboardingPending)).toBe("/dashboard");
+    });
+
+    it.each(["staff", "admin"] as const)("lets a %s who has no cadet profile sign up as one where «Staff como cadetes» is on", async (role) => {
+      signedIn(role);
+      modules.moduleOn.mockResolvedValue(true);
+
+      expect(await redirectTarget(requireOnboardingPending)).toBeNull();
+    });
+  });
+
+  describe("a team account that plays as a cadet", () => {
+    it("is shown the cadet screens as a cadet, with its real role kept apart, when the module is on and it has a cadet profile", async () => {
+      signedIn("staff");
+      modules.moduleOn.mockResolvedValue(true);
+      team.hasCadetProfile.mockResolvedValue(true);
+
+      await expect(requireAttendee()).resolves.toMatchObject({ uid: "u1", role: "attendee", playsAs: "staff" });
+      expect(modules.moduleOn).toHaveBeenCalledWith("staffPlay");
+    });
+
+    it("goes to its own home instead when the module is off or it has no cadet profile", async () => {
+      signedIn("admin");
+      team.hasCadetProfile.mockResolvedValue(true);
+      modules.moduleOn.mockImplementation((async (name: string) => name !== "staffPlay") as never);
+      expect(await redirectTarget(requireAttendee)).toBe("/admin");
+
+      modules.moduleOn.mockResolvedValue(true);
+      team.hasCadetProfile.mockResolvedValue(false);
+      expect(await redirectTarget(requireAttendee)).toBe("/admin");
+    });
+
+    it("treats a profile that cannot be read as no profile, so it never locks the account out", async () => {
+      signedIn("staff");
+      modules.moduleOn.mockResolvedValue(true);
+      team.hasCadetProfile.mockResolvedValue(false);
+
+      expect(await redirectTarget(requireAttendee)).toBe("/staff");
+    });
+
+    it("gives the cadet's actions the cadet view of the session, and anyone else their own session", async () => {
+      modules.moduleOn.mockResolvedValue(true);
+      team.hasCadetProfile.mockResolvedValue(true);
+
+      signedIn("staff");
+      await expect(getCadetSession()).resolves.toMatchObject({ role: "attendee", playsAs: "staff" });
+      signedIn("admin");
+      await expect(getCadetSession()).resolves.toMatchObject({ role: "attendee", playsAs: "admin" });
+      signedIn("attendee");
+      const cadet = await getCadetSession();
+      expect(cadet).toMatchObject({ role: "attendee" });
+      expect(cadet?.playsAs).toBeUndefined();
+      signedIn(null);
+      await expect(getCadetSession()).resolves.toMatchObject({ role: null });
+      authServer.readSession.mockResolvedValue({ ok: false, error: { code: "unauthenticated" } });
+      await expect(getCadetSession()).resolves.toBeNull();
+    });
+
+    it("keeps a team account's real role in the cadet view's absence: the cadet actions refuse it when it may not play", async () => {
+      signedIn("staff");
+      modules.moduleOn.mockImplementation((async (name: string) => name !== "staffPlay") as never);
+
+      await expect(getCadetSession()).resolves.toMatchObject({ role: "staff" });
+    });
+
+    it("says where a team account stands: off, may sign up, or already plays", async () => {
+      modules.moduleOn.mockResolvedValue(true);
+      team.hasCadetProfile.mockResolvedValue(false);
+      expect(await teamPlayState("staff", "u1")).toBe("join");
+      team.hasCadetProfile.mockResolvedValue(true);
+      expect(await teamPlayState("admin", "u2")).toBe("play");
+      expect(await teamPlayState("attendee", "u3")).toBe("off");
+      expect(await teamPlayState(null, "u4")).toBe("off");
+      modules.moduleOn.mockResolvedValue(false);
+      expect(await teamPlayState("staff", "u5")).toBe("off");
     });
   });
 

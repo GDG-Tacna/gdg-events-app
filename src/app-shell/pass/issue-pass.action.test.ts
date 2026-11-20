@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/composition/pass.server", () => ({ passDeps: { marker: "deps" } }));
 
-const guards = { getSession: vi.fn() };
+const guards = { getCadetSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 const passServer = { issuePass: vi.fn() };
@@ -20,18 +20,18 @@ describe("issuePassAction", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     features.FEATURES.checkins = true;
-    guards.getSession.mockResolvedValue(session("attendee"));
+    guards.getCadetSession.mockResolvedValue(session("attendee"));
   });
 
   it("does nothing when check-ins are switched off", async () => {
     features.FEATURES.checkins = false;
 
     expect(await issuePassAction()).toEqual({ ok: false, code: "disabled" });
-    expect(guards.getSession).not.toHaveBeenCalled();
+    expect(guards.getCadetSession).not.toHaveBeenCalled();
   });
 
   it("refuses an anonymous caller", async () => {
-    guards.getSession.mockResolvedValue(null);
+    guards.getCadetSession.mockResolvedValue(null);
 
     expect(await issuePassAction()).toEqual({ ok: false, code: "unauthenticated" });
     expect(passServer.issuePass).not.toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe("issuePassAction", () => {
   });
 
   it("maps a use case failure to its code only", async () => {
-    guards.getSession.mockResolvedValue(session("staff"));
+    guards.getCadetSession.mockResolvedValue(session("staff"));
     passServer.issuePass.mockReturnValue({ ok: false, error: { code: "forbidden" } });
 
     expect(await issuePassAction()).toEqual({ ok: false, code: "forbidden" });

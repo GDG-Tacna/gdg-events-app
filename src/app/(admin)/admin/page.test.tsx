@@ -8,7 +8,7 @@ import { axe } from "@/test-utils/axe";
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/composition/insights.server", () => ({ insightsDeps: { marker: "insights" } }));
 
-const guards = { requireRole: vi.fn() };
+const guards = { requireRole: vi.fn(), teamPlayState: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 const insightsServer = vi.hoisted(() => ({ getInsights: vi.fn() }));
@@ -27,6 +27,7 @@ describe("admin home page", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     guards.requireRole.mockResolvedValue({ uid: "a1", role: "admin", displayName: null, photoUrl: null });
+    guards.teamPlayState.mockResolvedValue("off");
     insightsServer.getInsights.mockResolvedValue({ ok: true, value: OVERVIEW });
     permissions.sectionLevels.mockResolvedValue(Object.fromEntries(ADMIN_SECTIONS.map((section) => [section, "edit"])));
   });
@@ -49,6 +50,23 @@ describe("admin home page", () => {
     render(await AdminHomePage());
     expect(screen.queryByRole("link", { name: /Cadetes registrados/ })).not.toBeInTheDocument();
     expect(screen.getByRole("list", { name: copy.admin.home.stats.label })).toHaveTextContent("200");
+  });
+
+  it("offers the way to the cadet panel to an admin who plays, the way to sign up to one who may, and nothing when «Staff como cadetes» is off", async () => {
+    guards.teamPlayState.mockResolvedValue("play");
+    const first = render(await AdminHomePage());
+    expect(guards.teamPlayState).toHaveBeenCalledWith("admin", "a1");
+    expect(screen.getByRole("link", { name: copy.teamPlay.toCadet.open })).toHaveAttribute("href", "/dashboard");
+    first.unmount();
+
+    guards.teamPlayState.mockResolvedValue("join");
+    const second = render(await AdminHomePage());
+    expect(screen.getByRole("link", { name: copy.teamPlay.join.open })).toHaveAttribute("href", "/onboarding");
+    second.unmount();
+
+    guards.teamPlayState.mockResolvedValue("off");
+    render(await AdminHomePage());
+    expect(screen.queryByRole("link", { name: copy.teamPlay.toCadet.open })).not.toBeInTheDocument();
   });
 
   it("stops before reading anything when the guard stops the request", async () => {
