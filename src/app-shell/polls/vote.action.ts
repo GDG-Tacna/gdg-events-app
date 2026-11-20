@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { pollStore, voteDeps } from "@/app-shell/composition/polls.server";
-import { getSession } from "@/app-shell/guards";
+import { getCadetSession } from "@/app-shell/guards";
 import { moduleOn } from "@/app-shell/modules.server";
 import type { VoteActionResult } from "@/features/polls";
 import { castVote } from "@/features/polls/server";
@@ -18,7 +18,7 @@ const inputSchema = z.object({ pollId: z.string().min(1).max(60), optionId: z.st
  */
 export async function votePollAction(input: { pollId: string; optionId: string }): Promise<VoteActionResult> {
   if (!FEATURES.polls || !(await moduleOn("polls"))) return { ok: false, code: "disabled" };
-  const session = await getSession();
+  const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   if (session.role !== "attendee") return { ok: false, code: session.role === null ? "not-registered" : "forbidden" };
   const parsed = inputSchema.safeParse(input);

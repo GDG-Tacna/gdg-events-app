@@ -32,6 +32,7 @@ export type {
   RegisterAttendeeInput,
 } from "./ui/registration";
 export { OnboardingForm } from "./ui/OnboardingForm";
+export { TeamPlayCallout, type TeamPlayCalloutProps } from "./ui/TeamPlayCallout";
 export {
   useAttendeeRegistration,
   type RegistrationState,

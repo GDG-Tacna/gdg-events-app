@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { getSession } from "@/app-shell/guards";
+import { getSession, teamPlayState } from "@/app-shell/guards";
 import { attendeeDeps } from "@/app-shell/composition/attendee.server";
 import { ticketHolders } from "@/app-shell/composition/tickets.server";
 import { moduleOn } from "@/app-shell/modules.server";
@@ -22,8 +22,9 @@ const inputSchema = z.object({ alias: z.string().max(64) });
 export async function registerAttendeeAction(input: RegisterAttendeeInput): Promise<RegisterAttendeeActionResult> {
   const session = await getSession();
   if (!session) return { ok: false, code: "unauthenticated" };
-  // Staff and admin accounts are not onboarded as attendees.
-  if (session.role !== null && session.role !== "attendee") return { ok: false, code: "forbidden" };
+  // A team account is onboarded as a cadet only where «Staff como cadetes» is on, and keeps its role.
+  const isTeam = session.role !== null && session.role !== "attendee";
+  if (isTeam && (await teamPlayState(session.role, session.uid)) === "off") return { ok: false, code: "forbidden" };
   // Where speakers may not play, a speaker's account only shows their code: it never becomes a cadet.
   if ((await linkedSpeaker(session.uid)) && !(await moduleOn("speakerPlay"))) return { ok: false, code: "forbidden" };
 
@@ -31,7 +32,7 @@ export async function registerAttendeeAction(input: RegisterAttendeeInput): Prom
   if (!parsed.success) return { ok: false, code: "alias-invalid", alias: "too-long" };
 
   const ticket = await resolveTicketFor({ holders: ticketHolders }, session.verifiedEmail);
-  const result = await registerAttendee(attendeeDeps, { uid: session.uid, rawAlias: parsed.data.alias, ticket });
+  const result = await registerAttendee(attendeeDeps, { uid: session.uid, rawAlias: parsed.data.alias, ticket, grantRole: !isTeam });
   if (!result.ok) {
     return { ok: false, code: result.error.code, alias: result.error.alias };
   }

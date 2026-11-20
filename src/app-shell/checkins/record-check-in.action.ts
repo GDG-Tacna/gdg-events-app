@@ -7,7 +7,7 @@ import { speakerCodeDeps } from "@/app-shell/composition/speakers.server";
 import { teamCodeDeps } from "@/app-shell/composition/team-code.server";
 import { currentEconomy, rewardLedger } from "@/app-shell/composition/economy.server";
 import { missionDeps } from "@/app-shell/composition/missions.server";
-import { getSession } from "@/app-shell/guards";
+import { getCadetSession } from "@/app-shell/guards";
 import { attendeeDeps } from "@/app-shell/composition/attendee.server";
 import { dashboardDeps } from "@/app-shell/composition/dashboard.server";
 import { connectContactAction } from "@/app-shell/network/network.actions";
@@ -44,7 +44,7 @@ const MISSION_KINDS: ReadonlySet<string> = new Set(["talk", "stand"]);
 export async function recordCheckInAction(payload: string): Promise<RecordCheckInActionResult> {
   if (!FEATURES.checkins) return { ok: false, code: "disabled" };
 
-  const session = await getSession();
+  const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   if (session.role !== "attendee") return { ok: false, code: session.role === null ? "not-registered" : "forbidden" };
 

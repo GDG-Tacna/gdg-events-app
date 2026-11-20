@@ -50,6 +50,13 @@ export function inviteDeps(): InviteDeps {
   };
 }
 
+/** Whether an account already has a cadet profile in the active edition (for a team account that plays as a cadet). */
+export async function hasCadetProfile(uid: string): Promise<boolean> {
+  const found = await profiles.hasProfile(uid);
+  // A failed read must never lock a team account out of its own screens: it is treated as having no profile.
+  return found.ok && found.value;
+}
+
 /** How long a staff or organizer's place in an edition's team is trusted in memory (every request checks it). */
 const EDITION_ROLE_TTL_MS = 30_000;
 const editionRoles = new Map<string, { role: "staff" | "organizer" | null; expiresAt: number }>();

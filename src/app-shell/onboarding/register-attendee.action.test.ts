@@ -7,7 +7,7 @@ vi.mock("@/app-shell/speakers/linked-speaker.server", () => speakers);
 const modules = vi.hoisted(() => ({ moduleOn: vi.fn(async () => true) }));
 vi.mock("@/app-shell/modules.server", () => modules);
 
-const guards = { getSession: vi.fn() };
+const guards = { getSession: vi.fn(), teamPlayState: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 const attendeeServer = { registerAttendee: vi.fn() };
@@ -32,11 +32,31 @@ describe("registerAttendeeAction", () => {
     expect(attendeeServer.registerAttendee).not.toHaveBeenCalled();
   });
 
-  it.each(["staff", "admin"] as const)("does not onboard %s accounts as attendees", async (role) => {
+  it.each(["staff", "admin"] as const)("does not onboard %s accounts as attendees where «Staff como cadetes» is off", async (role) => {
     guards.getSession.mockResolvedValue(session(role));
+    guards.teamPlayState.mockResolvedValue("off");
 
     expect(await registerAttendeeAction({ alias: "Nova_7" })).toEqual({ ok: false, code: "forbidden" });
     expect(attendeeServer.registerAttendee).not.toHaveBeenCalled();
+  });
+
+  it.each(["staff", "admin"] as const)("onboards a %s account as a cadet where «Staff como cadetes» is on, without touching its role", async (role) => {
+    guards.getSession.mockResolvedValue(session(role));
+    guards.teamPlayState.mockResolvedValue("join");
+    attendeeServer.registerAttendee.mockResolvedValue({ ok: true, value: { created: true } });
+
+    expect(await registerAttendeeAction({ alias: "Nova_7" })).toEqual({ ok: true, created: true });
+    expect(guards.teamPlayState).toHaveBeenCalledWith(role, "u1");
+    expect(attendeeServer.registerAttendee).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ uid: "u1", grantRole: false }));
+  });
+
+  it("lets a team account that already plays retry safely, still without touching its role", async () => {
+    guards.getSession.mockResolvedValue(session("staff"));
+    guards.teamPlayState.mockResolvedValue("play");
+    attendeeServer.registerAttendee.mockResolvedValue({ ok: true, value: { created: false } });
+
+    expect(await registerAttendeeAction({ alias: "Nova_7" })).toEqual({ ok: true, created: false });
+    expect(attendeeServer.registerAttendee).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ grantRole: false }));
   });
 
   it("never makes a speaker a cadet where speakers may not play, and does where they may", async () => {
@@ -60,7 +80,7 @@ describe("registerAttendeeAction", () => {
     const result = await registerAttendeeAction({ alias: "Nova_7", uid: "someone-else" } as never);
 
     expect(result).toEqual({ ok: true, created: true });
-    expect(attendeeServer.registerAttendee).toHaveBeenCalledWith(expect.anything(), { uid: "u1", rawAlias: "Nova_7", ticket: { type: "general", source: "default" } });
+    expect(attendeeServer.registerAttendee).toHaveBeenCalledWith(expect.anything(), { uid: "u1", rawAlias: "Nova_7", ticket: { type: "general", source: "default" }, grantRole: true });
   });
 
   it("registers with the ticket the list gives the email they signed in with", async () => {
@@ -71,7 +91,7 @@ describe("registerAttendeeAction", () => {
     expect(await registerAttendeeAction({ alias: "Nova_7" })).toEqual({ ok: true, created: true });
 
     expect(ticketsServer.resolveTicketFor).toHaveBeenCalledWith({ holders: { marker: "holders" } }, "ana@example.com");
-    expect(attendeeServer.registerAttendee).toHaveBeenCalledWith(expect.anything(), { uid: "u1", rawAlias: "Nova_7", ticket: { type: "premium", source: "list" } });
+    expect(attendeeServer.registerAttendee).toHaveBeenCalledWith(expect.anything(), { uid: "u1", rawAlias: "Nova_7", ticket: { type: "premium", source: "list" }, grantRole: true });
   });
 
   it("registers with the default ticket when the email is not on the list or there is no verified email", async () => {

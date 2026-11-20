@@ -1,7 +1,7 @@
 "use server";
 
 import { passDeps } from "@/app-shell/composition/pass.server";
-import { getSession } from "@/app-shell/guards";
+import { getCadetSession } from "@/app-shell/guards";
 import type { IssuePassActionResult } from "@/features/pass";
 import { issuePass } from "@/features/pass/server";
 import { FEATURES } from "@/shared/config/features";
@@ -14,7 +14,7 @@ import { FEATURES } from "@/shared/config/features";
 export async function issuePassAction(): Promise<IssuePassActionResult> {
   if (!FEATURES.checkins) return { ok: false, code: "disabled" };
 
-  const session = await getSession();
+  const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
 
   const result = issuePass(passDeps, { uid: session.uid, role: session.role });

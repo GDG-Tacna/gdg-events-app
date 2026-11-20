@@ -46,6 +46,16 @@ describe("registerAttendee", () => {
     expect(d.analytics.track).toHaveBeenCalledWith({ name: "attendee_registered", uid: "u1" });
   });
 
+  it("creates the profile of a team account that plays without touching its role claim, when told not to grant one", async () => {
+    const d = deps();
+
+    const result = await registerAttendee(d.all, { uid: "u1", rawAlias: "Nova_7", grantRole: false });
+
+    expect(result).toMatchObject({ ok: true, value: { created: true } });
+    expect(d.attendees.register).toHaveBeenCalled();
+    expect(d.roles.grantAttendeeRole).not.toHaveBeenCalled();
+  });
+
   it("registers with the ticket it is given", async () => {
     const d = deps();
 

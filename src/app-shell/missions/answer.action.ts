@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { unlockAchievements } from "@/app-shell/composition/achievements.server";
 import { missionDeps } from "@/app-shell/composition/missions.server";
-import { getSession } from "@/app-shell/guards";
+import { getCadetSession } from "@/app-shell/guards";
 import type { SubmitMissionActionResult } from "@/features/missions";
 import { submitMissionProof } from "@/features/missions/server";
 import { ROUTES } from "@/shared/config/routes";
@@ -26,7 +26,7 @@ const inputSchema = z.object({
 export async function submitMissionAnswerAction(input: unknown): Promise<SubmitMissionActionResult> {
   if (!(await moduleOn("missions"))) return { ok: false, code: "disabled" };
 
-  const session = await getSession();
+  const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   if (session.role !== "attendee") return { ok: false, code: session.role === null ? "not-registered" : "forbidden" };
 

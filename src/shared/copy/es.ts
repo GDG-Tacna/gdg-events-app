@@ -1669,7 +1669,7 @@ export const copy = {
       },
       team: {
         title: "Rol en el equipo",
-        help: "Una cuenta de cadete puede ayudar en el evento: dale un rol y aparece en Equipo, donde también se le puede quitar. Al quitárselo vuelve a jugar como cadete, con su XP y su avatar intactos.",
+        help: "Una cuenta de cadete puede ayudar en el evento: dale un rol y aparece en Equipo, donde también se le puede quitar. Con «Staff como cadetes» activado (Eventos › Módulos) sigue jugando mientras tenga el rol; si no, solo ve su vista de equipo hasta que se lo quites, y entonces vuelve a jugar con su XP y su avatar intactos.",
         /** Placeholder: {role}. */
         current: "Rol actual: {role}",
         none: "Ninguno: es solo cadete",
@@ -2099,6 +2099,7 @@ export const copy = {
           raffle: "Sorteo",
           polls: "Encuestas en vivo",
           speakerPlay: "Speakers como cadetes",
+          staffPlay: "Staff como cadetes",
         },
         help: {
           squads: "Los cadetes descubren su escuadrón y suman en equipo.",
@@ -2112,6 +2113,7 @@ export const copy = {
           raffle: "Sorteo final con los G-Credits como boletos.",
           polls: "Preguntas al público que los cadetes votan desde la app, con premio opcional.",
           speakerPlay: "Los speakers también juegan como cadetes. Apagado, su cuenta solo abre su QR de speaker.",
+          staffPlay: "El staff, los organizadores y los admins también juegan como cadetes. Apagado, su cuenta solo abre su vista de equipo.",
         },
         /** Placeholder: {parts}. */
         offWith: "Se apaga con {parts}.",
@@ -3203,6 +3205,30 @@ export const copy = {
         disabled: "Los códigos del equipo no están disponibles por ahora.",
         unknown: "No pudimos generar el código. Revisa la clave de firma del servidor e inténtalo de nuevo.",
       },
+    },
+  },
+  teamPlay: {
+    /** The cadet's home, for a team account that plays: the way back to their team screen. */
+    toTeam: {
+      label: "Tu cuenta del equipo",
+      /** Placeholder: {role}. */
+      title: "Eres {role} del equipo",
+      body: "Juegas como cadete con tu XP y tu avatar. Tu vista de equipo sigue aquí.",
+      open: "Ir a mi vista de equipo",
+    },
+    /** The team screens, for an account that has a cadet profile. */
+    toCadet: {
+      label: "Tu panel de cadete",
+      title: "También juegas como cadete",
+      body: "Tu XP, tus misiones y tu avatar de cadete siguen esperándote.",
+      open: "Ir a mi panel de cadete",
+    },
+    /** The team screens, for an account that has not signed up as a cadet yet. */
+    join: {
+      label: "Jugar como cadete",
+      title: "¿Quieres jugar también?",
+      body: "Elige un alias y suma XP como cualquier cadete. Seguirás siendo parte del equipo.",
+      open: "Jugar como cadete",
     },
   },
   speakerHome: {

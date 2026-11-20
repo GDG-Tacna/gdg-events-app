@@ -25,7 +25,7 @@ export interface RegisterAttendeeResult {
  */
 export async function registerAttendee(
   deps: RegisterAttendeeDeps,
-  input: { uid: string; rawAlias: string; ticket?: AttendeeTicket },
+  input: { uid: string; rawAlias: string; ticket?: AttendeeTicket; /** False for a team account that plays: its role claim stays as it is. */ grantRole?: boolean },
 ): Promise<Result<RegisterAttendeeResult, AttendeeError>> {
   const alias = createAlias(input.rawAlias);
   if (!alias.ok) return err(attendeeError("alias-invalid", alias.error));
@@ -38,8 +38,10 @@ export async function registerAttendee(
   const created = registered.value.kind === "created";
   if (created) deps.analytics.track({ name: "attendee_registered", uid: input.uid });
 
-  const granted = await deps.roles.grantAttendeeRole(input.uid);
-  if (!granted.ok) return granted;
+  if (input.grantRole !== false) {
+    const granted = await deps.roles.grantAttendeeRole(input.uid);
+    if (!granted.ok) return granted;
+  }
 
   return ok({ attendee: registered.value.kind === "created" ? attendee : registered.value.attendee, created });
 }

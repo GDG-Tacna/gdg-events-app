@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { avatarDeps } from "@/app-shell/composition/avatar.server";
-import { getSession } from "@/app-shell/guards";
+import { getCadetSession } from "@/app-shell/guards";
 import type { AvatarActionResult } from "@/features/avatar";
 import { resetAvatarLook, saveAvatarLook } from "@/features/avatar/server";
 import { ROUTES } from "@/shared/config/routes";
@@ -28,7 +28,7 @@ const lookSchema = z.object({
  * the session's account, and the use cases check the role and every choice again.
  */
 export async function saveAvatarAction(input: { look: unknown }): Promise<AvatarActionResult> {
-  const session = await getSession();
+  const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   const parsed = lookSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "invalid-look" };
@@ -39,7 +39,7 @@ export async function saveAvatarAction(input: { look: unknown }): Promise<Avatar
 }
 
 export async function resetAvatarAction(): Promise<AvatarActionResult> {
-  const session = await getSession();
+  const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   const reset = await resetAvatarLook(avatarDeps, { uid: session.uid, role: session.role });
   if (!reset.ok) return { ok: false, code: reset.error.code };

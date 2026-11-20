@@ -5,7 +5,7 @@ import { z } from "zod";
 import { unlockAchievements } from "@/app-shell/composition/achievements.server";
 import { missionDeps } from "@/app-shell/composition/missions.server";
 import { networkDeps } from "@/app-shell/composition/network.server";
-import { getSession } from "@/app-shell/guards";
+import { getCadetSession } from "@/app-shell/guards";
 import { completeBySquads } from "@/features/missions/server";
 import type { ConnectContactActionResult, IssueContactCodeActionResult, SaveContactLinksActionResult } from "@/features/network";
 import { connectCadets, issueContactCode, saveContactLinks, verifyContactCode, type NetworkActor } from "@/features/network/server";
@@ -23,7 +23,7 @@ const linksSchema = z.object({ linkedin: z.string().max(300), github: z.string()
  */
 async function cadet(): Promise<NetworkActor | { ok: false; code: "disabled" | "unauthenticated" }> {
   if (!(await moduleOn("network"))) return { ok: false, code: "disabled" };
-  const session = await getSession();
+  const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   return { uid: session.uid, role: session.role };
 }

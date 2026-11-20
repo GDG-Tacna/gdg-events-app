@@ -7,7 +7,7 @@ import { axe } from "@/test-utils/axe";
 vi.mock("server-only", () => ({}));
 vi.mock("@/app-shell/composition/checkpoints.server", () => ({ serveDeps: { marker: "deps" } }));
 
-const guards = { requireRole: vi.fn() };
+const guards = { requireRole: vi.fn(), teamPlayState: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 const permissions = vi.hoisted(() => ({ staffStations: vi.fn(), staffCheckpoints: vi.fn() }));
 vi.mock("@/app-shell/permissions.server", () => permissions);
@@ -21,6 +21,7 @@ describe("staff home page", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     guards.requireRole.mockResolvedValue({ uid: "s1", role: "staff", displayName: null, photoUrl: null });
+    guards.teamPlayState.mockResolvedValue("off");
     permissions.staffStations.mockResolvedValue(["entrance", "catering", "stand"]);
     permissions.staffCheckpoints.mockResolvedValue(undefined);
     server.listServePoints.mockResolvedValue({
@@ -39,6 +40,24 @@ describe("staff home page", () => {
 
     expect(guards.requireRole).toHaveBeenCalledWith(["staff"]);
     expect(server.listServePoints).toHaveBeenCalledWith({ marker: "deps" }, { uid: "s1", role: "staff", kinds: ["entrance", "catering", "stand"] });
+  });
+
+  it("offers the way to the cadet panel to a staff account that plays, and the way to sign up to one that may, and nothing when «Staff como cadetes» is off", async () => {
+    guards.teamPlayState.mockResolvedValue("play");
+    const first = render(await StaffHomePage());
+    expect(guards.teamPlayState).toHaveBeenCalledWith("staff", "s1");
+    expect(screen.getByRole("link", { name: copy.teamPlay.toCadet.open })).toHaveAttribute("href", "/dashboard");
+    first.unmount();
+
+    guards.teamPlayState.mockResolvedValue("join");
+    const second = render(await StaffHomePage());
+    expect(screen.getByRole("link", { name: copy.teamPlay.join.open })).toHaveAttribute("href", "/onboarding");
+    second.unmount();
+
+    guards.teamPlayState.mockResolvedValue("off");
+    render(await StaffHomePage());
+    expect(screen.queryByRole("link", { name: copy.teamPlay.toCadet.open })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: copy.teamPlay.join.open })).not.toBeInTheDocument();
   });
 
   it("does not read anything when the guard stops the request", async () => {
