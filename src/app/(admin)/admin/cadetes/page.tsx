@@ -6,7 +6,7 @@ import { requireRole } from "@/app-shell/guards";
 import { requireSection } from "@/app-shell/permissions.server";
 import { listTeam } from "@/features/admin/server";
 import { CadetsListView } from "@/features/cadets";
-import { CADETS_SEARCH_MAX, listCadets } from "@/features/cadets/server";
+import { CADETS_SEARCH_MAX, CADETS_SEARCH_MIN, listCadets } from "@/features/cadets/server";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { ScreenEnter } from "@/shared/ui";
@@ -19,7 +19,9 @@ export default async function AdminCadetsPage({ searchParams }: PageProps<"/admi
   const session = await requireRole(["admin"]);
   await requireSection(session, "cadets");
   const params = await searchParams;
-  const search = first(params.q).slice(0, CADETS_SEARCH_MAX);
+  // A search shorter than the minimum is no search: the box asks as the person types, and one letter shows everyone.
+  const typed = first(params.q).slice(0, CADETS_SEARCH_MAX).trim();
+  const search = typed.length >= CADETS_SEARCH_MIN ? typed : "";
   const after = first(params.despues) || null;
 
   const [page, squads, team] = await Promise.all([

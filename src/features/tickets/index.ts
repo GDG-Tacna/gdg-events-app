@@ -19,5 +19,15 @@ export { ChangeTicketScreen, type ChangeTicketScreenProps } from "./ui/ChangeTic
 export { ImportTicketsView, type ImportTicketsViewProps } from "./ui/ImportTicketsView";
 export { TicketBadge, TicketChip, ticketIncludes, ticketName } from "./ui/TicketChip";
 export type { TicketHolder } from "./domain/ports";
-export type { ChangeCadetTicketAction, ImportTicketHoldersAction, ImportTicketsActionResult, LookupTicketAction, LookupTicketActionResult, TicketActionResult } from "./ui/actions";
+export type {
+  ChangeCadetTicketAction,
+  ImportTicketHoldersAction,
+  ImportTicketsActionResult,
+  LookupTicketAction,
+  LookupTicketActionResult,
+  SearchTicketCadetsAction,
+  SearchTicketCadetsActionResult,
+  TicketActionResult,
+  TicketSearchHit,
+} from "./ui/actions";
 export type { TicketsError, TicketsErrorCode } from "./domain/error";

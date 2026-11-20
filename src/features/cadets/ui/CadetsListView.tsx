@@ -2,8 +2,9 @@ import Link from "next/link";
 import { TicketChip } from "@/features/tickets";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
-import { Button, ButtonLink, Card } from "@/shared/ui";
+import { ButtonLink, Card } from "@/shared/ui";
 import type { CadetRow } from "./actions";
+import { CadetSearchBox } from "./CadetSearchBox";
 
 export interface CadetsListViewProps {
   cadets: readonly CadetRow[];
@@ -21,7 +22,8 @@ const chip = "type-caption border-line-strong text-foreground px-space-3 rounded
 
 /**
  * The Cadetes screen: everyone registered in the edition, by alias, each with their real name and email, with a search
- * by alias, name, email or squad and a link to each one's page. It only shows (the search is a plain form, the next page a plain link): no state, no client code.
+ * by alias, name, email or squad and a link to each one's page. It only shows (the next page is a plain link): no state,
+ * no client code of its own. The search box is the one client piece: it filters as the person types.
  */
 export function CadetsListView({ cadets, total, search, nextHref, hrefs }: CadetsListViewProps) {
   const t = copy.admin.cadets;
@@ -37,26 +39,7 @@ export function CadetsListView({ cadets, total, search, nextHref, hrefs }: Cadet
         ) : null}
       </header>
 
-      <form action={hrefs.list} method="get" role="search" className="gap-space-2 flex">
-        <div className="gap-space-2 flex min-w-0 flex-1 flex-col">
-          <label htmlFor="cadet-search" className="type-label text-foreground">
-            {t.searchLabel}
-          </label>
-          <input
-            id="cadet-search"
-            name="q"
-            type="search"
-            defaultValue={search}
-            maxLength={80}
-            autoComplete="off"
-            placeholder={t.searchPlaceholder}
-            className="type-body bg-bg-deep text-foreground border-line-strong focus-visible:ring-ring h-12 w-full min-w-0 rounded-md border px-4 text-base focus-visible:ring-[3px] focus-visible:outline-none"
-          />
-        </div>
-        <Button type="submit" className="self-end">
-          {t.search}
-        </Button>
-      </form>
+      <CadetSearchBox list={hrefs.list} search={search} />
 
       {cadets.length === 0 ? (
         <Card>

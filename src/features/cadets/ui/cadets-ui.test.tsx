@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { copy } from "@/shared/copy/es";
@@ -10,7 +10,7 @@ import type { BanCadetAction, CadetDetailData, CadetRow, CadetSpeakerControls, C
 import { CadetDetailView } from "./CadetDetailView";
 import { CadetsListView } from "./CadetsListView";
 
-const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 
 const t = copy.admin.cadets;
@@ -71,7 +71,7 @@ describe("CadetsListView", () => {
     expect(items[1]).toHaveTextContent(t.noEmail);
   });
 
-  it("searches with a plain form that keeps the search in the box", () => {
+  it("keeps the search in the box, and stays a plain GET form for when scripts do not run", () => {
     renderList({ search: "mi" });
 
     const form = screen.getByRole("search");
@@ -79,6 +79,7 @@ describe("CadetsListView", () => {
     expect(form).toHaveAttribute("method", "get");
     expect(screen.getByLabelText(t.searchLabel)).toHaveValue("mi");
     expect(screen.getByLabelText(t.searchLabel)).toHaveAttribute("name", "q");
+    expect(screen.queryByRole("button", { name: /buscar/i })).not.toBeInTheDocument();
   });
 
   it("offers the next page only when there is one", () => {
@@ -103,6 +104,94 @@ describe("CadetsListView", () => {
   it("has no detectable accessibility violations", async () => {
     const { container } = renderList();
     expect((await axe(container)).violations).toEqual([]);
+  });
+});
+
+describe("CadetsListView search as you type", () => {
+  const LIST = "/admin/cadetes";
+  const user = () => userEvent.setup();
+  /** Lets the box's pause (300 ms) run out, so what it asks for has been asked. Real timers: fake ones stall Testing Library's async helpers under Vitest. */
+  const pause = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 450)));
+  const renderList = (search = "") => render(<CadetsListView cadets={[ROW("u1", "Nova")]} total={1} search={search} nextHref={null} hrefs={HREFS} />);
+  const box = () => screen.getByLabelText(t.searchLabel);
+
+  beforeEach(() => router.replace.mockClear());
+
+  it("does not navigate when it opens, with or without a search in the address", async () => {
+    renderList("mi");
+    await pause();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("asks for the search a moment after the person stops typing, once, without a page jump", async () => {
+    renderList();
+
+    await user().type(box(), "nov");
+    expect(router.replace).not.toHaveBeenCalled();
+    await pause();
+
+    expect(router.replace).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith("/admin/cadetes?q=nov", { scroll: false });
+    expect(box()).toHaveValue("nov");
+  });
+
+  it("does not search with one letter, and goes back to the full list when the text gets that short", async () => {
+    renderList();
+
+    await user().type(box(), "n");
+    await pause();
+    expect(router.replace).not.toHaveBeenCalled();
+
+    await user().type(box(), "o");
+    await pause();
+    expect(router.replace).toHaveBeenLastCalledWith("/admin/cadetes?q=no", { scroll: false });
+
+    await user().type(box(), "{Backspace}");
+    await pause();
+    expect(router.replace).toHaveBeenLastCalledWith(LIST, { scroll: false });
+  });
+
+  it("encodes what is typed, and ignores spaces around it", async () => {
+    renderList();
+
+    await user().type(box(), " ana&co ");
+    await pause();
+
+    expect(router.replace).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith("/admin/cadetes?q=ana%26co", { scroll: false });
+  });
+
+  it("searches at once on Enter, and only once when the pause ends", async () => {
+    renderList();
+
+    await user().type(box(), "nova{Enter}");
+    expect(router.replace).toHaveBeenCalledTimes(1);
+    expect(router.replace).toHaveBeenCalledWith("/admin/cadetes?q=nova", { scroll: false });
+    await pause();
+
+    expect(router.replace).toHaveBeenCalledTimes(1);
+  });
+
+  it("follows the address when something else clears the search (the «Ver todos» link)", async () => {
+    const { rerender } = renderList("zz");
+    expect(box()).toHaveValue("zz");
+
+    rerender(<CadetsListView cadets={[ROW("u1", "Nova")]} total={1} search="" nextHref={null} hrefs={HREFS} />);
+
+    expect(box()).toHaveValue("");
+    await pause();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("keeps what is being typed when an older address arrives in the middle of typing", async () => {
+    const { rerender } = renderList();
+
+    await user().type(box(), "no");
+    await pause();
+    await user().type(box(), "v");
+    rerender(<CadetsListView cadets={[ROW("u1", "Nova")]} total={1} search="" nextHref={null} hrefs={HREFS} />);
+
+    expect(box()).toHaveValue("nov");
   });
 });
 

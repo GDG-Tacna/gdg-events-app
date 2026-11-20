@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/app-shell/composition/tickets.server", () => ({ ticketDeps: { marker: "tickets" } }));
+const searchLimiter = vi.hoisted(() => ({ consume: vi.fn() }));
+vi.mock("@/app-shell/composition/tickets.server", () => ({ ticketDeps: { marker: "tickets" }, ticketSearchLimiter: searchLimiter }));
 const serve = vi.hoisted(() => ({
   limiter: { consume: vi.fn() },
   passes: { verify: vi.fn() },
   attendees: { find: vi.fn() },
 }));
 vi.mock("@/app-shell/composition/checkpoints.server", () => ({ serveDeps: serve }));
+
+vi.mock("@/app-shell/composition/cadets.server", () => ({ cadetsDeps: { marker: "cadets" } }));
+const cadets = vi.hoisted(() => ({ findCadetsForTicket: vi.fn(), TICKET_SEARCH_MIN: 3 }));
+vi.mock("@/features/cadets/server", () => cadets);
 
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
@@ -151,6 +156,68 @@ describe("lookupTicketAction", () => {
 
     serve.limiter.consume.mockResolvedValue(false);
     expect(await actions.lookupTicketAction({ payload: "devfest:at:abc" })).toEqual({ ok: false, code: "rate-limited" });
+  });
+});
+
+describe("searchTicketCadetsAction", () => {
+  const hit = { uid: UID, alias: "Nova_7", name: "Ana Quispe", email: "an•••••@gmail.com", ticket: "pro" };
+
+  beforeEach(() => {
+    guards.getSession.mockResolvedValue(session("staff"));
+    searchLimiter.consume.mockResolvedValue(true);
+    cadets.findCadetsForTicket.mockResolvedValue({ ok: true, value: [hit] });
+  });
+
+  it("answers the cadets found, as the actor of the session, with the masked email the use case gives", async () => {
+    expect(await actions.searchTicketCadetsAction({ query: "  ana " })).toEqual({ ok: true, cadets: [hit] });
+
+    expect(searchLimiter.consume).toHaveBeenCalledWith("a1");
+    expect(cadets.findCadetsForTicket).toHaveBeenCalledWith({ marker: "cadets" }, { uid: "a1", role: "staff" }, "ana");
+  });
+
+  it("needs a session, and is for staff and admins only", async () => {
+    guards.getSession.mockResolvedValue(null);
+    expect(await actions.searchTicketCadetsAction({ query: "ana" })).toEqual({ ok: false, code: "unauthenticated" });
+
+    guards.getSession.mockResolvedValue(session("attendee"));
+    expect(await actions.searchTicketCadetsAction({ query: "ana" })).toEqual({ ok: false, code: "forbidden" });
+    expect(cadets.findCadetsForTicket).not.toHaveBeenCalled();
+  });
+
+  it("refuses staff limited to no station, and staff with check-ins off", async () => {
+    permissions.staffCheckpoints.mockResolvedValue([]);
+    expect(await actions.searchTicketCadetsAction({ query: "ana" })).toEqual({ ok: false, code: "forbidden" });
+
+    permissions.staffCheckpoints.mockResolvedValue(undefined);
+    features.FEATURES.checkins = false;
+    expect(await actions.searchTicketCadetsAction({ query: "ana" })).toEqual({ ok: false, code: "disabled" });
+    expect(cadets.findCadetsForTicket).not.toHaveBeenCalled();
+  });
+
+  it("refuses a text that is too short or too long before reading anything", async () => {
+    expect(await actions.searchTicketCadetsAction({ query: " an " })).toEqual({ ok: false, code: "invalid-search" });
+    expect(await actions.searchTicketCadetsAction({ query: "a".repeat(81) })).toEqual({ ok: false, code: "invalid-search" });
+    expect(searchLimiter.consume).not.toHaveBeenCalled();
+    expect(cadets.findCadetsForTicket).not.toHaveBeenCalled();
+  });
+
+  it("answers rate-limited when the staff searches too fast", async () => {
+    searchLimiter.consume.mockResolvedValue(false);
+
+    expect(await actions.searchTicketCadetsAction({ query: "ana" })).toEqual({ ok: false, code: "rate-limited" });
+    expect(cadets.findCadetsForTicket).not.toHaveBeenCalled();
+  });
+
+  it("has a limit of its own: searching as the staff type never uses up the scans' budget", async () => {
+    await actions.searchTicketCadetsAction({ query: "ana" });
+
+    expect(serve.limiter.consume).not.toHaveBeenCalled();
+  });
+
+  it("answers unknown when the search fails, never the cause", async () => {
+    cadets.findCadetsForTicket.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+
+    expect(await actions.searchTicketCadetsAction({ query: "ana" })).toEqual({ ok: false, code: "unknown" });
   });
 });
 

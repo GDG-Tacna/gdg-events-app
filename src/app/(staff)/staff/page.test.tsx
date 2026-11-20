@@ -54,12 +54,8 @@ describe("staff home page", () => {
     const groups = screen.getByRole("group", { name: copy.staff.listLabel });
     const links = within(groups).getAllByRole("link", { name: copy.staff.serve });
     expect(links.map((link) => link.getAttribute("href"))).toEqual(["/staff/serve/entrance-main", "/staff/serve/lunch-1", "/staff/serve/coffee-1", "/staff/serve/stand-cloud"]);
-    expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([
-      copy.staff.kinds.entrance,
-      copy.staff.kinds.catering,
-      copy.staff.kinds.stand,
-      copy.staff.tickets.card.title,
-    ]);
+    // The ticket change has no card of its own while an entrance is open: it is a button inside the entrance's card.
+    expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([copy.staff.kinds.entrance, copy.staff.kinds.catering, copy.staff.kinds.stand]);
     const catering = screen.getByRole("region", { name: copy.staff.kinds.catering });
     expect(within(catering).getByText("120 raciones entregadas")).toBeInTheDocument();
     // A count that could not be read is left out instead of showing a made-up number.
@@ -93,6 +89,47 @@ describe("staff home page", () => {
     render(await StaffHomePage());
 
     expect(screen.getByRole("link", { name: copy.staff.tickets.card.title })).toHaveAttribute("href", "/staff/entradas");
+  });
+
+  it("puts «Cambiar entrada» inside the check-in card, and not in a card of its own, while an entrance is open", async () => {
+    render(await StaffHomePage());
+
+    const entrance = screen.getByRole("region", { name: copy.staff.kinds.entrance });
+    expect(within(entrance).getByRole("link", { name: copy.staff.tickets.card.title })).toHaveAttribute("href", "/staff/entradas");
+    expect(screen.getAllByRole("link", { name: copy.staff.tickets.card.title })).toHaveLength(1);
+    expect(screen.queryByRole("heading", { level: 2, name: copy.staff.tickets.card.title })).not.toBeInTheDocument();
+  });
+
+  it("gives every open entrance its own «Cambiar entrada» button, all to the same screen", async () => {
+    server.listServePoints.mockResolvedValue({
+      ok: true,
+      value: [
+        { id: "door-a", kind: "entrance", name: "Puerta A", servedCount: 1 },
+        { id: "door-b", kind: "entrance", name: "Puerta B", servedCount: 2 },
+      ],
+    });
+
+    render(await StaffHomePage());
+
+    const links = screen.getAllByRole("link", { name: copy.staff.tickets.card.title });
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["/staff/entradas", "/staff/entradas"]);
+  });
+
+  it("keeps the card at the bottom when there is no open entrance", async () => {
+    server.listServePoints.mockResolvedValue({ ok: true, value: [{ id: "lunch-1", kind: "catering", name: "Almuerzo", servedCount: 1 }] });
+
+    render(await StaffHomePage());
+
+    expect(screen.getByRole("heading", { level: 2, name: copy.staff.tickets.card.title })).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: copy.staff.kinds.catering })).queryByRole("link", { name: copy.staff.tickets.card.title })).not.toBeInTheDocument();
+  });
+
+  it("leaves «Cambiar entrada» out of the entrance's card for staff an organizer limited to no station", async () => {
+    permissions.staffCheckpoints.mockResolvedValue([]);
+
+    render(await StaffHomePage());
+
+    expect(screen.queryByRole("link", { name: copy.staff.tickets.card.title })).not.toBeInTheDocument();
   });
 
   it("leaves the card out for staff an organizer limited to no station, who cannot change tickets either", async () => {

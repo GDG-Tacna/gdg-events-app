@@ -5,11 +5,16 @@ export {
   BAN_REASON_MAX,
   CADETS_PAGE_SIZE,
   CADETS_SEARCH_MAX,
+  CADETS_SEARCH_MIN,
+  TICKET_SEARCH_LIMIT,
+  TICKET_SEARCH_MIN,
   banCadet,
   changeCadetSquad,
   deleteCadet,
+  findCadetsForTicket,
   getCadet,
   listCadets,
+  maskEmail,
   renameCadet,
   unbanCadet,
   type AccountDirectory,
@@ -29,7 +34,9 @@ export {
   type CadetsError,
   type CadetsErrorCode,
   type IndexedCadet,
+  type TicketSearchHit,
 } from "./domain/manage";
 export { FirebaseAccountDirectory } from "./data/server/firebase-account-directory";
+export { CachedAccountDirectory, type CachedAccountDirectoryOptions } from "./data/server/cached-account-directory";
 export { CachedCadetStore, type CachedCadetStoreOptions } from "./data/server/cached-cadet-store";
 export { FirestoreCadetStore, toCadet } from "./data/server/firestore-cadet-store";

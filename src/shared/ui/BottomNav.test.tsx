@@ -121,6 +121,24 @@ describe("BottomNav", () => {
     expect(screen.getByRole("link", { name: "Inicio" })).not.toHaveAttribute("aria-current");
   });
 
+  it("does not mark a tab current on the pages below it that another tab claims (`exclude`)", () => {
+    const props: BottomNavProps = {
+      ...PROPS,
+      start: [{ href: "/staff", label: "Puestos", icon: "flag", exclude: ["/staff/mi-codigo"] }],
+      end: [{ href: "/staff/mi-codigo", label: "Mi código", icon: "person" }],
+    };
+
+    navigation.pathname = "/staff/mi-codigo";
+    const { unmount } = renderNav(props);
+    expect(screen.getByRole("link", { name: "Puestos" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: "Mi código" })).toHaveAttribute("aria-current", "page");
+    unmount();
+
+    navigation.pathname = "/staff/serve/door";
+    renderNav(props);
+    expect(screen.getByRole("link", { name: "Puestos" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("copes with a missing pathname (it is null outside the router)", () => {
     navigation.pathname = null;
     renderNav();
