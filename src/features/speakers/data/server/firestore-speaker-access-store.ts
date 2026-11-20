@@ -95,6 +95,19 @@ export class FirestoreSpeakerAccessStore implements SpeakerAccessStore {
     return done.ok ? ok(done.value ?? "gone") : done;
   }
 
+  async link(speakerId: string, uid: string): Promise<Result<"linked" | "taken" | null, { code: string }>> {
+    return this.change(
+      speakerId,
+      (row): { fields: Record<string, unknown> | null; answer: "linked" | "taken" } => {
+        if (row.accountUid === uid) return { fields: null, answer: "linked" };
+        if (row.accountUid) return { fields: null, answer: "taken" };
+        // The account is known, so any invitation (a link for another person) goes.
+        return { fields: { accountUid: uid, invite: null }, answer: "linked" };
+      },
+      "speakers.access.link",
+    );
+  }
+
   async unlink(speakerId: string): Promise<Result<boolean, { code: string }>> {
     const done = await this.change(speakerId, () => ({ fields: { accountUid: null, invite: null }, answer: true }), "speakers.access.unlink");
     return done.ok ? ok(done.value === true) : done;

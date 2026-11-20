@@ -5,6 +5,14 @@ vi.mock("server-only", () => ({}));
 const cadetsDepsAccounts = vi.hoisted(() => ({ lookup: vi.fn() }));
 vi.mock("@/app-shell/composition/cadets.server", () => ({ cadetsDeps: { marker: "cadets", accounts: cadetsDepsAccounts } }));
 vi.mock("@/app-shell/composition/squads.server", () => ({ squadStore: { list: async () => squads.list() } }));
+const teamRoles = vi.hoisted(() => ({ roleOf: vi.fn(), listTeam: vi.fn() }));
+vi.mock("@/app-shell/composition/admin.server", () => ({ teamDeps: { marker: "team", team: { roleOf: teamRoles.roleOf } } }));
+vi.mock("@/features/admin/server", () => ({ listTeam: teamRoles.listTeam }));
+vi.mock("@/app-shell/admin/team.actions", () => ({ grantRoleAction: async () => ({ ok: true }), revokeRoleAction: async () => ({ ok: true }) }));
+const speakers = vi.hoisted(() => ({ speakerLinksOf: vi.fn() }));
+vi.mock("@/features/speakers/server", () => speakers);
+vi.mock("@/app-shell/composition/speakers.server", () => ({ speakerAccessDeps: { marker: "speaker-access" } }));
+vi.mock("@/app-shell/speakers/access.actions", () => ({ linkSpeakerAccountAction: async () => ({ ok: true }), unlinkSpeakerAction: async () => ({ ok: true }) }));
 vi.mock("@/app-shell/tickets/tickets.actions", () => ({ changeCadetTicketAction: async () => ({ ok: true }) }));
 vi.mock("@/app-shell/cadets/manage.actions", () => ({
   renameCadetAction: async () => ({ ok: true }),
@@ -33,6 +41,8 @@ vi.mock("@/features/cadets/server", () => server);
 const { CadetDetailView, CadetsListView } = await import("@/features/cadets");
 const actions = await import("@/app-shell/cadets/manage.actions");
 const tickets = await import("@/app-shell/tickets/tickets.actions");
+const teamActions = await import("@/app-shell/admin/team.actions");
+const speakerActions = await import("@/app-shell/speakers/access.actions");
 const { default: AdminCadetsPage } = await import("./page");
 const { default: AdminCadetPage } = await import("./[uid]/page");
 
@@ -77,6 +87,9 @@ beforeEach(() => {
   guards.requireRole.mockResolvedValue(SESSION);
   permissions.mayEdit.mockResolvedValue(true);
   squads.list.mockResolvedValue({ ok: true, value: [{ id: "firebase", name: "Firebase" }] });
+  teamRoles.listTeam.mockResolvedValue({ ok: true, value: [] });
+  teamRoles.roleOf.mockResolvedValue({ ok: true, value: null });
+  speakers.speakerLinksOf.mockResolvedValue({ ok: true, value: { linked: null, available: [{ id: "ana", name: "Ana Torres" }] } });
 });
 
 describe("admin cadets list page", () => {
@@ -100,7 +113,7 @@ describe("admin cadets list page", () => {
 
     expect(server.listCadets).toHaveBeenCalledWith({ marker: "cadets", accounts: cadetsDepsAccounts }, { uid: "a1", role: "admin" }, { search: "no", after: null });
     expect(view?.props).toEqual({
-      cadets: [{ uid: "cadet-0001", alias: "Nova", name: "Nova Real", email: "nova@example.com", squadName: "Firebase", xp: 120, credits: 30, attended: true, banned: false, ticket: "premium" }],
+      cadets: [{ uid: "cadet-0001", alias: "Nova", name: "Nova Real", email: "nova@example.com", squadName: "Firebase", xp: 120, credits: 30, attended: true, banned: false, ticket: "premium", teamRole: null }],
       total: 40,
       search: "no",
       nextHref: "/admin/cadetes?q=no&despues=nova",
@@ -114,6 +127,17 @@ describe("admin cadets list page", () => {
     expect(server.listCadets).toHaveBeenCalledWith({ marker: "cadets", accounts: cadetsDepsAccounts }, { uid: "a1", role: "admin" }, { search: "", after: null });
     expect(view?.props.search).toBe("");
     expect(view?.props.nextHref).toBe("/admin/cadetes?despues=nova");
+  });
+
+  it("marks the cadets who hold a role in the team, and lists them without marks when the team cannot be read", async () => {
+    teamRoles.listTeam.mockResolvedValue({ ok: true, value: [{ uid: "cadet-0001", email: "nova@example.com", displayName: "Nova", role: "staff" }] });
+    const marked = findElement(await page(), CadetsListView);
+    expect((marked?.props.cadets as Array<{ teamRole: string | null }>)[0].teamRole).toBe("staff");
+    expect(teamRoles.listTeam).toHaveBeenCalledWith({ marker: "team", team: expect.anything() }, { uid: "a1", role: "admin", adminScope: "edition" });
+
+    teamRoles.listTeam.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+    const plain = findElement(await page(), CadetsListView);
+    expect((plain?.props.cadets as Array<{ teamRole: string | null }>)[0].teamRole).toBeNull();
   });
 
   it("reads the page after the cursor in the address, and links no next page at the end", async () => {
@@ -171,6 +195,45 @@ describe("admin cadet page", () => {
       isSelf: false,
       listHref: "/admin/cadetes",
     });
+  });
+
+  it("gives the view the controls for the team role: the one they hold, what the session may give, and the Equipo actions", async () => {
+    teamRoles.roleOf.mockResolvedValue({ ok: true, value: "staff" });
+
+    const view = findElement(await detail(), CadetDetailView);
+
+    expect(teamRoles.roleOf).toHaveBeenCalledWith("cadet-0001");
+    expect(permissions.mayEdit).toHaveBeenCalledWith(SESSION, "team");
+    expect(view?.props.team).toEqual({ role: "staff", assignable: ["staff"], give: teamActions.grantRoleAction, take: teamActions.revokeRoleAction });
+
+    guards.requireRole.mockResolvedValue({ ...SESSION, adminScope: "global" });
+    expect(findElement(await detail(), CadetDetailView)?.props.team).toMatchObject({ assignable: ["staff", "organizer", "admin"] });
+  });
+
+  it("gives the view the speaker link: who they are, who is free, and the Speakers actions, with the talks permission", async () => {
+    const view = findElement(await detail(), CadetDetailView);
+
+    expect(speakers.speakerLinksOf).toHaveBeenCalledWith({ marker: "speaker-access" }, { role: "admin" }, "cadet-0001");
+    expect(permissions.mayEdit).toHaveBeenCalledWith(SESSION, "talks");
+    expect(view?.props.speaker).toEqual({ linked: null, available: [{ id: "ana", name: "Ana Torres" }], link: speakerActions.linkSpeakerAccountAction, unlink: speakerActions.unlinkSpeakerAction });
+  });
+
+  it("offers no speaker link without the talks permission, nor when the speakers could not be read", async () => {
+    permissions.mayEdit.mockImplementation(async (_session, section) => section !== "talks");
+    expect(findElement(await detail(), CadetDetailView)?.props.speaker).toBeUndefined();
+
+    permissions.mayEdit.mockResolvedValue(true);
+    speakers.speakerLinksOf.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+    expect(findElement(await detail(), CadetDetailView)?.props.speaker).toBeUndefined();
+  });
+
+  it("offers no team role to a session without the team permission, nor when their role could not be read", async () => {
+    permissions.mayEdit.mockImplementation(async (_session, section) => section !== "team");
+    expect(findElement(await detail(), CadetDetailView)?.props.team).toBeUndefined();
+
+    permissions.mayEdit.mockResolvedValue(true);
+    teamRoles.roleOf.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+    expect(findElement(await detail(), CadetDetailView)?.props.team).toBeUndefined();
   });
 
   it("hands the view the ticket and where it came from, with the name of whoever set it by hand", async () => {

@@ -15,5 +15,6 @@ export type SpeakerAccessView =
 
 export type SpeakerAccessActionResult = { ok: true } | { ok: false; code: SpeakerAccessErrorCode };
 export type InviteSpeakerAction = (input: { speakerId: string; email: string }) => Promise<{ ok: true; path: string } | { ok: false; code: SpeakerAccessErrorCode }>;
+export type LinkSpeakerAccountAction = (input: { speakerId: string; uid: string }) => Promise<SpeakerAccessActionResult>;
 export type UnlinkSpeakerAction = (input: { speakerId: string }) => Promise<SpeakerAccessActionResult>;
 export type AcceptSpeakerInviteAction = (input: { token: string }) => Promise<SpeakerAccessActionResult>;

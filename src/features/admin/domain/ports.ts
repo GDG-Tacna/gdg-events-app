@@ -7,11 +7,17 @@ export interface RoleDirectory {
   /** `null` when nobody has signed in with that email. */
   findByEmail(email: string): Promise<Result<Account | null, TeamError>>;
   /**
-   * Sets the role claim; `null` clears it (the person registers as an attendee again on their next visit). It signs
-   * the person out everywhere so the change applies at once, unless `keepSession` (they accepted an invitation and
-   * renew their own session right after).
+   * Sets the role claim; `null` clears it (the person registers as an attendee again on their next visit) and
+   * `"attendee"` puts a cadet's own claim back, for someone who already has a cadet profile. It signs the person out
+   * everywhere so the change applies at once, unless `keepSession` (they accepted an invitation and renew their own
+   * session right after).
    */
-  setRole(uid: string, role: ManagedRole | null, options?: { keepSession?: boolean }): Promise<Result<void, TeamError>>;
+  setRole(uid: string, role: ManagedRole | "attendee" | null, options?: { keepSession?: boolean }): Promise<Result<void, TeamError>>;
+}
+
+/** Whether an account already is a cadet of the active edition, so that taking its team role away leaves it playing. */
+export interface CadetProfiles {
+  hasProfile(uid: string): Promise<Result<boolean, TeamError>>;
 }
 
 export interface TeamRepository {
