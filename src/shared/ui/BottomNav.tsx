@@ -9,6 +9,8 @@ export interface BottomNavItem {
   href: string;
   label: string;
   icon: IconName;
+  /** Paths below this tab's own that belong to another tab (the staff's "Puestos" is /staff, but /staff/entradas is not one of its pages). */
+  exclude?: readonly string[];
 }
 
 export interface BottomNavProps {
@@ -23,13 +25,13 @@ export interface BottomNavProps {
 }
 
 /** A tab is current by its path: the query it opens with (`?vista=agenda`) is not part of `usePathname`. */
-const isActive = (pathname: string | null, href: string) => {
-  const path = href.split("?")[0];
-  return pathname === path || (pathname !== null && pathname.startsWith(`${path}/`));
-};
+const isUnder = (pathname: string | null, path: string) => pathname === path || (pathname !== null && pathname.startsWith(`${path}/`));
+
+const isActive = (pathname: string | null, item: BottomNavItem) =>
+  isUnder(pathname, item.href.split("?")[0]) && !(item.exclude ?? []).some((path) => isUnder(pathname, path));
 
 function Tab({ item, pathname }: { item: BottomNavItem; pathname: string | null }) {
-  const active = isActive(pathname, item.href);
+  const active = isActive(pathname, item);
   return (
     <li className="relative flex-1 min-[760px]:flex-none">
       {active ? (
@@ -68,7 +70,7 @@ function Spacer() {
  */
 export function BottomNav({ label, start, action, end = [] }: BottomNavProps) {
   const pathname = usePathname();
-  const actionActive = isActive(pathname, action.href);
+  const actionActive = isActive(pathname, action);
   // The action stays in the true middle even when one side has fewer tabs (only Inicio exists at first):
   // empty slots take the room of the missing tabs on phones. The side rail has no use for them.
   const startSpacers = Math.max(0, end.length - start.length);

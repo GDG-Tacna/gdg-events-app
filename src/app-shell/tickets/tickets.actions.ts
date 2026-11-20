@@ -1,17 +1,20 @@
 "use server";
 
 import { z } from "zod";
+import { cadetsDeps } from "@/app-shell/composition/cadets.server";
 import { serveDeps } from "@/app-shell/composition/checkpoints.server";
-import { ticketDeps } from "@/app-shell/composition/tickets.server";
+import { ticketDeps, ticketSearchLimiter } from "@/app-shell/composition/tickets.server";
 import { getSession, type AppSession } from "@/app-shell/guards";
 import { mayEdit, staffCheckpoints, staffStations } from "@/app-shell/permissions.server";
-import { TICKET_TYPES, type ImportTicketsActionResult, type LookupTicketActionResult, type TicketActionResult, type TicketsErrorCode } from "@/features/tickets";
+import { TICKET_SEARCH_MIN, findCadetsForTicket } from "@/features/cadets/server";
+import { TICKET_TYPES, type ImportTicketsActionResult, type LookupTicketActionResult, type SearchTicketCadetsActionResult, type TicketActionResult, type TicketsErrorCode } from "@/features/tickets";
 import { HOLDERS_MAX_ROWS, changeCadetTicket, importTicketHolders, type TicketsActor } from "@/features/tickets/server";
 import { FEATURES } from "@/shared/config/features";
 
 const uidSchema = z.string().min(1).max(128);
 const changeSchema = z.object({ uid: uidSchema, type: z.enum(TICKET_TYPES) });
 const lookupSchema = z.object({ payload: z.string().min(1).max(512) });
+const searchSchema = z.object({ query: z.string().trim().min(TICKET_SEARCH_MIN).max(80) });
 const importSchema = z.object({
   rows: z.array(z.object({ email: z.string().max(254), fullName: z.string().max(200), type: z.enum(TICKET_TYPES) })).min(1).max(HOLDERS_MAX_ROWS),
 });
@@ -73,6 +76,22 @@ export async function lookupTicketAction(input: { payload: string }): Promise<Lo
   if (!attendee.ok) return { ok: false, code: "unknown" };
   if (attendee.value === null) return { ok: false, code: "attendee-not-found" };
   return { ok: true, uid: pass.value.uid, alias: attendee.value.alias, ticket: attendee.value.ticket };
+}
+
+/**
+ * The staff typed a name, an email or an alias at «Cambiar entrada» instead of scanning: it answers the registered
+ * cadets that match, each with their ticket and a masked email. Same actor rule as the scan. The screen asks as the
+ * staff type, so the search has a limit of its own and never uses up the one the scans share.
+ */
+export async function searchTicketCadetsAction(input: { query: string }): Promise<SearchTicketCadetsActionResult> {
+  const actor = await ticketActor();
+  if (refused(actor)) return actor;
+  const parsed = searchSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, code: "invalid-search" };
+
+  if (!(await ticketSearchLimiter.consume(actor.uid))) return { ok: false, code: "rate-limited" };
+  const found = await findCadetsForTicket(cadetsDeps, actor, parsed.data.query);
+  return found.ok ? { ok: true, cadets: found.value } : { ok: false, code: "unknown" };
 }
 
 /** Loads the edition's list of ticket holders (Admin › Cadetes › Entradas): only an admin who may edit Cadetes. */

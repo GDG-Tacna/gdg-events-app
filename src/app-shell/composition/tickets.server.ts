@@ -1,6 +1,7 @@
 import "server-only";
 import { FirebaseRoleDirectory, FirestoreAuditLog } from "@/features/admin/server";
 import { forgetCadetList } from "@/app-shell/composition/cadets.server";
+import { InMemoryAttemptLimiter } from "@/features/checkins/server";
 import { FirestoreParticipantTicketStore, FirestoreTicketHolderStore, type ChangeTicketDeps, type ImportHoldersDeps, type ParticipantTicketStore } from "@/features/tickets/server";
 import { err, ok } from "@/shared/lib/result";
 
@@ -8,6 +9,12 @@ const roleDirectory = new FirebaseRoleDirectory();
 
 /** The edition's list of ticket holders: read when a cadet registers, written by the admin's import. */
 export const ticketHolders = new FirestoreTicketHolderStore();
+
+/**
+ * The staff's «Cambiar entrada» search asks as they type, so it has its own limit (per minute, per account): typing
+ * never uses up the budget of the scans (serving and the pass lookup), which share another limiter.
+ */
+export const ticketSearchLimiter = new InMemoryAttemptLimiter({ maxAttempts: 120 });
 
 const storedTickets = new FirestoreParticipantTicketStore();
 

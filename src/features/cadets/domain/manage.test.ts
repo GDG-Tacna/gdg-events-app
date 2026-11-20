@@ -4,9 +4,11 @@ import {
   banCadet,
   changeCadetSquad,
   deleteCadet,
+  findCadetsForTicket,
   foldForSearch,
   getCadet,
   listCadets,
+  maskEmail,
   matchesCadet,
   renameCadet,
   unbanCadet,
@@ -175,6 +177,19 @@ describe("listCadets", () => {
     expect(await listCadets(deps, ADMIN, {})).toEqual(err({ code: "unknown" }));
   });
 
+  it("treats a search of fewer than 2 letters as no search (the box asks as the person types), and filters from 2", async () => {
+    const { deps } = setup({ identities: ok(IDENTITIES) });
+
+    await listCadets(deps, ADMIN, { search: "n" });
+    await listCadets(deps, ADMIN, { search: " é " });
+    expect(deps.store.list).toHaveBeenCalledTimes(2);
+    expect(deps.store.listAll).not.toHaveBeenCalled();
+
+    const listed = await listCadets(deps, ADMIN, { search: "no" });
+    expect(deps.store.listAll).toHaveBeenCalledTimes(1);
+    expect(listed.ok && listed.value.cadets.map((cadet) => cadet.alias)).toEqual(["Nova"]);
+  });
+
   describe("with a search", () => {
     const search = (query: string, after: string | null = null, deps = setup({ identities: ok(IDENTITIES) }).deps) => listCadets(deps, ADMIN, { search: query, after });
     const aliases = async (query: string, after: string | null = null, deps?: CadetsDeps) => {
@@ -203,9 +218,11 @@ describe("listCadets", () => {
     });
 
     it("orders by alias key and keeps the edition's total, not the matches", async () => {
-      const listed = await search("a");
+      const { deps } = setup();
+      deps.store.listAll.mockResolvedValue(ok({ cadets: ["Zeta", "Nova", "Renée", "Mia"].map((alias) => cadetRow(`u-${alias}`, `${alias} ab`)), total: 9 }));
+      const listed = await listCadets(deps, ADMIN, { search: "ab" });
 
-      expect(listed.ok && listed.value.cadets.map((cadet) => cadet.alias)).toEqual(["Mia", "Nova", "Renée", "Zeta"]);
+      expect(listed.ok && listed.value.cadets.map((cadet) => cadet.alias)).toEqual(["Mia ab", "Nova ab", "Renée ab", "Zeta ab"]);
       expect(listed.ok && listed.value.total).toBe(9);
       expect(listed.ok && "aliasKey" in (listed.value.cadets[0] ?? {})).toBe(false);
     });
@@ -239,7 +256,7 @@ describe("listCadets", () => {
 
     it("reads the accounts of every cadet of the edition in one lookup, and reports a failed read", async () => {
       const { deps } = setup({ identities: ok(IDENTITIES) });
-      await listCadets(deps, ADMIN, { search: "x" });
+      await listCadets(deps, ADMIN, { search: "xy" });
       expect(deps.accounts.lookupMany).toHaveBeenCalledTimes(1);
       expect(deps.accounts.lookupMany).toHaveBeenCalledWith(["u-nova", "u-mia", "u-zeta", "u-renee"]);
 
@@ -421,6 +438,93 @@ describe("deleteCadet", () => {
 
     expect(await deleteCadet(deps, GLOBAL, { uid: UID })).toEqual(ok(REMOVAL));
     expect(console.error).toHaveBeenCalled();
+  });
+});
+
+describe("maskEmail", () => {
+  it("keeps the first two characters of the local part and the whole domain", () => {
+    expect(maskEmail("sebastian@gmail.com")).toBe("se•••••@gmail.com");
+  });
+
+  it("keeps one character of a very short local part, and hides everything of a text that is not an email", () => {
+    expect(maskEmail("ab@x.com")).toBe("a•••••@x.com");
+    expect(maskEmail("a@x.com")).toBe("a•••••@x.com");
+    expect(maskEmail("not-an-email")).toBe("•••••");
+    expect(maskEmail("@x.com")).toBe("•••••");
+  });
+});
+
+describe("findCadetsForTicket", () => {
+  const find = async (query: string, actor: CadetsActor = { uid: "s1", role: "staff" }, deps = setup({ identities: ok(IDENTITIES) }).deps) => findCadetsForTicket(deps, actor, query);
+  const aliases = async (query: string) => {
+    const found = await find(query);
+    return found.ok ? found.value.map((hit) => hit.alias) : found;
+  };
+
+  it.each([
+    ["an attendee", { uid: "u1", role: "attendee" }],
+    ["no role", { uid: "x", role: null }],
+  ] as const)("refuses %s, and reads nothing", async (_who, actor) => {
+    const { deps } = setup({ identities: ok(IDENTITIES) });
+
+    expect(await find("nova", actor, deps)).toEqual(err({ code: "forbidden" }));
+    expect(deps.store.listAll).not.toHaveBeenCalled();
+  });
+
+  it("is open to staff and to admins", async () => {
+    expect((await find("nova", { uid: "s1", role: "staff" })).ok).toBe(true);
+    expect((await find("nova", ADMIN)).ok).toBe(true);
+  });
+
+  it("answers nothing for a text shorter than three characters, without reading the edition", async () => {
+    const { deps } = setup({ identities: ok(IDENTITIES) });
+
+    expect(await find("  no ", { uid: "s1", role: "staff" }, deps)).toEqual(ok([]));
+    expect(deps.store.listAll).not.toHaveBeenCalled();
+  });
+
+  it("finds by alias, account name and email, ignoring case and accents", async () => {
+    expect(await aliases("NOVA")).toEqual(["Nova"]);
+    expect(await aliases("rené")).toEqual(["Renée"]);
+    expect(await aliases("jose perez")).toEqual(["Zeta"]);
+    expect(await aliases("@uni.edu")).toEqual(["Mia"]);
+  });
+
+  it("does not search the squads", async () => {
+    expect(await aliases("firebase")).toEqual([]);
+  });
+
+  it("gives the name, the ticket and a masked email, never the full one", async () => {
+    const found = await find("zeta");
+
+    expect(found).toEqual(ok([{ uid: "u-zeta", alias: "Zeta", name: "José Pérez", email: "ze•••••@example.com", ticket: "general" }]));
+    expect(JSON.stringify(found)).not.toContain("zeta@example.com");
+  });
+
+  it("leaves the name and email empty for a cadet whose account says none", async () => {
+    const found = await find("renee");
+
+    expect(found).toEqual(ok([{ uid: "u-renee", alias: "Renée", name: null, email: null, ticket: "general" }]));
+  });
+
+  it("orders by alias and stops at ten", async () => {
+    const { deps } = setup({ identities: ok(new Map()) });
+    const many: IndexedCadet[] = Array.from({ length: 15 }, (_, at) => cadetRow(`u-${at}`, `Cad${String(at).padStart(2, "0")}`));
+    deps.store.listAll.mockResolvedValue(ok({ cadets: [...many].reverse(), total: 15 }));
+
+    const found = await find("cad", { uid: "s1", role: "staff" }, deps);
+
+    expect(found.ok && found.value.map((hit) => hit.alias)).toEqual(many.slice(0, 10).map((cadet) => cadet.alias));
+  });
+
+  it("still finds by alias when the accounts cannot be read, and reports a failed read of the edition", async () => {
+    const failing = setup({ identities: err({ code: "x" }) });
+    expect(await find("mia", { uid: "s1", role: "staff" }, failing.deps)).toEqual(ok([{ uid: "u-mia", alias: "Mia", name: null, email: null, ticket: "general" }]));
+    expect(await find("jose", { uid: "s1", role: "staff" }, failing.deps)).toEqual(ok([]));
+
+    const { deps } = setup();
+    deps.store.listAll.mockResolvedValueOnce(err({ code: "x" }));
+    expect(await find("nova", { uid: "s1", role: "staff" }, deps)).toEqual(err({ code: "unknown" }));
   });
 });
 

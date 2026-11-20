@@ -27,7 +27,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const server = vi.hoisted(() => ({ CADETS_SEARCH_MAX: 80, listCadets: vi.fn(), getCadet: vi.fn() }));
+const server = vi.hoisted(() => ({ CADETS_SEARCH_MAX: 80, CADETS_SEARCH_MIN: 2, listCadets: vi.fn(), getCadet: vi.fn() }));
 vi.mock("@/features/cadets/server", () => server);
 
 const { CadetDetailView, CadetsListView } = await import("@/features/cadets");
@@ -106,6 +106,14 @@ describe("admin cadets list page", () => {
       nextHref: "/admin/cadetes?q=no&despues=nova",
       hrefs: { list: "/admin/cadetes", detailBase: "/admin/cadetes", tickets: "/admin/cadetes/entradas" },
     });
+  });
+
+  it("treats a search of one letter as no search: lists everyone and keeps it out of the next link", async () => {
+    const view = findElement(await page({ q: " n " }), CadetsListView);
+
+    expect(server.listCadets).toHaveBeenCalledWith({ marker: "cadets", accounts: cadetsDepsAccounts }, { uid: "a1", role: "admin" }, { search: "", after: null });
+    expect(view?.props.search).toBe("");
+    expect(view?.props.nextHref).toBe("/admin/cadetes?despues=nova");
   });
 
   it("reads the page after the cursor in the address, and links no next page at the end", async () => {

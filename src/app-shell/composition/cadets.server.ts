@@ -1,7 +1,7 @@
 import "server-only";
 import { FirestoreAuditLog } from "@/features/admin/server";
 import { createAlias } from "@/features/attendee";
-import { CachedCadetStore, FirebaseAccountDirectory, FirestoreCadetStore, type CadetsDeps } from "@/features/cadets/server";
+import { CachedAccountDirectory, CachedCadetStore, FirebaseAccountDirectory, FirestoreCadetStore, type CadetsDeps } from "@/features/cadets/server";
 import { err, ok } from "@/shared/lib/result";
 import { squadStore } from "./squads.server";
 
@@ -18,7 +18,8 @@ export const forgetCadetList = (): void => cadetStore.forget();
  */
 export const cadetsDeps: CadetsDeps = {
   store: cadetStore,
-  accounts: new FirebaseAccountDirectory(),
+  // Names and emails are read for every cadet on each search: kept for a minute, so typing does not ask for them again.
+  accounts: new CachedAccountDirectory(new FirebaseAccountDirectory()),
   aliases: { check: createAlias },
   squads: {
     exists: async (id) => {

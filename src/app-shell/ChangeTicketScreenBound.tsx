@@ -1,6 +1,6 @@
 "use client";
 
-import { changeCadetTicketAction, lookupTicketAction } from "@/app-shell/tickets/tickets.actions";
+import { changeCadetTicketAction, lookupTicketAction, searchTicketCadetsAction } from "@/app-shell/tickets/tickets.actions";
 import { QrCodeCamera } from "@/features/scanner";
 import { ChangeTicketScreen } from "@/features/tickets";
 import { ROUTES } from "@/shared/config/routes";
@@ -10,5 +10,5 @@ import { ROUTES } from "@/shared/config/routes";
  * same reason the serve screen does: it is the one place that knows both the camera and the actions.
  */
 export function ChangeTicketScreenBound() {
-  return <ChangeTicketScreen camera={QrCodeCamera} lookup={lookupTicketAction} change={changeCadetTicketAction} backHref={ROUTES.staff} />;
+  return <ChangeTicketScreen camera={QrCodeCamera} lookup={lookupTicketAction} search={searchTicketCadetsAction} change={changeCadetTicketAction} backHref={ROUTES.staff} />;
 }

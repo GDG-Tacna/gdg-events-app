@@ -23,6 +23,7 @@ export default async function StaffHomePage() {
   // The use case already orders them entrance, catering, stand; each kind with stations gets its own group.
   // Changing a ticket needs a station to operate, like serving: staff the organizer limited to none do not get the card.
   const mayChangeTickets = kinds === undefined || (kinds.length > 0 && (checkpointIds === undefined || checkpointIds.length > 0));
+  const hasEntrance = points.value.some((point) => point.kind === "entrance");
   const groups = STATION_KINDS.map((kind) => ({ kind, points: points.value.filter((point) => point.kind === kind) })).filter((group) => group.points.length > 0);
 
   return (
@@ -71,6 +72,12 @@ export default async function StaffHomePage() {
                             {point.kind === "stand" ? copy.staff.showStandQr : copy.staff.showEntranceQr}
                           </ButtonLink>
                         ) : null}
+                        {/* The ticket change belongs to the check-in: where the cadets come in, someone buys their ticket on the day. */}
+                        {point.kind === "entrance" && mayChangeTickets ? (
+                          <ButtonLink href={ROUTES.staffTickets} variant="secondary">
+                            {copy.staff.tickets.card.title}
+                          </ButtonLink>
+                        ) : null}
                       </Card>
                     </li>
                   ))}
@@ -80,7 +87,8 @@ export default async function StaffHomePage() {
           </div>
         )}
 
-        {mayChangeTickets ? (
+        {/* With an open entrance the button lives in its card; the card at the bottom is for when there is none. */}
+        {mayChangeTickets && !hasEntrance ? (
           <Card className="gap-space-3 flex flex-col">
             <div className="gap-space-1 flex flex-col">
               <h2 className="type-title text-foreground">{copy.staff.tickets.card.title}</h2>

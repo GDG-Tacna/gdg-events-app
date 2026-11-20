@@ -733,6 +733,7 @@ export const copy = {
       "invalid-rows": "La lista tiene filas que no son válidas. Revisa los correos y los tipos.",
       "too-many-rows": "La lista es demasiado larga: se importan hasta 2000 filas a la vez.",
       "not-found": "Ese cadete no está registrado en esta edición.",
+      "invalid-search": "Escribe al menos 3 letras del nombre, el correo o el alias.",
       "invalid-code": "QR no válido. Pídele que abra su QR en la app y vuelve a escanear.",
       "expired-code": "El QR venció. Pídele que vuelva a abrir su QR.",
       "attendee-not-found": "No está registrado: debe completar su perfil en la app.",
@@ -766,6 +767,8 @@ export const copy = {
   staff: {
     brand: "Puesto de staff",
     accountLabel: "Cuenta de staff",
+    /** The bottom bar: the stations, the ticket change (scan a cadet's QR or search for them) in the middle, and the staff's own code. */
+    nav: { label: "Navegación del staff", stations: "Puestos", tickets: "Cambiar entrada", code: "Mi código" },
     title: "Puestos",
     subtitle: "Elige tu puesto. Escanea el QR de cada cadete o, en la entrada y los stands, muestra el código en pantalla para que ellos lo escaneen.",
     listLabel: "Puestos abiertos",
@@ -808,17 +811,27 @@ export const copy = {
     changeTicketLink: "Cambiar entrada",
     /** The staff screen that changes a cadet's ticket (`/staff/entradas`). */
     tickets: {
-      card: { title: "Cambiar entrada", body: "Escanea el QR de un cadete para ver su entrada y cambiarla, por ejemplo si la compra en el momento." },
+      card: { title: "Cambiar entrada", body: "Escanea el QR de un cadete, o búscalo por nombre o correo, para ver su entrada y cambiarla, por ejemplo si la compra en el momento." },
       title: "Cambiar entrada",
-      subtitle: "Escanea el QR del cadete, elige su entrada nueva y confirma. Cada cambio queda registrado.",
+      subtitle: "Escanea el QR del cadete o búscalo por nombre o correo, elige su entrada nueva y confirma. Cada cambio queda registrado.",
       hint: "Pídele al cadete que abra su QR y escanéalo.",
+      /** Finding a cadet without scanning: by account name, email or alias. */
+      search: {
+        label: "Buscar por nombre, correo o alias",
+        placeholder: "Nombre, correo o alias",
+        searching: "Buscando…",
+        /** Shown quietly under the box while one or two letters are typed (not an error: the search starts at three). */
+        tooShort: "Escribe al menos 3 letras.",
+        empty: "No encontramos cadetes con ese dato. Solo aparecen quienes ya se registraron en la app.",
+        resultsLabel: "Cadetes encontrados",
+      },
       sending: "Verificando el QR…",
       /** Placeholder: {name}. */
       current: "Entrada actual: {name}",
       pickLegend: "Entrada nueva",
       /** Placeholder: {name}. */
       confirm: "Poner entrada {name}",
-      cancel: "Escanear a otro cadete",
+      cancel: "Atender a otro cadete",
       /** Placeholders: {alias}, {name}. */
       done: "{alias} ahora tiene entrada {name}.",
       unchanged: "{alias} ya tenía entrada {name}.",
@@ -1524,7 +1537,10 @@ export const copy = {
       subtitle: "Quién se registró en esta edición ({n} en total). Entra a un cadete para cambiar su alias o escuadrón, bloquearlo o eliminar un registro hecho por error.",
       searchLabel: "Buscar cadetes",
       searchPlaceholder: "Alias, nombre, correo o escuadrón",
-      search: "Buscar",
+      /** Under the box: the list filters as the person types, from two letters. */
+      searchHint: "La lista se filtra mientras escribes, desde 2 letras.",
+      /** Read out while the list reloads after a pause in typing. */
+      searching: "Buscando…",
       clear: "Ver todos",
       listLabel: "Cadetes de la edición",
       empty: "Todavía no se registró ningún cadete.",

@@ -91,6 +91,8 @@ export interface CadetListPage {
 export const CADETS_PAGE_SIZE = 25;
 /** Longest search kept: enough for a whole email. */
 export const CADETS_SEARCH_MAX = 80;
+/** Fewest letters that filter the admin's list; with fewer it shows everyone, so the first key of a search does not reload it. */
+export const CADETS_SEARCH_MIN = 2;
 export const BAN_REASON_MAX = 200;
 
 export type CadetsErrorCode =
@@ -229,7 +231,8 @@ export async function listCadets(
   const search = foldForSearch((query.search ?? "").slice(0, CADETS_SEARCH_MAX));
   const after = query.after && query.after.length <= 80 ? query.after : null;
 
-  if (!search) {
+  // A search shorter than the minimum is no search: the plain list (the box fires as the person types).
+  if (search.length < CADETS_SEARCH_MIN) {
     const listed = await deps.store.list({ after, limit: CADETS_PAGE_SIZE });
     if (!listed.ok) return err(cadetsError("unknown"));
     const identities = await identitiesOf(deps, listed.value.cadets);
@@ -254,6 +257,61 @@ export async function listCadets(
     next: matches.length > CADETS_PAGE_SIZE && last ? last.aliasKey : null,
     total: all.value.total,
   });
+}
+
+/** Fewest characters the staff's ticket search takes, and most results it answers. */
+export const TICKET_SEARCH_MIN = 3;
+export const TICKET_SEARCH_LIMIT = 10;
+
+/** A cadet found by the staff's «Cambiar entrada» search: the email is masked, the full one never leaves the server. */
+export interface TicketSearchHit {
+  uid: string;
+  alias: string;
+  /** The name of the sign-in account, `null` when it could not be read. */
+  name: string | null;
+  /** The email with most of its local part hidden (`sb•••••@gmail.com`), or `null`. */
+  email: string | null;
+  ticket: TicketType;
+}
+
+/** Hides most of an email's local part, so a person can confirm it with whoever is in front of them without it being exposed. */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at < 1) return "•••••";
+  const local = email.slice(0, at);
+  const keep = local.length <= 2 ? 1 : 2;
+  return `${local.slice(0, keep)}•••••${email.slice(at)}`;
+}
+
+/**
+ * Finds the edition's cadets by alias, account name or email for the staff's «Cambiar entrada» screen, as an
+ * alternative to scanning the pass. Staff and admins only; the staff see the email masked. Same approach as the admin's
+ * search (the edition has a few hundred cadets: read whole, matched here), without the squads and without paging.
+ */
+export async function findCadetsForTicket(
+  deps: Pick<CadetsDeps, "store" | "accounts">,
+  actor: CadetsActor,
+  rawSearch: string,
+): Promise<Result<readonly TicketSearchHit[], CadetsError>> {
+  if (actor.role !== "staff" && actor.role !== "admin") return err(cadetsError("forbidden"));
+  const search = foldForSearch(rawSearch.slice(0, CADETS_SEARCH_MAX));
+  if (search.length < TICKET_SEARCH_MIN) return ok([]);
+
+  const all = await deps.store.listAll();
+  if (!all.ok) return err(cadetsError("unknown"));
+  // Without the accounts the search still finds by alias.
+  const identities = await identitiesOf(deps, all.value.cadets);
+
+  const hits = all.value.cadets
+    .filter((cadet) => matchesCadet(search, { alias: cadet.alias, ...identities.get(cadet.uid) }))
+    .sort((a, b) => (a.aliasKey < b.aliasKey ? -1 : a.aliasKey > b.aliasKey ? 1 : 0))
+    .slice(0, TICKET_SEARCH_LIMIT);
+  return ok(
+    hits.map((cadet) => {
+      const identity = identities.get(cadet.uid);
+      return { uid: cadet.uid, alias: cadet.alias, name: identity?.displayName ?? null, email: identity?.email ? maskEmail(identity.email) : null, ticket: cadet.ticket };
+    }),
+  );
 }
 
 /** A cadet's record with the account behind it (email, whether it is disabled). */
