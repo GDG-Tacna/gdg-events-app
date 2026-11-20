@@ -17,6 +17,10 @@ export function ServeScreenBound({
   description,
   image,
   initialCount,
+  backHref = ROUTES.staff,
+  backLabel,
+  stations,
+  stationBase = `${ROUTES.staff}/serve`,
 }: {
   checkpointId: string;
   kind: StationKind;
@@ -24,6 +28,13 @@ export function ServeScreenBound({
   description?: string;
   image?: string | null;
   initialCount: number | null;
+  /** Where the back button goes: the staff's puestos by default. */
+  backHref?: string;
+  backLabel?: string;
+  /** The open puestos to switch between from the scanner (the row hides with fewer than two). */
+  stations?: readonly { id: string; name: string }[];
+  /** Where each station's scanner lives: the staff's by default. */
+  stationBase?: string;
 }) {
   return (
     <ServeScreen
@@ -35,7 +46,10 @@ export function ServeScreenBound({
       description={description}
       image={image}
       initialCount={initialCount}
-      backHref={ROUTES.staff}
+      backHref={backHref}
+      backLabel={backLabel}
+      stations={stations}
+      stationBase={stationBase}
       changeTicketHref={ROUTES.staffTickets}
     />
   );

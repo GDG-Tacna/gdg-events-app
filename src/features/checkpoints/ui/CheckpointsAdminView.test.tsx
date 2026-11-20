@@ -56,6 +56,15 @@ const row = (name: string) =>
     .getAllByRole("listitem")
     .find((item) => item.textContent?.includes(name))!;
 
+/** Opens a puesto's «⋯» menu. */
+const openMenu = (user: ReturnType<typeof userEvent.setup>, puesto: string) => user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.moreActions}: ${puesto}` }));
+
+/** Opens a puesto's «⋯» menu and picks one of its entries. */
+async function pick(user: ReturnType<typeof userEvent.setup>, puesto: string, entry: string) {
+  await openMenu(user, puesto);
+  await user.click(await screen.findByRole("menuitem", { name: entry }));
+}
+
 describe("CheckpointsAdminView list", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -68,10 +77,33 @@ describe("CheckpointsAdminView list", () => {
     expect(row("Stand Cloud")).toHaveTextContent("stand-cloud");
   });
 
-  it("links no station to any code: staff scan the cadet's QR there", () => {
+  it("links no station to any code or scanner when the page gives no places for them", () => {
     setup();
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("shows how many cadets each open puesto has scanned, in its kind's words, and nothing for a closed one or without counts", () => {
+    const { unmount } = render(
+      <CheckpointsAdminView checkpoints={[LUNCH, STAND, GATE]} create={vi.fn()} edit={vi.fn()} setActive={vi.fn()} remove={vi.fn()} upload={upload} counts={{ "lunch-1": 61, "stand-cloud": null, "entrance-main": 9 }} levels={LEVELS} />,
+    );
+
+    expect(row("Almuerzo")).toHaveTextContent(`61${copy.staff.counterLabel.catering}`);
+    // A count that could not be read shows a dash instead of a made-up zero.
+    expect(row("Stand Cloud")).toHaveTextContent(`–${copy.staff.counterLabel.stand}`);
+    expect(row("Entrada principal")).not.toHaveTextContent(copy.staff.counterLabel.entrance);
+    unmount();
+
+    setup();
+    expect(row("Almuerzo")).not.toHaveTextContent(copy.staff.counterLabel.catering);
+  });
+
+  it("explains a closed puesto and offers to open it in the main button's place, with no scan button", () => {
+    render(<CheckpointsAdminView checkpoints={[GATE]} create={vi.fn()} edit={vi.fn()} setActive={vi.fn()} remove={vi.fn()} upload={upload} scanBase="/admin/puestos/escanear" levels={LEVELS} />);
+
+    expect(row("Entrada principal")).toHaveTextContent(copy.admin.checkpoints.closedHint);
+    expect(within(row("Entrada principal")).getByRole("button", { name: copy.admin.checkpoints.openAction })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: copy.admin.checkpoints.scan })).not.toBeInTheDocument();
   });
 
   it("says so when there are no checkpoints yet", () => {
@@ -87,7 +119,7 @@ describe("CheckpointsAdminView open and close", () => {
   it("closes an open checkpoint, says which one, and refreshes the list", async () => {
     const { setActive, user } = setup();
 
-    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.close}: Almuerzo` }));
+    await pick(user, "Almuerzo", copy.admin.checkpoints.closeAction);
 
     expect(setActive).toHaveBeenCalledWith({ id: "lunch-1", active: false });
     expect(await screen.findByRole("status")).toHaveTextContent("«Almuerzo» está cerrado: ya no acepta escaneos.");
@@ -97,7 +129,7 @@ describe("CheckpointsAdminView open and close", () => {
   it("opens a closed one", async () => {
     const { setActive, user } = setup([GATE], { setActive: { ok: true, checkpoint: { ...GATE, active: true } } });
 
-    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.reopen}: Entrada principal` }));
+    await user.click(screen.getByRole("button", { name: copy.admin.checkpoints.openAction }));
 
     expect(setActive).toHaveBeenCalledWith({ id: "entrance-main", active: true });
     expect(await screen.findByRole("status")).toHaveTextContent("«Entrada principal» está abierto.");
@@ -106,10 +138,36 @@ describe("CheckpointsAdminView open and close", () => {
   it("shows the server's reason when the change is refused, and does not refresh", async () => {
     const { user } = setup([LUNCH], { setActive: { ok: false, code: "not-found" } });
 
-    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.close}: Almuerzo` }));
+    await pick(user, "Almuerzo", copy.admin.checkpoints.closeAction);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.checkpoints.errors["not-found"]);
     expect(router.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("CheckpointsAdminView scan button", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const ENTRANCE: CheckpointView = { id: "entrada-norte", kind: "entrance", name: "Entrada norte", active: true, ...PLAIN, requirements: NONE };
+  const render2 = (checkpoints: CheckpointView[], scanBase?: string) =>
+    render(<CheckpointsAdminView checkpoints={checkpoints} create={vi.fn()} edit={vi.fn()} setActive={vi.fn()} remove={vi.fn()} upload={upload} scanBase={scanBase} levels={LEVELS} />);
+
+  it("links every open puesto, whatever its kind, to its own scanner", () => {
+    render2([ENTRANCE, LUNCH, STAND], "/admin/puestos/escanear");
+
+    const scan = (puesto: string) => within(row(puesto)).getByRole("link", { name: copy.admin.checkpoints.scan });
+    expect(scan("Entrada norte")).toHaveAttribute("href", "/admin/puestos/escanear/entrada-norte");
+    expect(scan("Almuerzo")).toHaveAttribute("href", "/admin/puestos/escanear/lunch-1");
+    expect(scan(STAND.name)).toHaveAttribute("href", `/admin/puestos/escanear/${STAND.id}`);
+  });
+
+  it("leaves it out for a closed puesto, and without a place for the scanner", () => {
+    const { unmount } = render2([{ ...LUNCH, active: false }], "/admin/puestos/escanear");
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    unmount();
+
+    render2([LUNCH]);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });
 
@@ -120,21 +178,35 @@ describe("CheckpointsAdminView entrance code", () => {
   const render2 = (checkpoints: CheckpointView[], qrBase?: string) =>
     render(<CheckpointsAdminView checkpoints={checkpoints} create={vi.fn()} edit={vi.fn()} setActive={vi.fn()} remove={vi.fn()} upload={upload} qrBase={qrBase} levels={LEVELS} />);
 
-  it("links an open entrance and an open stand to the screen that shows its code, each with its own label, and never a meal", () => {
+  it("puts a link to the screen that shows its code in an open entrance's and an open stand's menu, each with its own label, and never in a meal's", async () => {
+    const user = userEvent.setup();
     render2([ENTRANCE, LUNCH, STAND], "/admin/qr");
 
-    expect(screen.getByRole("link", { name: `${copy.admin.checkpoints.showQr}: Entrada norte` })).toHaveAttribute("href", "/admin/qr/entrada-norte");
-    expect(screen.getByRole("link", { name: `${copy.admin.checkpoints.showStandQr}: ${STAND.name}` })).toHaveAttribute("href", `/admin/qr/${STAND.id}`);
-    expect(screen.getAllByRole("link")).toHaveLength(2);
+    await openMenu(user, "Entrada norte");
+    expect(await screen.findByRole("menuitem", { name: copy.admin.checkpoints.showQr })).toHaveAttribute("href", "/admin/qr/entrada-norte");
+    await user.keyboard("{Escape}");
+
+    await openMenu(user, STAND.name);
+    expect(await screen.findByRole("menuitem", { name: copy.admin.checkpoints.showStandQr })).toHaveAttribute("href", `/admin/qr/${STAND.id}`);
+    await user.keyboard("{Escape}");
+
+    await openMenu(user, "Almuerzo");
+    expect(await screen.findByRole("menuitem", { name: copy.admin.checkpoints.edit.action })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /QR/ })).not.toBeInTheDocument();
   });
 
-  it("leaves it out for a closed entrance or stand, and without a place to show the code", () => {
+  it("leaves it out for a closed entrance or stand, and without a place to show the code", async () => {
+    const user = userEvent.setup();
     const { unmount } = render2([{ ...ENTRANCE, active: false }, { ...STAND, active: false }], "/admin/qr");
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    await openMenu(user, "Entrada norte");
+    expect(await screen.findByRole("menuitem", { name: copy.admin.checkpoints.edit.action })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /QR/ })).not.toBeInTheDocument();
     unmount();
 
     render2([ENTRANCE]);
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    await openMenu(user, "Entrada norte");
+    expect(await screen.findByRole("menuitem", { name: copy.admin.checkpoints.edit.action })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /QR/ })).not.toBeInTheDocument();
   });
 });
 
@@ -144,7 +216,7 @@ describe("CheckpointsAdminView delete", () => {
   it("deletes a station after confirming, says which one and refreshes the list", async () => {
     const { remove, user } = setup(undefined, undefined, { remove: vi.fn<DeleteCheckpointAction>(async () => ({ ok: true, name: "Almuerzo" })) });
 
-    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    await pick(user, "Almuerzo", copy.admin.checkpoints.delete);
     await answerConfirm("confirm");
 
     expect(remove).toHaveBeenCalledWith({ id: "lunch-1" });
@@ -156,11 +228,11 @@ describe("CheckpointsAdminView delete", () => {
     const remove = vi.fn<DeleteCheckpointAction>(async () => ({ ok: false, code: "has-check-ins" }));
     const { user } = setup(undefined, undefined, { remove });
 
-    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    await pick(user, "Almuerzo", copy.admin.checkpoints.delete);
     await answerConfirm("cancel");
     expect(remove).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    await pick(user, "Almuerzo", copy.admin.checkpoints.delete);
     await answerConfirm("confirm");
     expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.checkpoints.errors["has-check-ins"]);
     expect(router.refresh).not.toHaveBeenCalled();
@@ -168,13 +240,15 @@ describe("CheckpointsAdminView delete", () => {
 
   it("survives a thrown action, and offers no delete button when the session may not delete here", async () => {
     const { user, unmount } = setup(undefined, undefined, { remove: vi.fn<DeleteCheckpointAction>(async () => { throw new Error("offline"); }) });
-    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` }));
+    await pick(user, "Almuerzo", copy.admin.checkpoints.delete);
     await answerConfirm("confirm");
     expect(await screen.findByRole("alert")).toHaveTextContent(copy.admin.checkpoints.errors.unknown);
     unmount();
 
-    setup(undefined, undefined, { canDelete: false });
-    expect(screen.queryByRole("button", { name: `${copy.admin.checkpoints.delete}: Almuerzo` })).not.toBeInTheDocument();
+    const readOnly = setup(undefined, undefined, { canDelete: false });
+    await openMenu(readOnly.user, "Almuerzo");
+    expect(await screen.findByRole("menuitem", { name: copy.admin.checkpoints.edit.action })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: copy.admin.checkpoints.delete })).not.toBeInTheDocument();
   });
 });
 
@@ -283,7 +357,7 @@ describe("CheckpointsAdminView accessibility", () => {
     const { container, user } = setup();
     expect((await axe(container)).violations).toEqual([]);
 
-    await user.click(screen.getByRole("button", { name: `${copy.admin.checkpoints.edit.action}: Almuerzo` }));
+    await pick(user, "Almuerzo", copy.admin.checkpoints.edit.action);
     expect((await axe(container)).violations).toEqual([]);
   });
 });
@@ -318,15 +392,16 @@ describe("CheckpointsAdminView edit", () => {
   const t = copy.admin.checkpoints;
   beforeEach(() => vi.clearAllMocks());
 
-  const open = async (user: ReturnType<typeof userEvent.setup>, name = "Almuerzo") => user.click(screen.getByRole("button", { name: `${t.edit.action}: ${name}` }));
+  const open = async (user: ReturnType<typeof userEvent.setup>, name = "Almuerzo") => pick(user, name, t.edit.action);
   const dialog = () => within(screen.getByRole("dialog"));
   const save = () => dialog().getByRole("button", { name: t.save });
 
-  it("offers Editar instead of renaming or a separate requirements dialog", () => {
-    setup();
+  it("offers Editar in the menu instead of renaming or a separate requirements dialog", async () => {
+    const { user } = setup();
 
-    expect(screen.getByRole("button", { name: `${t.edit.action}: Stand Cloud` })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Renombrar|Requisitos/ })).not.toBeInTheDocument();
+    await openMenu(user, "Stand Cloud");
+    expect(await screen.findByRole("menuitem", { name: t.edit.action })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Renombrar|Requisitos/ })).not.toBeInTheDocument();
   });
 
   it("opens with the saved values and sends only what can change: name, description", async () => {
@@ -419,8 +494,8 @@ describe("CheckpointsAdminView food gates", () => {
   const t = copy.admin.checkpoints;
   beforeEach(() => vi.clearAllMocks());
 
-  const open = async (user: ReturnType<typeof userEvent.setup>, name = "Almuerzo") => user.click(screen.getByRole("button", { name: `${t.edit.action}: ${name}` }));
-  const editor = () => within(screen.getByRole("group", { name: r.title }));
+  const open = async (user: ReturnType<typeof userEvent.setup>, name = "Almuerzo") => pick(user, name, t.edit.action);
+  const editor =() => within(screen.getByRole("group", { name: r.title }));
   const save = () => within(screen.getByRole("dialog")).getByRole("button", { name: t.save });
 
   it("shows what each meal asks for", () => {

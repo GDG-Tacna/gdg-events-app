@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { isCheckpointId, type CheckpointKind } from "@/features/checkins";
@@ -9,7 +8,7 @@ import type { TicketType } from "@/features/tickets";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Button, Card, FormDialog, Icon, InlineAlert, TextAreaField, TextField, Thumbnail, useConfirm, type IconName } from "@/shared/ui";
+import { ActionMenu, Button, ButtonLink, Card, FormDialog, Icon, InlineAlert, TextAreaField, TextField, Thumbnail, useConfirm, type ActionMenuItem, type IconName } from "@/shared/ui";
 import { DESCRIPTION_MAX_LENGTH, normalizeName, suggestId } from "../domain/manage";
 import type { ManageErrorCode } from "../domain/manage-error";
 import { STATION_KINDS } from "../domain/serve";
@@ -40,6 +39,10 @@ export interface CheckpointsAdminViewProps {
   locks?: Readonly<Record<string, CheckpointLockReason | null>>;
   /** Where an entrance's or a stand's code is shown (`${qrBase}/${id}`); without it they have no such button. A plain path: a client component cannot receive functions from a server page. */
   qrBase?: string;
+  /** Where the scanner of a puesto lives (`${scanBase}/${id}`); without it open puestos have no "Escanear cadetes" button. A plain path, like `qrBase`. */
+  scanBase?: string;
+  /** Cadets scanned at each open puesto, by id (`null` when it could not be read). Without it the cards show no count. */
+  counts?: Readonly<Record<string, number | null>>;
   /** Whether the session may delete stations here (a draft edition, or an admin of every edition); the server decides again. */
   canDelete?: boolean;
   /** The edition's rank ladder, to name the minimum level of a meal. */
@@ -230,7 +233,7 @@ function EditCheckpointForm({ checkpoint, lock, levels, upload, busy, error, onS
  * and deleting, and "Crear un puesto" on top. Creating and editing open in a dialog, where a refusal shows too. The
  * server decides everything; this view shows the outcome.
  */
-export function CheckpointsAdminView({ checkpoints, create, edit, setActive, remove, upload, locks = {}, qrBase, canDelete = true, levels }: CheckpointsAdminViewProps) {
+export function CheckpointsAdminView({ checkpoints, create, edit, setActive, remove, upload, locks = {}, qrBase, scanBase, counts, canDelete = true, levels }: CheckpointsAdminViewProps) {
   const t = copy.admin.checkpoints;
   const router = useRouter();
   const [notice, setNotice] = useState<Notice>(null);
@@ -283,6 +286,24 @@ export function CheckpointsAdminView({ checkpoints, create, edit, setActive, rem
     setNotice({ kind: "success", text: success(result.checkpoint) });
     router.refresh();
     return true;
+  }
+
+  /** Opens a closed puesto or closes an open one (a closed puesto accepts no scans). */
+  function toggleActive(checkpoint: CheckpointView) {
+    return run(`active:${checkpoint.id}`, () => setActive({ id: checkpoint.id, active: !checkpoint.active }), (updated) =>
+      interpolate(updated.active ? t.openedDone : t.closedDone, { name: updated.name }),
+    );
+  }
+
+  /** What the «⋯» menu of a puesto offers: edit, its screen code (entrance and stand), close, and delete last and apart. */
+  function menuItems(checkpoint: CheckpointView): ActionMenuItem[] {
+    const items: ActionMenuItem[] = [{ label: t.edit.action, icon: "edit", onSelect: () => openDialog({ kind: "edit", checkpoint }) }];
+    if (qrBase && (checkpoint.kind === "entrance" || checkpoint.kind === "stand") && checkpoint.active) {
+      items.push({ label: checkpoint.kind === "stand" ? t.showStandQr : t.showQr, icon: "qr", href: `${qrBase}/${checkpoint.id}` });
+    }
+    if (checkpoint.active) items.push({ label: t.closeAction, icon: "lock", onSelect: () => void toggleActive(checkpoint) });
+    if (canDelete) items.push({ label: t.delete, icon: "trash", tone: "danger", separatorBefore: true, onSelect: () => void handleDelete(checkpoint) });
+    return items;
   }
 
   async function handleDelete(checkpoint: CheckpointView) {
@@ -351,7 +372,7 @@ export function CheckpointsAdminView({ checkpoints, create, edit, setActive, rem
             const toggling = busy === `active:${checkpoint.id}`;
             return (
               <li key={checkpoint.id}>
-                <Card className={cn("gap-space-3 flex flex-col", !checkpoint.active && "opacity-75")}>
+                <Card className="gap-space-3 flex flex-col">
                   <div className="gap-space-3 flex items-start">
                     {checkpoint.image ? (
                       <Thumbnail url={checkpoint.image.url} size={44} />
@@ -371,46 +392,36 @@ export function CheckpointsAdminView({ checkpoints, create, edit, setActive, rem
                       <span className={cn(chip, checkpoint.active ? "border-accent/70" : "text-text-subtle")}>{checkpoint.active ? t.open : t.closed}</span>
                     </div>
                   </div>
-                  <div className="gap-space-2 -ml-space-4 flex flex-wrap items-center">
-                    <Button variant="ghost" size="sm" disabled={busy !== null} aria-label={`${t.edit.action}: ${checkpoint.name}`} onClick={() => openDialog({ kind: "edit", checkpoint })}>
-                      {t.edit.action}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy !== null}
-                      loading={toggling}
-                      aria-label={`${checkpoint.active ? t.close : t.reopen}: ${checkpoint.name}`}
-                      onClick={() =>
-                        void run(`active:${checkpoint.id}`, () => setActive({ id: checkpoint.id, active: !checkpoint.active }), (updated) =>
-                          interpolate(updated.active ? t.openedDone : t.closedDone, { name: updated.name }),
-                        )
-                      }
-                    >
-                      {toggling ? (checkpoint.active ? t.closing : t.opening) : checkpoint.active ? t.close : t.reopen}
-                    </Button>
-                    {qrBase && (checkpoint.kind === "entrance" || checkpoint.kind === "stand") && checkpoint.active ? (
-                      <Link
-                        href={`${qrBase}/${checkpoint.id}`}
-                        aria-label={`${checkpoint.kind === "stand" ? t.showStandQr : t.showQr}: ${checkpoint.name}`}
-                        className="type-label text-primary hover:bg-secondary focus-visible:ring-ring px-space-4 inline-flex h-9 items-center rounded-md focus-visible:ring-[3px] focus-visible:outline-none"
-                      >
-                        {checkpoint.kind === "stand" ? t.showStandQr : t.showQr}
-                      </Link>
-                    ) : null}
-                    {canDelete ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={busy !== null}
-                        loading={busy === `delete:${checkpoint.id}`}
-                        aria-label={`${t.delete}: ${checkpoint.name}`}
-                        onClick={() => void handleDelete(checkpoint)}
-                      >
-                        <Icon name="trash" size={16} />
-                        {t.delete}
+                  {checkpoint.active && counts && checkpoint.kind !== "talk" ? (
+                    <p className="gap-space-2 flex items-baseline">
+                      <span className="type-title-xl text-lime-ink tabular-nums">{counts[checkpoint.id] ?? "–"}</span>
+                      <span className="type-caption text-text-subtle">{copy.staff.counterLabel[checkpoint.kind]}</span>
+                    </p>
+                  ) : null}
+                  {checkpoint.active ? null : <p className="type-body-sm text-muted-foreground">{t.closedHint}</p>}
+                  <div className="gap-space-2 flex items-center">
+                    {checkpoint.active ? (
+                      scanBase ? (
+                        <ButtonLink href={`${scanBase}/${checkpoint.id}`} variant="primary" className="gap-space-2 flex-1">
+                          <Icon name="scan" size={20} />
+                          {t.scan}
+                        </ButtonLink>
+                      ) : (
+                        <span className="flex-1" />
+                      )
+                    ) : (
+                      <Button className="bg-lime text-on-accent flex-1" disabled={busy !== null} loading={toggling} icon="unlock" onClick={() => void toggleActive(checkpoint)}>
+                        {toggling ? t.opening : t.openAction}
                       </Button>
-                    ) : null}
+                    )}
+                    <ActionMenu
+                      label={`${t.moreActions}: ${checkpoint.name}`}
+                      icon="more"
+                      title={checkpoint.name}
+                      disabled={busy !== null}
+                      variant="pill"
+                      items={menuItems(checkpoint)}
+                    />
                   </div>
                 </Card>
               </li>

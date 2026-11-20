@@ -3,13 +3,26 @@ import { serveDeps } from "@/app-shell/composition/checkpoints.server";
 import { requireRole } from "@/app-shell/guards";
 import { staffCheckpoints, staffStations } from "@/app-shell/permissions.server";
 import { STATION_KINDS } from "@/features/checkpoints";
-import { listServePoints } from "@/features/checkpoints/server";
+import { listServePoints, type ServePoint } from "@/features/checkpoints/server";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
-import { interpolate } from "@/shared/lib/format";
-import { ButtonLink, Card, ScreenEnter, Thumbnail } from "@/shared/ui";
+import { ActionMenu, ButtonLink, Card, Icon, ScreenEnter, Thumbnail, type ActionMenuItem } from "@/shared/ui";
 
 export const metadata: Metadata = { title: copy.staff.title };
+
+/**
+ * The «⋯» menu of a puesto's card: its code on a screen (entrance and stand) and, on an entrance, the ticket change
+ * (where the cadets come in, someone buys their ticket on the day). A puesto with neither has no menu.
+ */
+function PointMenu({ point, mayChangeTickets }: { point: ServePoint; mayChangeTickets: boolean }) {
+  const items: ActionMenuItem[] = [];
+  if (point.kind === "entrance" || point.kind === "stand") {
+    items.push({ label: point.kind === "stand" ? copy.staff.showStandQr : copy.staff.showEntranceQr, icon: "qr", href: `${ROUTES.staffQr}/${point.id}` });
+  }
+  if (point.kind === "entrance" && mayChangeTickets) items.push({ label: copy.staff.tickets.card.title, icon: "refresh", href: ROUTES.staffTickets });
+  if (items.length === 0) return null;
+  return <ActionMenu label={`${copy.staff.moreActions}: ${point.name}`} icon="more" title={point.name} variant="pill" items={items} />;
+}
 
 export default async function StaffHomePage() {
   const session = await requireRole(["staff"]);
@@ -57,27 +70,21 @@ export default async function StaffHomePage() {
                           <div className="gap-space-1 flex min-w-0 flex-col">
                             <h3 className="type-title text-foreground">{point.name}</h3>
                             {point.description ? <p className="type-body-sm text-muted-foreground">{point.description}</p> : null}
-                            {point.servedCount !== null ? (
-                              <p className="type-body-sm text-muted-foreground tabular-nums">
-                                {interpolate(copy.staff.servedCount[point.kind], { count: String(point.servedCount) })}
-                              </p>
-                            ) : null}
                           </div>
                         </div>
-                        <ButtonLink href={`${ROUTES.staff}/serve/${point.id}`} className="mt-auto">
-                          {copy.staff.serve}
-                        </ButtonLink>
-                        {point.kind === "entrance" || point.kind === "stand" ? (
-                          <ButtonLink href={`${ROUTES.staffQr}/${point.id}`} variant="secondary">
-                            {point.kind === "stand" ? copy.staff.showStandQr : copy.staff.showEntranceQr}
-                          </ButtonLink>
+                        {point.servedCount !== null ? (
+                          <p className="gap-space-2 flex items-baseline">
+                            <span className="type-title-xl text-lime-ink tabular-nums">{point.servedCount}</span>
+                            <span className="type-caption text-text-subtle">{copy.staff.counterLabel[point.kind]}</span>
+                          </p>
                         ) : null}
-                        {/* The ticket change belongs to the check-in: where the cadets come in, someone buys their ticket on the day. */}
-                        {point.kind === "entrance" && mayChangeTickets ? (
-                          <ButtonLink href={ROUTES.staffTickets} variant="secondary">
-                            {copy.staff.tickets.card.title}
+                        <div className="gap-space-2 mt-auto flex items-center">
+                          <ButtonLink href={`${ROUTES.staff}/serve/${point.id}`} className="gap-space-2 flex-1">
+                            <Icon name="scan" size={20} />
+                            {copy.staff.serve}
                           </ButtonLink>
-                        ) : null}
+                          <PointMenu point={point} mayChangeTickets={mayChangeTickets} />
+                        </div>
                       </Card>
                     </li>
                   ))}
