@@ -1,11 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { err, ok } from "@/shared/lib/result";
 import {
-  TALK_QR_MARGIN_MS,
   checkFeedAccess,
   feedTalks,
   getTalkQr,
-  talkQrOpen,
   type FeedTalk,
   type TalkQrDeps,
 } from "./show-feed";
@@ -35,47 +33,34 @@ describe("checkFeedAccess", () => {
   });
 });
 
-describe("talkQrOpen", () => {
-  it("opens from 15 minutes before the start until 15 minutes after the end, edges included", () => {
-    expect(talkQrOpen(TALK, new Date(START.getTime() - TALK_QR_MARGIN_MS))).toBe(true);
-    expect(talkQrOpen(TALK, new Date(END.getTime() + TALK_QR_MARGIN_MS))).toBe(true);
-    expect(talkQrOpen(TALK, new Date(START.getTime() - TALK_QR_MARGIN_MS - 1))).toBe(false);
-    expect(talkQrOpen(TALK, new Date(END.getTime() + TALK_QR_MARGIN_MS + 1))).toBe(false);
-  });
-
-  it("stays closed for an inactive talk or one without a schedule", () => {
-    expect(talkQrOpen({ ...TALK, active: false }, START)).toBe(false);
-    expect(talkQrOpen({ ...TALK, startsAt: null }, START)).toBe(false);
-    expect(talkQrOpen({ ...TALK, endsAt: null }, START)).toBe(false);
-  });
-});
-
 describe("feedTalks", () => {
-  it("lists the talks by start time, unscheduled last, with whether their code is out now", () => {
+  it("lists the talks by start time, unscheduled last, with whether their code can be handed out", () => {
     const later = { ...TALK, id: "later", title: "Later", startsAt: new Date(END), endsAt: new Date(END.getTime() + 3_600_000) };
-    const loose = { ...TALK, id: "loose", title: "Loose", startsAt: null, endsAt: null };
+    const loose = { ...TALK, id: "loose", title: "Loose", startsAt: null, endsAt: null, active: false };
 
-    expect(feedTalks([loose, later, TALK], START)).toEqual([
+    expect(feedTalks([loose, later, TALK])).toEqual([
       { id: "talk-genkit", name: "Genkit", startsAt: START.getTime(), endsAt: END.getTime(), active: true, qrNow: true },
-      { id: "later", name: "Later", startsAt: END.getTime(), endsAt: END.getTime() + 3_600_000, active: true, qrNow: false },
-      { id: "loose", name: "Loose", startsAt: null, endsAt: null, active: true, qrNow: false },
+      { id: "later", name: "Later", startsAt: END.getTime(), endsAt: END.getTime() + 3_600_000, active: true, qrNow: true },
+      { id: "loose", name: "Loose", startsAt: null, endsAt: null, active: false, qrNow: false },
     ]);
   });
 });
 
 describe("getTalkQr", () => {
   const issued = { checkpointId: "talk-genkit", name: "Genkit", cells: ["101", "010"], issuedAt: 1, expiresAt: 2 };
-  const setup = (now = START, talks: readonly FeedTalk[] = [TALK]): TalkQrDeps & { issue: ReturnType<typeof vi.fn> } => ({
+  const setup = (talks: readonly FeedTalk[] = [TALK]): TalkQrDeps & { issue: ReturnType<typeof vi.fn> } => ({
     talks: vi.fn(async () => ok(talks)),
     issue: vi.fn(async () => ok(issued)),
-    now: () => now,
   });
 
-  it("hands out the code of the talk in progress, without the signed text", async () => {
+  it("hands out the code of an open talk at any time, scheduled or not, without the signed text", async () => {
     const deps = setup();
 
     expect(await getTalkQr(deps, " talk-genkit ")).toEqual(ok({ talkId: "talk-genkit", name: "Genkit", cells: ["101", "010"], issuedAt: 1, expiresAt: 2 }));
     expect(deps.issue).toHaveBeenCalledWith("talk-genkit");
+
+    const loose = setup([{ ...TALK, startsAt: null, endsAt: null }]);
+    expect((await getTalkQr(loose, "talk-genkit")).ok).toBe(true);
   });
 
   it("refuses a missing or too long id before reading anything", async () => {
@@ -86,12 +71,11 @@ describe("getTalkQr", () => {
     expect(deps.talks).not.toHaveBeenCalled();
   });
 
-  it("refuses another checkpoint, an inactive talk and a talk out of its window, never issuing", async () => {
-    const deps = setup(new Date(END.getTime() + TALK_QR_MARGIN_MS + 1), [TALK, { ...TALK, id: "off", active: false }]);
+  it("refuses another checkpoint and an inactive talk, never issuing", async () => {
+    const deps = setup([TALK, { ...TALK, id: "off", active: false }]);
 
     expect(await getTalkQr(deps, "entrance")).toEqual(err({ code: "not-found" }));
     expect(await getTalkQr(deps, "off")).toEqual(err({ code: "inactive" }));
-    expect(await getTalkQr(deps, "talk-genkit")).toEqual(err({ code: "not-live" }));
     expect(deps.issue).not.toHaveBeenCalled();
   });
 

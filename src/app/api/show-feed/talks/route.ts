@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       logServerError("show-feed.talks", new Error("the talks could not be read"));
       return feedError("unknown", 500);
     }
-    return feedJson({ talks: feedTalks(talks.value, talkQrDeps.now()) });
+    return feedJson({ talks: feedTalks(talks.value) });
   } catch (cause) {
     logServerError("show-feed.talks", cause);
     return feedError("unknown", 500);

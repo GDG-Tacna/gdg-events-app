@@ -9,9 +9,6 @@ import { err, ok, type Result } from "@/shared/lib/result";
 /** A shorter secret switches the feed off: a guessable token would hand out talk codes. */
 export const SHOW_FEED_TOKEN_MIN = 32;
 
-/** A talk's code is handed out from this long before it starts until this long after it ends. */
-export const TALK_QR_MARGIN_MS = 15 * 60_000;
-
 /** The longest talk id the feed accepts (the same bound as the QR server action). */
 export const TALK_ID_MAX = 48;
 
@@ -44,13 +41,6 @@ export interface FeedTalk {
   active: boolean;
 }
 
-/** Whether a talk's attendance code may be handed out now: an open talk with a schedule, within its margin. */
-export function talkQrOpen(talk: FeedTalk, now: Date): boolean {
-  if (!talk.active || !talk.startsAt || !talk.endsAt) return false;
-  const at = now.getTime();
-  return at >= talk.startsAt.getTime() - TALK_QR_MARGIN_MS && at <= talk.endsAt.getTime() + TALK_QR_MARGIN_MS;
-}
-
 export interface FeedTalkView {
   id: string;
   name: string;
@@ -58,12 +48,12 @@ export interface FeedTalkView {
   startsAt: number | null;
   endsAt: number | null;
   active: boolean;
-  /** Whether `qr` would hand out its code right now. */
+  /** Whether `qr` hands out its code: any open talk, at any time (the operator decides when to show it). */
   qrNow: boolean;
 }
 
 /** The talks for the show, in schedule order (unscheduled last, then by name). */
-export function feedTalks(talks: readonly FeedTalk[], now: Date): FeedTalkView[] {
+export function feedTalks(talks: readonly FeedTalk[]): FeedTalkView[] {
   const startOf = (talk: FeedTalk) => talk.startsAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
   return [...talks]
     .sort((a, b) => startOf(a) - startOf(b) || a.title.localeCompare(b.title, "es"))
@@ -73,7 +63,7 @@ export function feedTalks(talks: readonly FeedTalk[], now: Date): FeedTalkView[]
       startsAt: talk.startsAt?.getTime() ?? null,
       endsAt: talk.endsAt?.getTime() ?? null,
       active: talk.active,
-      qrNow: talkQrOpen(talk, now),
+      qrNow: talk.active,
     }));
 }
 
@@ -90,10 +80,9 @@ export interface TalkQrDeps {
   talks(): Promise<Result<readonly FeedTalk[], { code: string }>>;
   /** Issues the code of a talk that already passed the feed's checks. */
   issue(talkId: string): Promise<Result<FeedIssuedQr, { code: string }>>;
-  now: () => Date;
 }
 
-export type TalkQrErrorCode = "bad-request" | "not-found" | "inactive" | "not-live" | "unknown";
+export type TalkQrErrorCode = "bad-request" | "not-found" | "inactive" | "unknown";
 
 export interface FeedTalkQr {
   talkId: string;
@@ -104,8 +93,9 @@ export interface FeedTalkQr {
 }
 
 /**
- * The attendance code of the talk in progress. Only a talk of the edition, open, with a schedule and within its
- * margin gets one: a leaked secret cannot hand out the other talks' codes. Each call issues a fresh code.
+ * The attendance code of a talk of the edition, at any time: the show's operator decides when to project it (speakers
+ * ask for it before or after their slot, and talks run late). Only an open talk gets one, and each call issues a fresh
+ * two-minute code, so a projected code stops working on its own.
  */
 export async function getTalkQr(deps: TalkQrDeps, talkId: string | null): Promise<Result<FeedTalkQr, { code: TalkQrErrorCode }>> {
   const id = talkId?.trim() ?? "";
@@ -116,7 +106,6 @@ export async function getTalkQr(deps: TalkQrDeps, talkId: string | null): Promis
   const talk = talks.value.find((candidate) => candidate.id === id);
   if (!talk) return err({ code: "not-found" });
   if (!talk.active) return err({ code: "inactive" });
-  if (!talkQrOpen(talk, deps.now())) return err({ code: "not-live" });
 
   const issued = await deps.issue(talk.id);
   if (!issued.ok) {
