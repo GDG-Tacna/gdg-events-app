@@ -20,6 +20,12 @@ export interface StageChampions {
   runnersUp?: readonly BoardCadet[];
 }
 
+/**
+ * Who took part in a raffle draw, as the stage words it: every cadet with G-Credits (one ticket each), the top `n`
+ * by XP or every cadet with `min` XP (in those two, one ticket each).
+ */
+export type StageRaffleRule = { kind: "credits" } | { kind: "top"; n: number } | { kind: "xp"; min: number };
+
 /** A raffle draw on the stage: the prize, the winner, and the names to spin through before landing on them. */
 export interface StageRaffle {
   drawId: string;
@@ -29,6 +35,8 @@ export interface StageRaffle {
   winner: { alias: string; squad: string | null };
   tickets: number;
   totalTickets: number;
+  /** Who took part (stage documents from before prize rules read as `credits`). */
+  rule: StageRaffleRule;
   /** Other entrants' aliases, the winner's last. */
   reel: readonly string[];
   at: Date;
@@ -285,9 +293,17 @@ function parseRaffle(input: unknown): StageRaffle | null {
     winner: { alias: input.winner.alias, squad: typeof input.winner.squad === "string" ? input.winner.squad : null },
     tickets,
     totalTickets,
+    rule: parseRaffleRule(input.rule),
     reel: reel as string[],
     at,
   };
+}
+
+/** A draw's rule; anything unreadable (or a stage document from before rules) is the G-Credits raffle. */
+function parseRaffleRule(input: unknown): StageRaffleRule {
+  if (isRecord(input) && input.kind === "top" && whole(input.n) && input.n > 0) return { kind: "top", n: input.n };
+  if (isRecord(input) && input.kind === "xp" && whole(input.min) && input.min > 0) return { kind: "xp", min: input.min };
+  return { kind: "credits" };
 }
 
 /** What the raffle feature hands the stage for one draw. */
@@ -299,6 +315,7 @@ export interface RaffleShowing {
   winnerSquadId: string | null;
   tickets: number;
   totalTickets: number;
+  rule: StageRaffleRule;
   reel: readonly string[];
   at: Date;
 }
@@ -325,6 +342,7 @@ export async function presentRaffle(deps: Pick<StageDeps, "stage" | "squads">, s
       winner: { alias: showing.winnerAlias, squad },
       tickets: showing.tickets,
       totalTickets: showing.totalTickets,
+      rule: { ...showing.rule },
       reel: [...showing.reel],
       at: showing.at,
     },

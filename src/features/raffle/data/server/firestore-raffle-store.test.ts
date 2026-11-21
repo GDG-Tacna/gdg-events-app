@@ -17,8 +17,10 @@ const { FirestoreRaffleStore } = await import("./firestore-raffle-store");
 
 type Doc = Record<string, unknown>;
 const AT = new Date("2026-10-24T23:50:00Z");
+// Stored as a prize made before rules: it reads as a G-Credits prize.
 const PRIZE = { name: "Polera", quantity: 2, awarded: 0, drawSeq: 0, active: true, order: 0, image: null };
-const NEW_DRAW = { winnerUid: "u1", winnerAlias: "Nova", winnerSquadId: "firebase", tickets: 10, totalTickets: 40, entrants: 3, at: AT };
+const CREDITS = { kind: "credits" } as const;
+const NEW_DRAW = { winnerUid: "u1", winnerAlias: "Nova", winnerSquadId: "firebase", tickets: 10, totalTickets: 40, entrants: 3, rule: CREDITS, at: AT };
 
 /** Documents, collection reads, auto ids, and transactions that refuse a read after a write. */
 function fakeFirestore(initial: Record<string, Doc> = {}) {
@@ -77,16 +79,39 @@ describe("FirestoreRaffleStore", () => {
   });
 
   it("creates prizes with their own id and lists them, skipping broken ones", async () => {
-    const created = await store.createPrize({ ...PRIZE, name: "Taza", order: 1 });
+    const created = await store.createPrize({ ...PRIZE, name: "Taza", order: 1, rule: CREDITS });
     fake.store.set("events/e1/rafflePrizes/broken", { name: "x", quantity: 0 });
 
-    expect(created).toEqual(ok({ ...PRIZE, name: "Taza", order: 1, id: "auto1" }));
+    expect(created).toEqual(ok({ ...PRIZE, name: "Taza", order: 1, rule: CREDITS, id: "auto1" }));
     expect(await store.prizes()).toMatchObject({ ok: true, value: [{ id: "polera" }, { id: "auto1" }] });
+  });
+
+  it("keeps a prize's rule, and reads a prize without one (or with a broken one) as a G-Credits prize", async () => {
+    await store.createPrize({ ...PRIZE, name: "Taza", order: 1, rule: { kind: "top", n: 5 } });
+    expect(fake.store.get("events/e1/rafflePrizes/auto1")).toMatchObject({ rule: { kind: "top", n: 5 } });
+
+    expect(await store.updatePrize("polera", { rule: { kind: "xp", min: 300 } })).toMatchObject({ ok: true, value: { before: { rule: CREDITS }, after: { rule: { kind: "xp", min: 300 } } } });
+    expect(fake.store.get("events/e1/rafflePrizes/polera")).toMatchObject({ rule: { kind: "xp", min: 300 } });
+    fake.store.set("events/e1/rafflePrizes/odd", { ...PRIZE, rule: { kind: "top", n: 0 } });
+
+    const listed = await store.prizes();
+    expect(listed.ok && Object.fromEntries(listed.value.map((prize) => [prize.id, prize.rule]))).toEqual({ polera: { kind: "xp", min: 300 }, auto1: { kind: "top", n: 5 }, odd: CREDITS });
+  });
+
+  it("keeps the rule with each draw, and reads a draw made before rules as a G-Credits draw", async () => {
+    await store.draw("polera", () => ok({ ...NEW_DRAW, rule: { kind: "top", n: 10 } }));
+    const legacy: Doc = { ...NEW_DRAW, prizeId: "old", prizeName: "Taza" };
+    delete legacy.rule;
+    fake.store.set("events/e1/raffleDraws/old-1", legacy);
+
+    expect(fake.store.get("events/e1/raffleDraws/polera-1")).toMatchObject({ rule: { kind: "top", n: 10 } });
+    const listed = await store.draws();
+    expect(listed.ok && Object.fromEntries(listed.value.map((draw) => [draw.id, draw.rule]))).toEqual({ "polera-1": { kind: "top", n: 10 }, "old-1": CREDITS });
   });
 
   it("draws the next unit in one go: the numbered draw and the prize's counts", async () => {
     const drawn = await store.draw("polera", (prize, draws) => {
-      expect(prize).toEqual({ ...PRIZE, id: "polera" });
+      expect(prize).toEqual({ ...PRIZE, id: "polera", rule: CREDITS });
       expect(draws).toEqual([]);
       return ok(NEW_DRAW);
     });
@@ -141,9 +166,10 @@ describe("FirestoreRaffleStore", () => {
     expect(await store.updatePrize("ghost", { name: "x" })).toEqual(ok(null));
   });
 
-  it("lists the draws with their timestamps, and the entrants with their G-Credits as tickets", async () => {
+  it("lists the draws with their timestamps, and the entrants with their G-Credits as tickets and their XP", async () => {
+    const reached = new Date("2026-10-24T20:00:00Z");
     fake.store.set("events/e1/raffleDraws/polera-1", { ...NEW_DRAW, prizeId: "polera", prizeName: "Polera", at: { toDate: () => AT } });
-    fake.store.set("events/e1/participants/u1", { alias: "Nova", squad: "firebase", credits: 12.9 });
+    fake.store.set("events/e1/participants/u1", { alias: "Nova", squad: "firebase", credits: 12.9, xp: 340.5, xpReachedAt: { toDate: () => reached } });
     fake.store.set("events/e1/participants/u2", { alias: "Cero" });
     fake.store.set("events/e1/participants/broken", { credits: 5 });
     // A blocked cadet holds no tickets, however many G-Credits they had.
@@ -152,8 +178,8 @@ describe("FirestoreRaffleStore", () => {
     expect(await store.draws()).toMatchObject({ ok: true, value: [{ id: "polera-1", at: AT, voided: false }] });
     expect(await store.entrants()).toEqual(
       ok([
-        { uid: "u1", alias: "Nova", squadId: "firebase", credits: 12 },
-        { uid: "u2", alias: "Cero", squadId: null, credits: 0 },
+        { uid: "u1", alias: "Nova", squadId: "firebase", credits: 12, xp: 340, reachedAt: reached },
+        { uid: "u2", alias: "Cero", squadId: null, credits: 0, xp: 0, reachedAt: null },
       ]),
     );
   });
@@ -175,7 +201,7 @@ describe("FirestoreRaffleStore", () => {
       () => broken.settings(),
       () => broken.saveSettings({ minCredits: 1 }),
       () => broken.prizes(),
-      () => broken.createPrize(PRIZE),
+      () => broken.createPrize({ ...PRIZE, rule: CREDITS }),
       () => broken.updatePrize("p", {}),
       () => broken.draws(),
       () => broken.drawsOf("u1"),

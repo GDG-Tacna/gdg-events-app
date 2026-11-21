@@ -1,14 +1,27 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { ImageField, type ImageRef, type UploadImageAction } from "@/features/media";
 import { EDITION } from "@/shared/config/edition";
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
 import { Button, ButtonLink, Card, FormDialog, Icon, InlineAlert, TextField, Thumbnail } from "@/shared/ui";
-import { MIN_CREDITS_MAX, PRIZE_NAME_MAX, PRIZE_QUANTITY_MAX, type RaffleDraw, type RaffleErrorCode, type RaffleOverview, type RafflePrize } from "../domain/raffle";
+import {
+  MIN_CREDITS_MAX,
+  MIN_XP_MAX,
+  PRIZE_NAME_MAX,
+  PRIZE_QUANTITY_MAX,
+  TOP_N_MAX,
+  type PrizeRule,
+  type PrizeRuleKind,
+  type RaffleDraw,
+  type RaffleErrorCode,
+  type RaffleOverview,
+  type RafflePrize,
+  type RafflePrizeOverview,
+} from "../domain/raffle";
 import type { RaffleActions } from "./actions";
 
 export interface RaffleAdminViewProps {
@@ -31,6 +44,30 @@ async function run<T extends { ok: true } | { ok: false; code: RaffleErrorCode }
   }
 }
 
+const RULE_KINDS: readonly PrizeRuleKind[] = ["credits", "top", "xp"];
+const TOP_QUICK = [5, 10] as const;
+const DEFAULT_TOP = 10;
+const whole = (value: string) => (value === "" ? Number.NaN : Number(value));
+
+/** A prize's rule as its chip says it: "G-Créditos", "Top 10 por XP", "300+ XP". */
+function ruleChip(rule: PrizeRule): string {
+  if (rule.kind === "top") return interpolate(t.ruleChip.top, { n: formatNumber(rule.n) });
+  if (rule.kind === "xp") return interpolate(t.ruleChip.xp, { min: formatNumber(rule.min) });
+  return t.ruleChip.credits;
+}
+
+/** Who could win a prize's next draw: with tickets for a G-Credits prize, cadets otherwise (one ticket each). */
+function prizeEntrants(prize: RafflePrizeOverview): string {
+  if (prize.eligible === 0) return t.prizeEntrantsNone;
+  if (prize.rule.kind === "credits") return interpolate(t.prizeEntrantsTickets, { n: formatNumber(prize.eligible), tickets: formatNumber(prize.tickets) });
+  return prize.eligible === 1 ? t.prizeEntrantsOne : interpolate(t.prizeEntrants, { n: formatNumber(prize.eligible) });
+}
+
+/** The pill that names a rule on a prize or a draw. */
+function RuleChip({ rule }: { rule: PrizeRule }) {
+  return <span className="type-caption border-ink text-foreground px-space-2 inline-flex items-center rounded-full border-2 font-semibold whitespace-nowrap">{ruleChip(rule)}</span>;
+}
+
 function PrizeEditor({
   prize,
   onSave,
@@ -39,19 +76,24 @@ function PrizeEditor({
   upload,
 }: {
   prize?: RafflePrize;
-  onSave: (input: { name: string; quantity: number; imagePath?: string | null }) => void;
+  onSave: (input: { name: string; quantity: number; imagePath?: string | null; rule: PrizeRule }) => void;
   onCancel?: () => void;
   pending: boolean;
   upload: UploadImageAction;
 }) {
+  const ruleName = useId();
   const [name, setName] = useState(prize?.name ?? "");
   const [quantity, setQuantity] = useState(String(prize?.quantity ?? 1));
   const [image, setImage] = useState<ImageRef | null>(prize?.image ?? null);
   // Only a changed image is sent: an untouched form keeps the stored one.
   const [imageChanged, setImageChanged] = useState(false);
+  const [ruleKind, setRuleKind] = useState<PrizeRuleKind>(prize?.rule.kind ?? "credits");
+  const [topN, setTopN] = useState(String(prize?.rule.kind === "top" ? prize.rule.n : DEFAULT_TOP));
+  const [minXp, setMinXp] = useState(prize?.rule.kind === "xp" ? String(prize.rule.min) : "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSave({ name, quantity: quantity === "" ? Number.NaN : Number(quantity), ...(imageChanged ? { imagePath: image?.path ?? null } : {}) });
+    const rule: PrizeRule = ruleKind === "top" ? { kind: "top", n: whole(topN) } : ruleKind === "xp" ? { kind: "xp", min: whole(minXp) } : { kind: "credits" };
+    onSave({ name, quantity: whole(quantity), ...(imageChanged ? { imagePath: image?.path ?? null } : {}), rule });
   }
   return (
     <form onSubmit={submit} noValidate className="gap-space-3 flex flex-col">
@@ -66,6 +108,59 @@ function PrizeEditor({
         readOnly={pending}
         onChange={(event) => setQuantity(digits(event.target.value))}
       />
+      <fieldset className="gap-space-2 flex flex-col" disabled={pending}>
+        <legend className="type-label text-foreground mb-space-2">{t.ruleLegend}</legend>
+        {RULE_KINDS.map((kind) => (
+          <label key={kind} className="relative block cursor-pointer">
+            <input type="radio" name={ruleName} value={kind} checked={ruleKind === kind} onChange={() => setRuleKind(kind)} className="peer sr-only" />
+            <span
+              className={cn(
+                "gap-space-1 p-space-3 flex min-h-12 flex-col justify-center rounded-md border transition-colors",
+                "border-line-strong bg-bg-deep peer-checked:border-primary peer-checked:bg-surface-raised",
+                "peer-focus-visible:ring-ring peer-focus-visible:ring-[3px]",
+              )}
+            >
+              <span className="type-label text-foreground">{t.ruleOptions[kind]}</span>
+              <span className="type-caption text-text-subtle">{t.ruleHelp[kind]}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      {ruleKind === "top" ? (
+        <div className="gap-space-2 flex flex-col">
+          <TextField
+            label={t.topLabel}
+            hint={t.topHint}
+            value={topN}
+            inputMode="numeric"
+            maxLength={String(TOP_N_MAX).length}
+            autoComplete="off"
+            readOnly={pending}
+            onChange={(event) => setTopN(digits(event.target.value))}
+          />
+          <div className="gap-space-2 flex flex-wrap">
+            {TOP_QUICK.map((n) => (
+              <Button key={n} type="button" variant="secondary" size="sm" disabled={pending} aria-pressed={topN === String(n)}
+                className={topN === String(n) ? "bg-primary text-primary-foreground" : undefined}
+                onClick={() => setTopN(String(n))}>
+                {interpolate(t.topQuick, { n: String(n) })}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {ruleKind === "xp" ? (
+        <TextField
+          label={t.minXpLabel}
+          hint={t.minXpHint}
+          value={minXp}
+          inputMode="numeric"
+          maxLength={String(MIN_XP_MAX).length}
+          autoComplete="off"
+          readOnly={pending}
+          onChange={(event) => setMinXp(digits(event.target.value))}
+        />
+      ) : null}
       <ImageField
         label={t.image}
         purpose="raffle-prize"
@@ -92,9 +187,10 @@ function PrizeEditor({
 }
 
 /**
- * The "Sorteo" screen: who takes part and with how many tickets, the minimum to enter, the prizes (each unit drawn
- * on the server behind an in-page confirmation, and shown on the stage), and every draw, which can be voided when
- * the winner is not in the room.
+ * The "Sorteo" screen: who takes part in the G-Credits prizes and with how many tickets, their minimum to enter, the
+ * prizes with each one's rule (G-Credits, top N by XP or an XP minimum) and who could win it now (each unit drawn on
+ * the server behind an in-page confirmation, and shown on the stage), and every draw with its rule, which can be
+ * voided when the winner is not in the room.
  */
 export function RaffleAdminView({ overview, actions, stageHref }: RaffleAdminViewProps) {
   const router = useRouter();
@@ -202,6 +298,10 @@ export function RaffleAdminView({ overview, actions, stageHref }: RaffleAdminVie
                           {interpolate(t.awarded, { awarded: String(prize.awarded), quantity: String(prize.quantity) })}
                           {!prize.active ? ` · ${t.inactive}` : ""}
                         </p>
+                        <div className="gap-space-2 flex flex-wrap items-center">
+                          <RuleChip rule={prize.rule} />
+                          <span className="type-caption text-text-subtle">{prizeEntrants(prize)}</span>
+                        </div>
                       </div>
                     </div>
                     {confirming === `draw-${prize.id}` ? (
@@ -218,7 +318,9 @@ export function RaffleAdminView({ overview, actions, stageHref }: RaffleAdminVie
                                 `draw-${prize.id}`,
                                 () => actions.draw({ prizeId: prize.id }),
                                 (result) =>
-                                  interpolate(t.drawn, { alias: result.winnerAlias, n: formatNumber(result.tickets), total: formatNumber(result.totalTickets) }),
+                                  result.rule.kind === "credits"
+                                    ? interpolate(t.drawn, { alias: result.winnerAlias, n: formatNumber(result.tickets), total: formatNumber(result.totalTickets) })
+                                    : interpolate(t.drawnOneOf, { alias: result.winnerAlias, total: formatNumber(result.totalTickets) }),
                               )
                             }
                           >
@@ -293,10 +395,15 @@ export function RaffleAdminView({ overview, actions, stageHref }: RaffleAdminVie
                 </span>
                 <span className="type-caption text-text-subtle tabular-nums">{formatTime(draw.at)}</span>
               </div>
-              <p className="type-caption text-text-subtle">
-                {interpolate(t.tickets, { n: formatNumber(draw.tickets), total: formatNumber(draw.totalTickets) })}
-                {draw.voided ? ` · ${t.voided}` : ""}
-              </p>
+              <div className="gap-space-2 flex flex-wrap items-center">
+                <RuleChip rule={draw.rule} />
+                <p className="type-caption text-text-subtle">
+                  {draw.rule.kind === "credits"
+                    ? interpolate(t.tickets, { n: formatNumber(draw.tickets), total: formatNumber(draw.totalTickets) })
+                    : interpolate(t.oneOf, { total: formatNumber(draw.totalTickets) })}
+                  {draw.voided ? ` · ${t.voided}` : ""}
+                </p>
+              </div>
               {!draw.voided ? (
                 confirming === `void-${draw.id}` ? (
                   <div className="gap-space-2 flex flex-col">

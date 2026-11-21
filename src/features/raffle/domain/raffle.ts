@@ -1,18 +1,25 @@
+import { compareEntries } from "@/features/leaderboard/constants";
 import { chooseImage, dropReplacedImage, type ImageRef, type RecordImages } from "@/features/media/constants";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 
 /**
- * The final swag raffle of an edition: every G-Credit a cadet earned in it is a ticket (nothing is spent; the
- * global wallet is untouched), cadets need a minimum to enter, and each unit of each prize is drawn on the server,
- * weighted by tickets. A winner never wins again; a draw can be voided (the winner was not in the room), which
- * frees the unit and keeps that cadet out.
+ * The final swag raffle of an edition. Each prize has its own rule for who takes part: every cadet with G-Credits
+ * (each G-Credit earned in the edition is a ticket; nothing is spent, the global wallet is untouched, and there is a
+ * global minimum to enter), the top N of the fleet ranking by XP, or every cadet with a minimum XP (in those two,
+ * every entrant holds one ticket: the same chance). Each unit of each prize is drawn on the server, weighted by
+ * tickets. A winner never wins again; a draw can be voided (the winner was not in the room), which frees the unit
+ * and keeps that cadet out.
  */
 
 export const MIN_CREDITS_MAX = 10_000;
 export const PRIZE_QUANTITY_MAX = 50;
 export const PRIZE_NAME_MIN = 2;
 export const PRIZE_NAME_MAX = 60;
+/** The largest top a prize can be drawn among. */
+export const TOP_N_MAX = 100;
+/** The highest XP minimum a prize can ask for. */
+export const MIN_XP_MAX = 100_000;
 /** Names the stage spins through before landing on the winner. */
 export const REEL_SIZE = 24;
 
@@ -22,6 +29,17 @@ export interface RaffleSettings {
 }
 
 export const DEFAULT_RAFFLE: RaffleSettings = { minCredits: 1 };
+
+/**
+ * Who takes part in a prize's draws: every cadet with the global minimum of G-Credits (`credits`, one ticket per
+ * G-Credit), the first `n` cadets of the XP ranking who have not won yet (`top`), or every cadet with at least
+ * `min` XP (`xp`). In `top` and `xp` each entrant holds one ticket, and a cadet without XP never enters.
+ */
+export type PrizeRule = { kind: "credits" } | { kind: "top"; n: number } | { kind: "xp"; min: number };
+export type PrizeRuleKind = PrizeRule["kind"];
+
+/** What a prize without a stored rule follows: the open G-Credits raffle (prizes and draws made before rules). */
+export const DEFAULT_RULE: PrizeRule = { kind: "credits" };
 
 export interface RafflePrize {
   id: string;
@@ -36,6 +54,8 @@ export interface RafflePrize {
   order: number;
   /** A photo of the prize, shown in the admin and on the stage when it is drawn. */
   image: ImageRef | null;
+  /** Who takes part in this prize's draws. */
+  rule: PrizeRule;
 }
 
 export interface RaffleDraw {
@@ -50,18 +70,25 @@ export interface RaffleDraw {
   tickets: number;
   totalTickets: number;
   entrants: number;
+  /** The prize's rule when it was drawn (draws made before rules read as `credits`). */
+  rule: PrizeRule;
   at: Date;
   voided: boolean;
   /** The prize's image when it was drawn, for the stage (answered by a draw, never stored with it). */
   prizeImageUrl?: string | null;
 }
 
-/** A cadet as the raffle sees them: their G-Credits earned in this edition are their tickets. */
+/**
+ * A cadet as the raffle sees them: their G-Credits earned in this edition (their tickets in a `credits` draw), and
+ * their XP in it with when they reached it (`null` when unknown), which place them in the ranking.
+ */
 export interface Entrant {
   uid: string;
   alias: string;
   squadId: string | null;
   credits: number;
+  xp: number;
+  reachedAt: Date | null;
 }
 
 export type NewDraw = Omit<RaffleDraw, "id" | "prizeId" | "prizeName" | "voided" | "prizeImageUrl">;
@@ -72,7 +99,7 @@ export interface RaffleStore {
   prizes(): Promise<Result<readonly RafflePrize[], { code: string }>>;
   createPrize(prize: Omit<RafflePrize, "id">): Promise<Result<RafflePrize, { code: string }>>;
   /** `null` when the prize does not exist. */
-  updatePrize(id: string, patch: Partial<Pick<RafflePrize, "name" | "quantity" | "active" | "image">>): Promise<Result<{ before: RafflePrize; after: RafflePrize } | null, { code: string }>>;
+  updatePrize(id: string, patch: Partial<Pick<RafflePrize, "name" | "quantity" | "active" | "image" | "rule">>): Promise<Result<{ before: RafflePrize; after: RafflePrize } | null, { code: string }>>;
   draws(): Promise<Result<readonly RaffleDraw[], { code: string }>>;
   /** The draws one cadet won (voided ones included): a cadet's visit reads only these. */
   drawsOf(uid: string): Promise<Result<readonly RaffleDraw[], { code: string }>>;
@@ -110,6 +137,8 @@ export type RaffleErrorCode =
   | "invalid-name"
   | "invalid-quantity"
   | "invalid-image"
+  /** A prize's rule is not one of the kinds, or its top or XP minimum is out of range. */
+  | "invalid-rule"
   /** A prize's quantity cannot go below the units already given. */
   | "quantity-below-awarded"
   | "not-found"
@@ -144,20 +173,62 @@ const prizeName = (value: unknown) => {
   return name.length >= PRIZE_NAME_MIN && name.length <= PRIZE_NAME_MAX ? name : null;
 };
 
-/** Who can win now: enough tickets, and not a winner of a draw that stands or a voided one (absent). */
-export function eligibleEntrants(entrants: readonly Entrant[], settings: RaffleSettings, draws: readonly RaffleDraw[]): Entrant[] {
-  const out = new Set(draws.map((draw) => draw.winnerUid));
-  return entrants.filter((entrant) => entrant.credits >= Math.max(1, settings.minCredits) && !out.has(entrant.uid));
+/** A prize's rule as stored or sent, or `null` when it is not one of the kinds or its number is out of range. */
+export function parsePrizeRule(input: unknown): PrizeRule | null {
+  if (typeof input !== "object" || input === null) return null;
+  const { kind, n, min } = input as Record<string, unknown>;
+  if (kind === "credits") return { kind };
+  if (kind === "top") return whole(n, 1, TOP_N_MAX) ? { kind, n } : null;
+  if (kind === "xp") return whole(min, 1, MIN_XP_MAX) ? { kind, min } : null;
+  return null;
 }
 
-/** One winner, each entrant's chance proportional to their tickets. `null` when nobody can win. */
-export function pickWinner(eligible: readonly Entrant[], random: (max: number) => number): Entrant | null {
-  const total = eligible.reduce((sum, entrant) => sum + entrant.credits, 0);
+/** A rule as one short text, for the audit trail and to tell whether it changed: `credits`, `top:10`, `xp:300`. */
+export function ruleKey(rule: PrizeRule): string {
+  return rule.kind === "top" ? `top:${rule.n}` : rule.kind === "xp" ? `xp:${rule.min}` : rule.kind;
+}
+
+/** An entrant's tickets under a rule: their G-Credits in a `credits` draw, one otherwise (everyone the same chance). */
+export function ticketsOf(entrant: Entrant, rule: PrizeRule): number {
+  return rule.kind === "credits" ? entrant.credits : 1;
+}
+
+/** Every ticket in a draw under a rule. */
+export function totalTicketsOf(eligible: readonly Entrant[], rule: PrizeRule): number {
+  return eligible.reduce((sum, entrant) => sum + ticketsOf(entrant, rule), 0);
+}
+
+/**
+ * Who can win a prize now. Winners of a draw that stands or a voided one (absent) leave first, under every rule;
+ * then `credits` keeps whoever has the global minimum of G-Credits, `xp` whoever has the XP minimum, and `top` the
+ * first `n` with XP in the ranking's order (XP, then who reached it first, then alias). Because past winners left
+ * before the top is taken, the top moves down the ranking: there are always `n` in play while the ranking has them.
+ */
+export function eligibleEntrants(entrants: readonly Entrant[], rule: PrizeRule, settings: RaffleSettings, draws: readonly RaffleDraw[]): Entrant[] {
+  const out = new Set(draws.map((draw) => draw.winnerUid));
+  const open = entrants.filter((entrant) => !out.has(entrant.uid));
+  switch (rule.kind) {
+    case "credits":
+      return open.filter((entrant) => entrant.credits >= Math.max(1, settings.minCredits));
+    case "xp":
+      return open.filter((entrant) => entrant.xp > 0 && entrant.xp >= rule.min);
+    case "top":
+      return open
+        .filter((entrant) => entrant.xp > 0)
+        .sort(compareEntries)
+        .slice(0, rule.n);
+  }
+}
+
+/** One winner, each entrant's chance proportional to their tickets under the rule. `null` when nobody can win. */
+export function pickWinner(eligible: readonly Entrant[], rule: PrizeRule, random: (max: number) => number): Entrant | null {
+  const total = totalTicketsOf(eligible, rule);
   if (total <= 0) return null;
   let ticket = random(total);
   for (const entrant of eligible) {
-    if (ticket < entrant.credits) return entrant;
-    ticket -= entrant.credits;
+    const tickets = ticketsOf(entrant, rule);
+    if (ticket < tickets) return entrant;
+    ticket -= tickets;
   }
   return null;
 }
@@ -185,13 +256,19 @@ async function currentSettings(deps: { store: Pick<RaffleStore, "settings"> }): 
   return ok({ settings: read.value ?? DEFAULT_RAFFLE, isDefault: read.value === null });
 }
 
+/** A prize on the admin's screen, with who could win its next draw under its rule, and their tickets. */
+export interface RafflePrizeOverview extends RafflePrize {
+  eligible: number;
+  tickets: number;
+}
+
 export interface RaffleOverview {
   settings: RaffleSettings;
   isDefault: boolean;
-  prizes: readonly RafflePrize[];
+  prizes: readonly RafflePrizeOverview[];
   /** Newest first. */
   draws: readonly RaffleDraw[];
-  /** Who could win the next draw, and their tickets. */
+  /** Who could win the next G-Credits draw, and their tickets. */
   eligible: number;
   tickets: number;
 }
@@ -201,13 +278,15 @@ export async function getRaffleOverview(deps: Pick<RaffleDeps, "store" | "entran
   if (forbidden(actor)) return fail("forbidden");
   const [settings, prizes, draws, entrants] = await Promise.all([currentSettings(deps), deps.store.prizes(), deps.store.draws(), deps.entrants.list()]);
   if (!settings.ok || !prizes.ok || !draws.ok || !entrants.ok) return fail("unknown");
-  const eligible = eligibleEntrants(entrants.value, settings.value.settings, draws.value);
+  const inPlay = (rule: PrizeRule) => {
+    const eligible = eligibleEntrants(entrants.value, rule, settings.value.settings, draws.value);
+    return { eligible: eligible.length, tickets: totalTicketsOf(eligible, rule) };
+  };
   return ok({
     ...settings.value,
-    prizes: [...prizes.value].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)),
+    prizes: [...prizes.value].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name)).map((prize) => ({ ...prize, ...inPlay(prize.rule) })),
     draws: [...draws.value].sort((a, b) => b.at.getTime() - a.at.getTime()),
-    eligible: eligible.length,
-    tickets: eligible.reduce((sum, entrant) => sum + entrant.credits, 0),
+    ...inPlay(DEFAULT_RULE),
   });
 }
 
@@ -221,29 +300,36 @@ export async function saveRaffleSettings(deps: RaffleDeps, actor: RaffleActor, i
   return ok(settings);
 }
 
-export async function createRafflePrize(deps: RaffleDeps, actor: RaffleActor, input: { name: unknown; quantity: unknown; imagePath?: unknown }): Promise<Result<RafflePrize, { code: RaffleErrorCode }>> {
+/** Adds a prize at the end of the list. A prize sent without a rule follows the G-Credits raffle. */
+export async function createRafflePrize(
+  deps: RaffleDeps,
+  actor: RaffleActor,
+  input: { name: unknown; quantity: unknown; imagePath?: unknown; rule?: unknown },
+): Promise<Result<RafflePrize, { code: RaffleErrorCode }>> {
   if (forbidden(actor)) return fail("forbidden");
   const name = prizeName(input.name);
   if (!name) return fail("invalid-name");
   if (!whole(input.quantity, 1, PRIZE_QUANTITY_MAX)) return fail("invalid-quantity");
+  const rule = input.rule === undefined ? DEFAULT_RULE : parsePrizeRule(input.rule);
+  if (!rule) return fail("invalid-rule");
   const image = chooseImage(deps.images, "raffle-prize", input.imagePath);
   if (!image) return fail("invalid-image");
   const listed = await deps.store.prizes();
   if (!listed.ok) return fail("unknown");
   const order = Math.max(-1, ...listed.value.map((prize) => prize.order)) + 1;
-  const created = await deps.store.createPrize({ name, quantity: input.quantity, awarded: 0, drawSeq: 0, active: true, order, image: image.keep ? null : image.image });
+  const created = await deps.store.createPrize({ name, quantity: input.quantity, awarded: 0, drawSeq: 0, active: true, order, image: image.keep ? null : image.image, rule });
   if (!created.ok) return fail("unknown");
-  await audit(deps, actor, "raffle.prize.created", created.value.id, { name, quantity: String(input.quantity) });
+  await audit(deps, actor, "raffle.prize.created", created.value.id, { name, quantity: String(input.quantity), rule: ruleKey(rule) });
   return ok(created.value);
 }
 
 export async function updateRafflePrize(
   deps: RaffleDeps,
   actor: RaffleActor,
-  input: { id: string; name?: unknown; quantity?: unknown; active?: unknown; imagePath?: unknown },
+  input: { id: string; name?: unknown; quantity?: unknown; active?: unknown; imagePath?: unknown; rule?: unknown },
 ): Promise<Result<RafflePrize, { code: RaffleErrorCode }>> {
   if (forbidden(actor)) return fail("forbidden");
-  const patch: Partial<Pick<RafflePrize, "name" | "quantity" | "active" | "image">> = {};
+  const patch: Partial<Pick<RafflePrize, "name" | "quantity" | "active" | "image" | "rule">> = {};
   const image = chooseImage(deps.images, "raffle-prize", input.imagePath);
   if (!image) return fail("invalid-image");
   if (!image.keep) patch.image = image.image;
@@ -260,6 +346,11 @@ export async function updateRafflePrize(
     if (typeof input.active !== "boolean") return fail("invalid-settings");
     patch.active = input.active;
   }
+  if (input.rule !== undefined) {
+    const rule = parsePrizeRule(input.rule);
+    if (!rule) return fail("invalid-rule");
+    patch.rule = rule;
+  }
   if (patch.quantity !== undefined) {
     const listed = await deps.store.prizes();
     if (!listed.ok) return fail("unknown");
@@ -272,14 +363,19 @@ export async function updateRafflePrize(
   if (!updated.value) return fail("not-found");
   const { before, after } = updated.value;
   await dropReplacedImage(deps.images, before.image, after.image);
-  const changed = [...(["name", "quantity", "active"] as const).filter((field) => before[field] !== after[field]), ...(before.image?.path === after.image?.path ? [] : ["image"])];
+  const changed = [
+    ...(["name", "quantity", "active"] as const).filter((field) => before[field] !== after[field]),
+    ...(before.image?.path === after.image?.path ? [] : ["image"]),
+    ...(ruleKey(before.rule) === ruleKey(after.rule) ? [] : ["rule"]),
+  ];
   if (changed.length > 0) await audit(deps, actor, "raffle.prize.updated", input.id, { changed: changed.join(","), name: after.name });
   return ok(after);
 }
 
 /**
- * Draws the next unit of a prize: a winner among the cadets with enough tickets who have not won (or been voided),
- * weighted by tickets, with a cryptographic random number. Recorded and audited, then shown on the stage (a stage
+ * Draws the next unit of a prize: a winner among the cadets its rule lets in who have not won (or been voided),
+ * weighted by tickets (one each outside the G-Credits rule), with a cryptographic random number. The rule is read
+ * from the prize inside the draw's transaction and kept with the draw. Recorded and audited, then shown on the stage (a stage
  * that cannot be updated never undoes the draw).
  */
 export async function drawRafflePrize(deps: RaffleDeps, actor: RaffleActor, input: { prizeId: string }): Promise<Result<RaffleDraw, { code: RaffleErrorCode }>> {
@@ -291,17 +387,18 @@ export async function drawRafflePrize(deps: RaffleDeps, actor: RaffleActor, inpu
   const drawn = await deps.store.draw(input.prizeId, (prize, draws) => {
     if (!prize.active) return fail("inactive");
     if (prize.awarded >= prize.quantity) return fail("exhausted");
-    const eligible = eligibleEntrants(entrants.value, settings.value.settings, draws);
-    const winner = pickWinner(eligible, deps.random);
+    const eligible = eligibleEntrants(entrants.value, prize.rule, settings.value.settings, draws);
+    const winner = pickWinner(eligible, prize.rule, deps.random);
     if (!winner) return fail("no-entrants");
     reel = buildReel(eligible, winner, deps.random);
     return ok({
       winnerUid: winner.uid,
       winnerAlias: winner.alias,
       winnerSquadId: winner.squadId,
-      tickets: winner.credits,
-      totalTickets: eligible.reduce((sum, entrant) => sum + entrant.credits, 0),
+      tickets: ticketsOf(winner, prize.rule),
+      totalTickets: totalTicketsOf(eligible, prize.rule),
       entrants: eligible.length,
+      rule: prize.rule,
       at: deps.now(),
     });
   });
@@ -311,6 +408,7 @@ export async function drawRafflePrize(deps: RaffleDeps, actor: RaffleActor, inpu
     prize: drawn.value.prizeName,
     winner: drawn.value.winnerUid,
     tickets: `${drawn.value.tickets}/${drawn.value.totalTickets}`,
+    rule: ruleKey(drawn.value.rule),
   });
   const shown = await deps.stage.present(drawn.value, reel);
   if (!shown.ok) logServerError("raffle.stage.present", new Error(`draw ${drawn.value.id} not shown on the stage`));

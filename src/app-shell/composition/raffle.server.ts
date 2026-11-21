@@ -31,6 +31,7 @@ export const raffleDeps: RaffleDeps = {
         winnerSquadId: draw.winnerSquadId,
         tickets: draw.tickets,
         totalTickets: draw.totalTickets,
+        rule: draw.rule,
         reel,
         at: draw.at,
       });

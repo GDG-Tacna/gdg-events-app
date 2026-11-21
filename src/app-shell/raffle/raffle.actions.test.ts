@@ -15,7 +15,7 @@ const actions = await import("./raffle.actions");
 
 const session = (role: "attendee" | "staff" | "admin" | null) => ({ uid: "a1", role, displayName: null, photoUrl: null });
 const ADMIN = { uid: "a1", role: "admin" };
-const DRAW = { id: "polera-1", winnerUid: "u1", winnerAlias: "Nova", tickets: 4, totalTickets: 90 };
+const DRAW = { id: "polera-1", winnerUid: "u1", winnerAlias: "Nova", tickets: 1, totalTickets: 10, rule: { kind: "top", n: 10 } };
 
 describe("raffle actions", () => {
   beforeEach(() => {
@@ -65,11 +65,35 @@ describe("raffle actions", () => {
     expect(cache.revalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
-  it("answers a draw with the winner's alias and tickets, never their uid", async () => {
+  it("answers a draw with the winner's alias, tickets and rule, never their uid", async () => {
     const result = await actions.drawRafflePrizeAction({ prizeId: "polera" });
 
-    expect(result).toEqual({ ok: true, winnerAlias: "Nova", tickets: 4, totalTickets: 90 });
+    expect(result).toEqual({ ok: true, winnerAlias: "Nova", tickets: 1, totalTickets: 10, rule: { kind: "top", n: 10 } });
     expect(server.drawRafflePrize).toHaveBeenCalledWith({ marker: "raffle" }, ADMIN, { prizeId: "polera" });
+  });
+
+  it("passes each prize rule kind through to the use cases, which check the ranges", async () => {
+    for (const rule of [{ kind: "credits" }, { kind: "top", n: 5 }, { kind: "xp", min: 300 }] as const) {
+      expect(await actions.createRafflePrizeAction({ name: "Taza", quantity: 1, rule })).toEqual({ ok: true });
+      expect(server.createRafflePrize).toHaveBeenLastCalledWith({ marker: "raffle" }, ADMIN, { name: "Taza", quantity: 1, rule });
+      expect(await actions.updateRafflePrizeAction({ id: "p", rule })).toEqual({ ok: true });
+      expect(server.updateRafflePrize).toHaveBeenLastCalledWith({ marker: "raffle" }, ADMIN, { id: "p", rule });
+    }
+    // Extra fields never reach the use cases.
+    await actions.updateRafflePrizeAction({ id: "p", rule: { kind: "top", n: 5, min: 9 } as never });
+    expect(server.updateRafflePrize).toHaveBeenLastCalledWith({ marker: "raffle" }, ADMIN, { id: "p", rule: { kind: "top", n: 5 } });
+  });
+
+  it.each([
+    ["an unknown kind", { kind: "rank", n: 2 }],
+    ["a top without its size", { kind: "top" }],
+    ["an XP minimum as text", { kind: "xp", min: "300" }],
+    ["not an object", "top-10"],
+  ])("refuses a rule with %s before the use cases", async (_, rule) => {
+    expect(await actions.createRafflePrizeAction({ name: "Taza", quantity: 1, rule: rule as never })).toEqual({ ok: false, code: "invalid-rule" });
+    expect(await actions.updateRafflePrizeAction({ id: "p", rule: rule as never })).toEqual({ ok: false, code: "invalid-rule" });
+    expect(server.createRafflePrize).not.toHaveBeenCalled();
+    expect(server.updateRafflePrize).not.toHaveBeenCalled();
   });
 
   it("refuses malformed input before the use cases, and passes refusals through", async () => {

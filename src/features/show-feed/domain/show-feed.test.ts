@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { err, ok } from "@/shared/lib/result";
 import {
   checkFeedAccess,
+  feedDraws,
   feedTalks,
   getTalkQr,
+  type FeedDrawSource,
   type FeedTalk,
   type TalkQrDeps,
 } from "./show-feed";
@@ -86,5 +88,34 @@ describe("getTalkQr", () => {
     const failing = setup();
     failing.issue.mockResolvedValue(err({ code: "unknown" }));
     expect(await getTalkQr(failing, "talk-genkit")).toEqual(err({ code: "unknown" }));
+  });
+});
+
+describe("feedDraws", () => {
+  const draw = (id: string, at: string, rule: FeedDrawSource["rule"], voided = false): FeedDrawSource => ({
+    id,
+    prizeId: "mug",
+    prizeName: "Taza",
+    winnerAlias: `Alias-${id}`,
+    winnerSquadId: null,
+    tickets: 1,
+    totalTickets: 10,
+    rule,
+    at: new Date(at),
+    voided,
+  });
+
+  it("passes each draw's rule through, newest first, without voided draws", () => {
+    const views = feedDraws(
+      [draw("mug-1", "2026-11-21T16:00:00Z", { kind: "credits" }), draw("mug-2", "2026-11-21T16:10:00Z", { kind: "top", n: 10 }), draw("mug-3", "2026-11-21T16:20:00Z", { kind: "xp", min: 300 }, true)],
+      [],
+      [],
+      null,
+    );
+
+    expect(views.map((view) => [view.id, view.rule])).toEqual([
+      ["mug-2", { kind: "top", n: 10 }],
+      ["mug-1", { kind: "credits" }],
+    ]);
   });
 });

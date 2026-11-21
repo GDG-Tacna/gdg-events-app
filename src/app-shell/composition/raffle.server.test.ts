@@ -17,16 +17,16 @@ vi.mock("@/features/raffle/server", () => ({
 const { raffleCardDeps, raffleDeps } = await import("./raffle.server");
 
 const AT = new Date("2026-10-24T23:50:00Z");
-const DRAW = { id: "polera-1", prizeId: "polera", prizeName: "Polera", winnerUid: "u1", winnerAlias: "Nova", winnerSquadId: "firebase", tickets: 4, totalTickets: 90, entrants: 9, at: AT, voided: false };
+const DRAW = { id: "polera-1", prizeId: "polera", prizeName: "Polera", winnerUid: "u1", winnerAlias: "Nova", winnerSquadId: "firebase", tickets: 1, totalTickets: 9, entrants: 9, rule: { kind: "top" as const, n: 10 }, at: AT, voided: false };
 
 describe("raffleDeps", () => {
-  it("hands each draw to the stage, without the winner's uid", async () => {
+  it("hands each draw to the stage with its rule, without the winner's uid", async () => {
     mocks.presentRaffle.mockResolvedValue({ ok: true, value: {} });
 
     expect(await raffleDeps.stage.present(DRAW, ["Orion", "Nova"])).toEqual({ ok: true, value: undefined });
     expect(mocks.presentRaffle).toHaveBeenCalledWith(
       { marker: "stage" },
-      { drawId: "polera-1", prizeName: "Polera", prizeImageUrl: null, winnerAlias: "Nova", winnerSquadId: "firebase", tickets: 4, totalTickets: 90, reel: ["Orion", "Nova"], at: AT },
+      { drawId: "polera-1", prizeName: "Polera", prizeImageUrl: null, winnerAlias: "Nova", winnerSquadId: "firebase", tickets: 1, totalTickets: 9, rule: { kind: "top", n: 10 }, reel: ["Orion", "Nova"], at: AT },
     );
 
     // The prize's photo, answered by the draw, goes to the stage too.

@@ -25,7 +25,7 @@ La spec completa está en `gdg-presentacion/docs/SPEC-FEED-ESCENARIO.md`. Códig
 | `GET /api/show-feed/qr?talk=<id>` | `talkId`, `name`, `cells` (filas de `"1"`/`"0"`, sin zona de silencio), `issuedAt`, `expiresAt` | `400 bad-request`, `404 not-found`, `409 inactive` |
 | `GET /api/show-feed/polls` | `polls` (`id`, `question`, `status`): la abierta primero, luego las cerradas; sin borradores | `404 off` (encuestas apagadas) |
 | `GET /api/show-feed/polls?id=<id>` | `poll`: `id`, `question`, `status`, `options` (`id`, `text`, `imageUrl`, `votes`) y `total` | `404 not-found` (no existe o es borrador) |
-| `GET /api/show-feed/raffle` | `draws` (más reciente primero, sin anulados): `id`, `prizeName`, `prizeImageUrl`, `winner` (`alias`, `squad`), `tickets`, `totalTickets`, `at`, `reel` (los nombres que giró el escenario de la app; solo el último sorteo) | `404 off` (sorteo apagado) |
+| `GET /api/show-feed/raffle` | `draws` (más reciente primero, sin anulados): `id`, `prizeName`, `prizeImageUrl`, `winner` (`alias`, `squad`), `tickets`, `totalTickets`, `rule` (quién participó: `{ kind: "credits" }`, `{ kind: "top", n }` o `{ kind: "xp", min }`; en `top` y `xp` cada cadete tiene un boleto), `at`, `reel` (los nombres que giró el escenario de la app; solo el último sorteo) | `404 off` (sorteo apagado) |
 
 **Cuándo se entrega el QR:** para cualquier charla activa de la edición, a cualquier hora. El operador del show decide cuándo proyectarlo (los speakers lo piden antes o después de su charla, y las charlas se atrasan). `qrNow` en `talks` indica si la charla está activa. Cada llamada emite un código nuevo de 2 minutos, que se verifica como cualquier otro QR de charla. El texto firmado nunca sale del servidor.
 

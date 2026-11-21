@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { raffleDeps } from "@/app-shell/composition/raffle.server";
 import { getSession } from "@/app-shell/guards";
-import type { DrawRaffleActionResult, RaffleActionResult } from "@/features/raffle";
+import type { DrawRaffleActionResult, PrizeRule, RaffleActionResult } from "@/features/raffle";
 import { createRafflePrize, drawRafflePrize, saveRaffleSettings, updateRafflePrize, voidRaffleDraw, type RaffleActor } from "@/features/raffle/server";
 import { FEATURES } from "@/shared/config/features";
 import { ROUTES } from "@/shared/config/routes";
@@ -14,8 +14,14 @@ import { mayEdit } from "@/app-shell/permissions.server";
 /** Shapes only; every rule (lengths, ranges, units left) is checked again by the use cases. */
 const settingsSchema = z.object({ minCredits: z.number() });
 const imagePath = z.string().max(300).nullable().optional();
-const createSchema = z.object({ name: z.string().max(200), quantity: z.number(), imagePath });
-const updateSchema = z.object({ id: z.string().min(1).max(100), name: z.string().max(200).optional(), quantity: z.number().optional(), active: z.boolean().optional(), imagePath });
+/** Who takes part in a prize; the top and the XP minimum are checked against their ranges by the use cases. */
+const rule = z
+  .discriminatedUnion("kind", [z.object({ kind: z.literal("credits") }), z.object({ kind: z.literal("top"), n: z.number() }), z.object({ kind: z.literal("xp"), min: z.number() })])
+  .optional();
+const createSchema = z.object({ name: z.string().max(200), quantity: z.number(), imagePath, rule });
+const updateSchema = z.object({ id: z.string().min(1).max(100), name: z.string().max(200).optional(), quantity: z.number().optional(), active: z.boolean().optional(), imagePath, rule });
+/** A malformed rule says so; any other malformed field answers `fallback`. */
+const shapeRefusal = (error: z.ZodError, fallback: "invalid-name" | "not-found") => (error.issues.some((issue) => issue.path[0] === "rule") ? "invalid-rule" : fallback);
 const drawSchema = z.object({ prizeId: z.string().min(1).max(100) });
 const voidSchema = z.object({ drawId: z.string().min(1).max(200) });
 
@@ -49,22 +55,22 @@ export async function saveRaffleSettingsAction(input: { minCredits: number }): P
   return { ok: true };
 }
 
-export async function createRafflePrizeAction(input: { name: string; quantity: number; imagePath?: string | null }): Promise<RaffleActionResult> {
+export async function createRafflePrizeAction(input: { name: string; quantity: number; imagePath?: string | null; rule?: PrizeRule }): Promise<RaffleActionResult> {
   const actor = await admin();
   if (refused(actor)) return actor;
   const parsed = createSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, code: "invalid-name" };
+  if (!parsed.success) return { ok: false, code: shapeRefusal(parsed.error, "invalid-name") };
   const created = await createRafflePrize(raffleDeps, actor, parsed.data);
   if (!created.ok) return { ok: false, code: created.error.code };
   refresh();
   return { ok: true };
 }
 
-export async function updateRafflePrizeAction(input: { id: string; name?: string; quantity?: number; active?: boolean }): Promise<RaffleActionResult> {
+export async function updateRafflePrizeAction(input: { id: string; name?: string; quantity?: number; active?: boolean; imagePath?: string | null; rule?: PrizeRule }): Promise<RaffleActionResult> {
   const actor = await admin();
   if (refused(actor)) return actor;
   const parsed = updateSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, code: "not-found" };
+  if (!parsed.success) return { ok: false, code: shapeRefusal(parsed.error, "not-found") };
   const updated = await updateRafflePrize(raffleDeps, actor, parsed.data);
   if (!updated.ok) return { ok: false, code: updated.error.code };
   refresh();
@@ -79,7 +85,7 @@ export async function drawRafflePrizeAction(input: { prizeId: string }): Promise
   const drawn = await drawRafflePrize(raffleDeps, actor, parsed.data);
   if (!drawn.ok) return { ok: false, code: drawn.error.code };
   refresh();
-  return { ok: true, winnerAlias: drawn.value.winnerAlias, tickets: drawn.value.tickets, totalTickets: drawn.value.totalTickets };
+  return { ok: true, winnerAlias: drawn.value.winnerAlias, tickets: drawn.value.tickets, totalTickets: drawn.value.totalTickets, rule: drawn.value.rule };
 }
 
 export async function voidRaffleDrawAction(input: { drawId: string }): Promise<RaffleActionResult> {
