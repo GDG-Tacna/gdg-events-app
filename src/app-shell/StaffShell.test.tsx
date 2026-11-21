@@ -12,7 +12,7 @@ const features = vi.hoisted(() => ({ FEATURES: { checkins: true } }));
 vi.mock("@/shared/config/features", () => features);
 
 describe("StaffShell", () => {
-  it("has a bottom bar with the stations, the ticket change in the middle and the staff's own code", () => {
+  it("has a bottom bar with only the stations and the staff's own code: each station has its own reader, so no scan button in the middle", () => {
     navigation.pathname = "/staff";
     render(
       <StaffShell account="Bruno">
@@ -21,7 +21,7 @@ describe("StaffShell", () => {
     );
 
     const nav = screen.getByRole("navigation", { name: copy.staff.nav.label });
-    expect(within(nav).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/staff", "/staff/entradas", "/staff/mi-codigo"]);
+    expect(within(nav).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/staff", "/staff/mi-codigo"]);
     expect(within(nav).getByRole("link", { name: copy.staff.nav.stations })).toHaveAttribute("aria-current", "page");
   });
 
