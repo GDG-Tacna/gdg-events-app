@@ -43,6 +43,27 @@ describe("AdminShell", () => {
     expect(screen.getByRole("button", { name: "Salir" })).toBeInTheDocument();
   });
 
+  it("keeps the team code button within reach on every screen when it is given, as a link with its own name", () => {
+    render(
+      <AdminShell items={ITEMS} account="Ana Pérez" quickCode={{ href: "/staff/mi-codigo", label: "Mi QR", accessibleLabel: "Mostrar mi código" }}>
+        <h1>Contenido</h1>
+      </AdminShell>,
+    );
+
+    const button = screen.getByRole("link", { name: "Mostrar mi código" });
+    expect(button).toHaveAttribute("href", "/staff/mi-codigo");
+    expect(button).toHaveTextContent("Mi QR");
+    // It floats over the content, never inside the navigation or the page.
+    expect(button.className).toContain("fixed");
+    expect(within(screen.getByRole("navigation", { name: copy.admin.navLabel })).queryByRole("link", { name: "Mostrar mi código" })).not.toBeInTheDocument();
+  });
+
+  it("has no team code button when none is given", () => {
+    renderShell();
+
+    expect(screen.queryByRole("link", { name: "Mostrar mi código" })).not.toBeInTheDocument();
+  });
+
   it("marks only the home item as current on the home page, even though /admin/team starts with /admin", () => {
     renderShell();
 

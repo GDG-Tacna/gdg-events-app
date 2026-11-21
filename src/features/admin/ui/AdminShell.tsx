@@ -33,6 +33,8 @@ export interface AdminShellProps {
   edition?: ReactNode;
   /** A line above every screen (for example, that the edition being prepared is not the one in course). */
   notice?: ReactNode;
+  /** The button that always goes with the person (their team code, «Mi QR»): where it leads and what it says. Without it there is none. */
+  quickCode?: { href: string; label: string; accessibleLabel: string };
   /** Areas the person may only look at: their screens show with every control switched off. */
   readOnly?: readonly string[];
   children: ReactNode;
@@ -73,7 +75,7 @@ function groupsOf(items: readonly AdminNavItem[]): Array<{ label: string | null;
  * rail (Design System); on phones it hides behind a "Menú" button that names the current area, so the screen starts
  * with its content. Each item is a plain link and the current one is marked for assistive tech.
  */
-export function AdminShell({ items, account, accountActions, accountPhotoUrl, compactAccountActions, edition, notice, readOnly = [], children }: AdminShellProps) {
+export function AdminShell({ items, account, accountActions, accountPhotoUrl, compactAccountActions, edition, notice, quickCode, readOnly = [], children }: AdminShellProps) {
   const pathname = usePathname();
   const viewOnly = readOnly.some((href) => pathname === href || pathname?.startsWith(`${href}/`));
   const [menuOpen, setMenuOpen] = useState(false);
@@ -176,6 +178,18 @@ export function AdminShell({ items, account, accountActions, accountPhotoUrl, co
           )}
         </main>
       </div>
+      {quickCode ? (
+        // Always in reach, on every screen of the control center: the main action of an organizer on the floor (a cadet
+        // scans their code to meet them). The primary color of the design, over the content and under the dialogs.
+        <Link
+          href={quickCode.href}
+          aria-label={quickCode.accessibleLabel}
+          className="bg-ink text-on-ink border-ink focus-visible:ring-ring type-label print:hidden fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 inline-flex h-14 items-center gap-2 rounded-full border-2 px-5 text-base font-bold focus-visible:ring-[3px] focus-visible:outline-none"
+        >
+          <Icon name="qr" size={22} />
+          {quickCode.label}
+        </Link>
+      ) : null}
     </>
   );
 }
