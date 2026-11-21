@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 import { copy } from "@/shared/copy/es";
 import { interpolate } from "@/shared/lib/format";
 import { cn } from "@/shared/lib/utils";
-import { Icon, PlatformMark, SpaceBackground, type IconName } from "@/shared/ui";
+import { Icon, PlatformMark, QuickCodeButton, SpaceBackground, type IconName } from "@/shared/ui";
 
 export interface AdminNavItem {
   href: string;
@@ -178,18 +178,8 @@ export function AdminShell({ items, account, accountActions, accountPhotoUrl, co
           )}
         </main>
       </div>
-      {quickCode ? (
-        // Always in reach, on every screen of the control center: the main action of an organizer on the floor (a cadet
-        // scans their code to meet them). The primary color of the design, over the content and under the dialogs.
-        <Link
-          href={quickCode.href}
-          aria-label={quickCode.accessibleLabel}
-          className="bg-ink text-on-ink border-ink focus-visible:ring-ring type-label print:hidden fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 inline-flex h-14 items-center gap-2 rounded-full border-2 px-5 text-base font-bold focus-visible:ring-[3px] focus-visible:outline-none"
-        >
-          <Icon name="qr" size={22} />
-          {quickCode.label}
-        </Link>
-      ) : null}
+      {/* Always in reach, on every screen of the control center: the main action of an organizer on the floor. */}
+      {quickCode ? <QuickCodeButton {...quickCode} /> : null}
     </>
   );
 }

@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { SignOutButton } from "@/features/auth";
+import { FEATURES } from "@/shared/config/features";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
-import { BottomNav, BrandMark, SpaceBackground, ThemeToggle, type BottomNavItem } from "@/shared/ui";
+import { BottomNav, BrandMark, QuickCodeButton, SpaceBackground, ThemeToggle, type BottomNavItem } from "@/shared/ui";
 
 // "Puestos" is /staff and everything under it that serves a station; the ticket change and the staff's code are tabs of their own.
 const START: BottomNavItem[] = [{ href: ROUTES.staff, label: copy.staff.nav.stations, icon: "flag", exclude: [ROUTES.staffTickets, ROUTES.teamCode] }];
@@ -37,6 +38,8 @@ export function StaffShell({ account, children }: { account: string | null; chil
           <main>{children}</main>
         </div>
       </div>
+      {/* Within reach on every screen, above the bottom bar on phones (the rail sits at the side from 760px). */}
+      {FEATURES.checkins ? <QuickCodeButton href={ROUTES.teamCode} label={copy.teamCode.fab} accessibleLabel={copy.teamCode.fabLabel} className="bottom-[calc(6.25rem+env(safe-area-inset-bottom))] min-[760px]:bottom-[max(1rem,env(safe-area-inset-bottom))]" /> : null}
       <BottomNav label={copy.staff.nav.label} start={START} action={{ href: ROUTES.staffTickets, label: copy.staff.nav.tickets, icon: "qr" }} end={END} />
     </>
   );
