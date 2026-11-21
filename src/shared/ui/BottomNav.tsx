@@ -18,19 +18,27 @@ export interface BottomNavProps {
   label: string;
   /** Tabs to the left of the main action. */
   start: readonly BottomNavItem[];
-  /** The main action, raised in the middle of the bar. */
-  action: BottomNavItem;
+  /** The main action, raised in the middle of the bar. Without it the bar has only tabs (staff's: each station has its own reader). */
+  action?: BottomNavItem;
   /** Tabs to the right of the main action (later phases add them). */
   end?: readonly BottomNavItem[];
 }
 
 /** A tab is current by its path: the query it opens with (`?vista=agenda`) is not part of `usePathname`. */
-const isUnder = (pathname: string | null, path: string) => pathname === path || (pathname !== null && pathname.startsWith(`${path}/`));
+const isUnder = (pathname: string | null, path: string) =>
+  pathname === path || (pathname !== null && pathname.startsWith(`${path}/`));
 
 const isActive = (pathname: string | null, item: BottomNavItem) =>
-  isUnder(pathname, item.href.split("?")[0]) && !(item.exclude ?? []).some((path) => isUnder(pathname, path));
+  isUnder(pathname, item.href.split("?")[0]) &&
+  !(item.exclude ?? []).some((path) => isUnder(pathname, path));
 
-function Tab({ item, pathname }: { item: BottomNavItem; pathname: string | null }) {
+function Tab({
+  item,
+  pathname,
+}: {
+  item: BottomNavItem;
+  pathname: string | null;
+}) {
   const active = isActive(pathname, item);
   return (
     <li className="relative flex-1 min-[760px]:flex-none">
@@ -47,7 +55,9 @@ function Tab({ item, pathname }: { item: BottomNavItem; pathname: string | null 
         className={cn(
           "gap-space-1 type-caption focus-visible:ring-ring flex min-h-12 flex-col items-center justify-center rounded-md px-2 py-1 transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
           // The current tab's icon and label are yellow. As text the yellow is `gold-ink`: the bright one is 1.7:1 on the light canvas.
-          active ? "text-gold-ink font-semibold" : "text-muted-foreground hover:text-foreground",
+          active
+            ? "text-gold-ink font-semibold"
+            : "text-muted-foreground hover:text-foreground",
         )}
       >
         <Icon name={item.icon} size={24} />
@@ -70,7 +80,7 @@ function Spacer() {
  */
 export function BottomNav({ label, start, action, end = [] }: BottomNavProps) {
   const pathname = usePathname();
-  const actionActive = isActive(pathname, action);
+  const actionActive = action ? isActive(pathname, action) : false;
   // The action stays in the true middle even when one side has fewer tabs (only Inicio exists at first):
   // empty slots take the room of the missing tabs on phones. The side rail has no use for them.
   const startSpacers = Math.max(0, end.length - start.length);
@@ -100,23 +110,25 @@ export function BottomNav({ label, start, action, end = [] }: BottomNavProps) {
         ))}
 
         {/* The slot keeps the middle free; the button hangs from the bar's line, so the bar itself stays slim. */}
-        <li className="relative w-16 shrink-0 self-stretch min-[760px]:w-auto min-[760px]:flex-none min-[760px]:self-auto">
-          <Link
-            href={action.href}
-            aria-current={actionActive ? "page" : undefined}
-            aria-label={action.label}
-            className={cn(
-              "bg-gold text-on-accent border-ink hover:bg-pastel-yellow focus-visible:ring-ring grid size-16 place-items-center rounded-full border-2 transition-[background-color,scale] focus-visible:ring-[3px] focus-visible:outline-none active:scale-95",
-              // The ring is the bar's own color: it hides the line behind the button, like a notch.
-              "ring-surface absolute top-[-9px] left-1/2 -translate-x-1/2 -translate-y-1/2 ring-[6px]",
-              "min-[760px]:static min-[760px]:mx-auto min-[760px]:translate-x-0 min-[760px]:translate-y-0 min-[760px]:ring-0",
-              // Its own screen is open: the fill turns the pastel yellow (the ring is taken by the notch).
-              actionActive && "bg-pastel-yellow",
-            )}
-          >
-            <Icon name={action.icon} size={30} />
-          </Link>
-        </li>
+        {action ? (
+          <li className="relative w-16 shrink-0 self-stretch min-[760px]:w-auto min-[760px]:flex-none min-[760px]:self-auto">
+            <Link
+              href={action.href}
+              aria-current={actionActive ? "page" : undefined}
+              aria-label={action.label}
+              className={cn(
+                "bg-gold text-on-accent border-ink hover:bg-pastel-yellow focus-visible:ring-ring grid size-16 place-items-center rounded-full border-2 transition-[background-color,scale] focus-visible:ring-[3px] focus-visible:outline-none active:scale-95",
+                // The ring is the bar's own color: it hides the line behind the button, like a notch.
+                "ring-surface absolute top-[-9px] left-1/2 -translate-x-1/2 -translate-y-1/2 ring-[6px]",
+                "min-[760px]:static min-[760px]:mx-auto min-[760px]:translate-x-0 min-[760px]:translate-y-0 min-[760px]:ring-0",
+                // Its own screen is open: the fill turns the pastel yellow (the ring is taken by the notch).
+                actionActive && "bg-pastel-yellow",
+              )}
+            >
+              <Icon name={action.icon} size={30} />
+            </Link>
+          </li>
+        ) : null}
 
         {end.map((item) => (
           <Tab key={item.href} item={item} pathname={pathname} />
