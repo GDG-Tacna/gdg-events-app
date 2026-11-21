@@ -2132,6 +2132,38 @@ export const copy = {
           unknown: "No pudimos guardar los módulos. Inténtalo de nuevo.",
         },
       },
+      reset: {
+        open: "Limpiar experiencia y créditos",
+        title: "Limpiar experiencia y créditos",
+        /** Placeholder: {name}. */
+        description: "Vas a dejar en cero a todos los cadetes de «{name}». Úsalo, por ejemplo, para empezar el evento real después de las pruebas.",
+        clearsTitle: "Se borra",
+        clears: [
+          "La experiencia (XP) y los G-Créditos de todos los cadetes: quedan en 0.",
+          "El historial de XP, las misiones completadas, las insignias, los mini-juegos jugados y las recompensas por contactos: así pueden volver a ganarlo todo.",
+          "Los créditos de escuadrón y sus canjes: quedan en 0 y los premios canjeados vuelven al inventario.",
+        ],
+        staysTitle: "Se conserva",
+        stays: [
+          "Los cadetes registrados: alias, escuadrón y entrada.",
+          "La asistencia (check-ins), los contactos, las misiones, los premios y todo lo que preparaste.",
+          "Los créditos que los cadetes ganaron en otros eventos.",
+        ],
+        warning: "No se puede deshacer. Si dudas, cancela.",
+        confirm: "Sí, limpiar todo",
+        running: "Limpiando…",
+        cancel: "Cancelar",
+        /** Placeholders: {name}, {n}. */
+        done: "Listo: «{name}» está en cero. {n} cadetes empiezan de nuevo.",
+        errors: {
+          "not-found": "Ese evento no existe.",
+          finished: "Un evento terminado no se limpia: sus resultados son historia.",
+          forbidden: "Solo un admin de todos los eventos puede limpiar la experiencia y los créditos.",
+          unauthenticated: "Tu sesión terminó. Vuelve a entrar con Google.",
+          disabled: "Esta sección no está disponible por ahora.",
+          unknown: "No pudimos limpiar todo. Revisa los cadetes y vuelve a intentarlo: es seguro repetirlo.",
+        },
+      },
       copy: {
         open: "Copiar contenido",
         title: "Copiar contenido de otro evento",

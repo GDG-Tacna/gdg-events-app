@@ -1,11 +1,11 @@
 "use server";
 
 import { z } from "zod";
-import { copyDeps, editionModules, editionPermissions, editionsDeps, moduleDeps, permissionDeps } from "@/app-shell/composition/event.server";
+import { copyDeps, editionModules, editionPermissions, editionsDeps, moduleDeps, permissionDeps, progressDeps } from "@/app-shell/composition/event.server";
 import { dropEditionCaches } from "@/app-shell/composition/per-edition";
 import { getSession } from "@/app-shell/guards";
-import type { CopyEditionResult, EditionActionResult, EditionsErrorCode, SaveModulesResult, SavePermissionsResult } from "@/features/event";
-import { copyEditionContent, createEdition, forgetPublicEdition, runInEdition, setEditionModules, setEditionPermissions, publishEdition, setEditionStatus, updateEdition, type EditionsActor } from "@/features/event/server";
+import type { CopyEditionResult, EditionActionResult, EditionsErrorCode, ResetProgressResult, SaveModulesResult, SavePermissionsResult } from "@/features/event";
+import { copyEditionContent, createEdition, resetEditionProgress, forgetPublicEdition, runInEdition, setEditionModules, setEditionPermissions, publishEdition, setEditionStatus, updateEdition, type EditionsActor } from "@/features/event/server";
 import { FEATURES } from "@/shared/config/features";
 import { isEventId } from "@/shared/types/event";
 import { forgetCachedKey } from "@/shared/lib/ttl-cache";
@@ -22,6 +22,7 @@ const statusSchema = z.object({ id: z.string().max(60), status: z.enum(["draft",
 const publishSchema = z.object({ id: z.string().max(60) });
 const permissionsSchema = z.object({ eventId: z.string().max(60), organizer: z.record(z.string().max(30), z.string().max(10)), staffStations: z.array(z.string().max(20)).max(10) });
 const modulesSchema = z.object({ eventId: z.string().max(60), off: z.array(z.string().max(30)).max(20) });
+const resetSchema = z.object({ eventId: z.string().max(60) });
 const copySchema = z.object({ from: z.string().max(60), to: z.string().max(60), parts: z.array(z.string().max(30)).max(20) });
 
 /**
@@ -91,6 +92,22 @@ export async function copyEditionAction(input: { from: string; to: string; parts
   dropEditionCaches(parsed.data.to);
   forgetCachedKey(parsed.data.to);
   return { ok: true, ...copied.value };
+}
+
+/**
+ * Cleans the XP and G-Credits of an edition and what earned them (only an admin of every edition, never a finished
+ * edition). Afterwards this server forgets what it kept of that edition, so its screens show the zeros at once.
+ */
+export async function resetEditionProgressAction(input: { eventId: string }): Promise<ResetProgressResult> {
+  const who = await actor();
+  if (isResult(who)) return { ok: false, code: who.ok ? "unknown" : (who.code as "disabled" | "unauthenticated" | "forbidden") };
+  const parsed = resetSchema.safeParse(input);
+  if (!parsed.success || !isEventId(parsed.data.eventId)) return { ok: false, code: "not-found" };
+  const cleared = await resetEditionProgress(progressDeps, who, parsed.data);
+  if (!cleared.ok) return { ok: false, code: cleared.error.code };
+  dropEditionCaches(parsed.data.eventId);
+  forgetCachedKey(parsed.data.eventId);
+  return { ok: true, ...cleared.value };
 }
 
 /**

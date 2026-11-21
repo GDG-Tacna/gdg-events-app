@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const modules = vi.hoisted(() => ({ clear: vi.fn() }));
 const permissionsCache = vi.hoisted(() => ({ clear: vi.fn() }));
-vi.mock("@/app-shell/composition/event.server", () => ({ editionsDeps: { marker: "editions" }, copyDeps: { marker: "copy" }, moduleDeps: { marker: "modules" }, editionModules: modules, permissionDeps: { marker: "permissions" }, editionPermissions: permissionsCache }));
+vi.mock("@/app-shell/composition/event.server", () => ({ editionsDeps: { marker: "editions" }, copyDeps: { marker: "copy" }, progressDeps: { marker: "progress" }, moduleDeps: { marker: "modules" }, editionModules: modules, permissionDeps: { marker: "permissions" }, editionPermissions: permissionsCache }));
 const caches = vi.hoisted(() => ({ dropEditionCaches: vi.fn(), forgetCachedKey: vi.fn() }));
 vi.mock("@/app-shell/composition/per-edition", () => ({ dropEditionCaches: caches.dropEditionCaches }));
 vi.mock("@/shared/lib/ttl-cache", () => ({ forgetCachedKey: caches.forgetCachedKey }));
@@ -11,7 +11,7 @@ vi.mock("@/shared/lib/ttl-cache", () => ({ forgetCachedKey: caches.forgetCachedK
 const guards = { getSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
-const server = { createEdition: vi.fn(), updateEdition: vi.fn(), setEditionStatus: vi.fn(), publishEdition: vi.fn(), forgetPublicEdition: vi.fn(), copyEditionContent: vi.fn(), setEditionModules: vi.fn(), setEditionPermissions: vi.fn(), runInEdition: vi.fn() };
+const server = { createEdition: vi.fn(), updateEdition: vi.fn(), setEditionStatus: vi.fn(), publishEdition: vi.fn(), forgetPublicEdition: vi.fn(), copyEditionContent: vi.fn(), resetEditionProgress: vi.fn(), setEditionModules: vi.fn(), setEditionPermissions: vi.fn(), runInEdition: vi.fn() };
 vi.mock("@/features/event/server", () => server);
 
 const features = vi.hoisted(() => ({ FEATURES: { admin: true } }));
@@ -118,5 +118,45 @@ describe("editions actions", () => {
     expect(permissionsCache.clear).toHaveBeenCalledTimes(1);
 
     expect(await actions.setEditionPermissionsAction({ ...input, eventId: "Not Valid" })).toEqual({ ok: false, code: "invalid-permissions" });
+  });
+});
+
+describe("resetEditionProgressAction", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    features.FEATURES.admin = true;
+    guards.getSession.mockResolvedValue(session("admin", "global"));
+    server.resetEditionProgress.mockResolvedValue({ ok: true, value: { cadets: 120, documents: 840 } });
+  });
+
+  it("cleans the edition as the admin of every edition in the session, and forgets what this server kept of it", async () => {
+    expect(await actions.resetEditionProgressAction({ eventId: "devfest-2026" })).toEqual({ ok: true, cadets: 120, documents: 840 });
+
+    expect(server.resetEditionProgress).toHaveBeenCalledWith({ marker: "progress" }, { uid: "a1", role: "admin", adminScope: "global" }, { eventId: "devfest-2026" });
+    expect(caches.dropEditionCaches).toHaveBeenCalledWith("devfest-2026");
+    expect(caches.forgetCachedKey).toHaveBeenCalledWith("devfest-2026");
+  });
+
+  it("is off with the admin area off, and only for an admin with the Eventos permission", async () => {
+    features.FEATURES.admin = false;
+    expect(await actions.resetEditionProgressAction({ eventId: "devfest-2026" })).toEqual({ ok: false, code: "disabled" });
+    features.FEATURES.admin = true;
+    guards.getSession.mockResolvedValue(session("staff"));
+    expect(await actions.resetEditionProgressAction({ eventId: "devfest-2026" })).toEqual({ ok: false, code: "forbidden" });
+    guards.getSession.mockResolvedValue(null);
+    expect(await actions.resetEditionProgressAction({ eventId: "devfest-2026" })).toEqual({ ok: false, code: "unauthenticated" });
+    expect(server.resetEditionProgress).not.toHaveBeenCalled();
+  });
+
+  it("refuses an input that is not an edition id before the use case", async () => {
+    for (const eventId of ["", "../x", "A B", 5]) expect(await actions.resetEditionProgressAction({ eventId } as never)).toEqual({ ok: false, code: "not-found" });
+    expect(server.resetEditionProgress).not.toHaveBeenCalled();
+  });
+
+  it("passes the use case's refusal on, and keeps what the caches hold when nothing was cleaned", async () => {
+    server.resetEditionProgress.mockResolvedValue({ ok: false, error: { code: "finished" } });
+
+    expect(await actions.resetEditionProgressAction({ eventId: "devfest-2025" })).toEqual({ ok: false, code: "finished" });
+    expect(caches.dropEditionCaches).not.toHaveBeenCalled();
   });
 });

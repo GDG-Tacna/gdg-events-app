@@ -1,4 +1,5 @@
 import type { CopyErrorCode, CopyPart } from "../domain/copy";
+import type { ProgressResetErrorCode } from "../domain/progress-reset";
 import type { EditionModule, ModulesErrorCode } from "../domain/modules";
 import type { AccessLevel, AdminSection, PermissionsErrorCode, StaffStation } from "../domain/permissions";
 import type { EditionDraft, EditionStatus, EditionsErrorCode } from "../domain/editions";
@@ -13,6 +14,10 @@ export type ChooseEditionAction = (input: { id: string }) => Promise<ChooseEditi
 
 export type CopyEditionResult = { ok: true; parts: readonly CopyPart[]; documents: number } | { ok: false; code: CopyErrorCode; parts?: readonly CopyPart[] };
 export type CopyEditionAction = (input: { from: string; to: string; parts: readonly CopyPart[] }) => Promise<CopyEditionResult>;
+
+/** What cleaning an edition's progress answers: how many cadets went back to zero, or why it was not done. */
+export type ResetProgressResult = { ok: true; cadets: number; documents: number } | { ok: false; code: ProgressResetErrorCode };
+export type ResetProgressAction = (input: { eventId: string }) => Promise<ResetProgressResult>;
 
 export type SaveModulesResult = { ok: true } | { ok: false; code: ModulesErrorCode };
 export type SaveModulesAction = (input: { eventId: string; off: readonly EditionModule[] }) => Promise<SaveModulesResult>;

@@ -76,6 +76,7 @@ export interface AuditEntry {
     | "event.reopened"
     | "event.published"
     | "event.copied"
+    | "event.progress-reset"
     | "event.modules"
     | "event.permissions"
     | "squads.seeded"
