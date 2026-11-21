@@ -11,10 +11,11 @@ import { EDITION_NAME_MAX, EDITION_VENUE_MAX, suggestEditionId, type EditionStat
 import { toEventLocal } from "../domain/event";
 import type { EditionModule } from "../domain/modules";
 import type { EditionPermissions } from "../domain/permissions";
-import type { CopyEditionAction, EditionActionResult, PublishEditionAction, SaveEditionAction, SaveModulesAction, SavePermissionsAction, SetEditionStatusAction } from "./actions";
+import type { CopyEditionAction, EditionActionResult, PublishEditionAction, ResetProgressAction, SaveEditionAction, SaveModulesAction, SavePermissionsAction, SetEditionStatusAction } from "./actions";
 import { PermissionsDialog } from "./PermissionsDialog";
 import { ModulesDialog } from "./ModulesDialog";
 import { CopyEditionDialog } from "./CopyEditionDialog";
+import { ResetProgressDialog } from "./ResetProgressDialog";
 
 /** One edition as the screen gets it from the server (dates as ISO strings). */
 export interface EditionRow {
@@ -39,6 +40,8 @@ export interface EventsAdminViewProps {
   publish: PublishEditionAction;
   /** Copies another edition's content in (admins of every edition only). */
   copyContent?: CopyEditionAction;
+  /** Cleans an edition's XP and credits (admins of every edition only; not offered for a finished edition). */
+  resetProgress?: ResetProgressAction;
   /** The modules each edition has off, by edition id, and the action that saves them (admins of every edition only). */
   modules?: Readonly<Record<string, readonly EditionModule[]>>;
   saveModules?: SaveModulesAction;
@@ -79,7 +82,7 @@ const emptyForm: FormState = { mode: "create", id: "", idTouched: false, name: "
  * dates and place. An admin of every edition creates them, finishes or reopens them and makes one public, asking first
  * because cadets, staff and the stage move to it; an organizer only edits their edition's details. The server checks it all.
  */
-export function EventsAdminView({ editions, now, canManage, create, update, setStatus, publish, copyContent, modules, saveModules, permissions, savePermissions }: EventsAdminViewProps) {
+export function EventsAdminView({ editions, now, canManage, create, update, setStatus, publish, copyContent, resetProgress, modules, saveModules, permissions, savePermissions }: EventsAdminViewProps) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
@@ -88,6 +91,7 @@ export function EventsAdminView({ editions, now, canManage, create, update, setS
   const [publishing, setPublishing] = useState<EditionRow | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [copyTarget, setCopyTarget] = useState<EditionRow | null>(null);
+  const [resetTarget, setResetTarget] = useState<EditionRow | null>(null);
   const [modulesTarget, setModulesTarget] = useState<EditionRow | null>(null);
   const [permissionsTarget, setPermissionsTarget] = useState<EditionRow | null>(null);
 
@@ -264,6 +268,21 @@ export function EventsAdminView({ editions, now, canManage, create, update, setS
                       {t.copy.open}
                     </Button>
                   ) : null}
+                  {canManage && resetProgress && edition.status !== "finished" ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon="trash"
+                      disabled={busy !== null}
+                      aria-label={label(t.reset.open)}
+                      onClick={() => {
+                        setNotice(null);
+                        setResetTarget(edition);
+                      }}
+                    >
+                      {t.reset.open}
+                    </Button>
+                  ) : null}
                   {canManage && !edition.isPublic ? (
                     <Button
                       variant="secondary"
@@ -387,6 +406,19 @@ export function EventsAdminView({ editions, now, canManage, create, update, setS
           onClose={() => setModulesTarget(null)}
           onSaved={(message) => {
             setModulesTarget(null);
+            setNotice({ kind: "success", text: message });
+            router.refresh();
+          }}
+        />
+      ) : null}
+
+      {resetProgress ? (
+        <ResetProgressDialog
+          target={resetTarget ? { id: resetTarget.id, name: nameOf(resetTarget) } : null}
+          resetProgress={resetProgress}
+          onClose={() => setResetTarget(null)}
+          onDone={(message) => {
+            setResetTarget(null);
             setNotice({ kind: "success", text: message });
             router.refresh();
           }}

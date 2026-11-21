@@ -122,6 +122,36 @@ describe("EventsAdminView", () => {
     expect(screen.queryByRole("button", { name: new RegExp(t.copy.open) })).not.toBeInTheDocument();
   });
 
+  it("offers «Limpiar experiencia y créditos» on each edition that is not finished, only when cleaning is offered, and opens the explanation", async () => {
+    const resetProgress = vi.fn(async () => ({ ok: true as const, cadets: 3, documents: 9 }));
+    const { user, unmount } = setup({ resetProgress, editions: [LIVE, NEXT, { ...OLD, status: "finished" }] });
+
+    expect(screen.getByRole("button", { name: `${t.reset.open}: DevFest Tacna 2026` })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `${t.reset.open}: Meetup noviembre` })).toBeInTheDocument();
+    // A finished edition's results are history: it has no button.
+    expect(screen.queryByRole("button", { name: `${t.reset.open}: devfest-2025` })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: `${t.reset.open}: DevFest Tacna 2026` }));
+    expect(screen.getByRole("dialog", { name: t.reset.title })).toHaveTextContent("DevFest Tacna 2026");
+    expect(resetProgress).not.toHaveBeenCalled();
+    unmount();
+
+    setup();
+    expect(screen.queryByRole("button", { name: new RegExp(t.reset.open) })).not.toBeInTheDocument();
+  });
+
+  it("cleans after the confirmation, announces it and refreshes the list", async () => {
+    const resetProgress = vi.fn(async () => ({ ok: true as const, cadets: 3, documents: 9 }));
+    const { user } = setup({ resetProgress });
+
+    await user.click(screen.getByRole("button", { name: `${t.reset.open}: DevFest Tacna 2026` }));
+    await user.click(within(screen.getByRole("dialog", { name: t.reset.title })).getByRole("button", { name: t.reset.confirm }));
+
+    expect(resetProgress).toHaveBeenCalledWith({ eventId: "devfest-2026" });
+    expect(await screen.findByText("Listo: «DevFest Tacna 2026» está en cero. 3 cadetes empiezan de nuevo.")).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("lets an organizer only edit: no create, finish or publish", () => {
     setup({ editions: [LIVE], canManage: false });
 

@@ -73,7 +73,7 @@ export interface EditionCatalog {
 }
 
 export interface EditionsAuditEntry {
-  action: "event.created" | "event.updated" | "event.finished" | "event.reopened" | "event.published" | "event.copied" | "event.modules" | "event.permissions";
+  action: "event.created" | "event.updated" | "event.finished" | "event.reopened" | "event.published" | "event.copied" | "event.modules" | "event.permissions" | "event.progress-reset";
   actorUid: string;
   targetUid: string;
   details: Record<string, string | null>;

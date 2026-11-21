@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { editionsDeps, moduleDeps, permissionDeps } from "@/app-shell/composition/event.server";
-import { copyEditionAction, createEditionAction, publishEditionAction, setEditionModulesAction, setEditionPermissionsAction, setEditionStatusAction, updateEditionAction } from "@/app-shell/event/editions.actions";
+import { copyEditionAction, createEditionAction, publishEditionAction, resetEditionProgressAction, setEditionModulesAction, setEditionPermissionsAction, setEditionStatusAction, updateEditionAction } from "@/app-shell/event/editions.actions";
 import { requireRole } from "@/app-shell/guards";
 import { EventsAdminView } from "@/features/event";
 import { getEditionPermissions, listEditions, listOffModules, runInEdition } from "@/features/event/server";
@@ -47,6 +47,7 @@ export default async function AdminEventsPage() {
         setStatus={setEditionStatusAction}
         publish={publishEditionAction}
         copyContent={global ? copyEditionAction : undefined}
+        resetProgress={global ? resetEditionProgressAction : undefined}
         modules={modules}
         saveModules={global ? setEditionModulesAction : undefined}
         permissions={permissions}

@@ -10,6 +10,7 @@ vi.mock("@/app-shell/event/editions.actions", () => ({
   setEditionStatusAction: async () => ({ ok: true }),
   publishEditionAction: async () => ({ ok: true }),
   copyEditionAction: async () => ({ ok: true }),
+  resetEditionProgressAction: async () => ({ ok: true, cadets: 0, documents: 0 }),
   setEditionModulesAction: async () => ({ ok: true }),
   setEditionPermissionsAction: async () => ({ ok: true }),
 }));
@@ -73,6 +74,7 @@ describe("admin events page", () => {
       setStatus: actions.setEditionStatusAction,
       publish: actions.publishEditionAction,
       copyContent: actions.copyEditionAction,
+      resetProgress: actions.resetEditionProgressAction,
       modules: { "devfest-2026": ["raffle"] },
       saveModules: actions.setEditionModulesAction,
       permissions: { "devfest-2026": PERMISSIONS },
@@ -89,6 +91,7 @@ describe("admin events page", () => {
     expect(server.listEditions).toHaveBeenCalledWith(expect.anything(), { uid: "o1", role: "admin", adminScope: "edition" });
     expect(view?.props.canManage).toBe(false);
     expect(view?.props.copyContent).toBeUndefined();
+    expect(view?.props.resetProgress).toBeUndefined();
     expect(view?.props.saveModules).toBeUndefined();
     expect(server.listOffModules).not.toHaveBeenCalled();
   });

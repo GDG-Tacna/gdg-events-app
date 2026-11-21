@@ -1,6 +1,6 @@
 import "server-only";
 import { FirestoreAuditLog } from "@/features/admin/server";
-import { FirestoreEditionCatalog, FirestoreEditionCopier, FirestoreEventStore, FirestoreModuleStore, FirestorePermissionStore, currentEditionOf, getEditionModules, getEditionPermissions, type CopyDeps, type EditionsDeps, type EventDeps, type ModuleDeps, type PermissionDeps } from "@/features/event/server";
+import { FirestoreEditionCatalog, FirestoreEditionCopier, FirestoreProgressResetter, FirestoreEventStore, FirestoreModuleStore, FirestorePermissionStore, currentEditionOf, getEditionModules, getEditionPermissions, type CopyDeps, type ProgressResetDeps, type EditionsDeps, type EventDeps, type ModuleDeps, type PermissionDeps } from "@/features/event/server";
 import { ttlCached } from "@/shared/lib/ttl-cache";
 import { copyEditionImage } from "./media.server";
 
@@ -22,6 +22,14 @@ export const copyDeps: CopyDeps = {
   catalog: editionsDeps.catalog,
   copier: new FirestoreEditionCopier(),
   copyImage: copyEditionImage,
+  audit: editionsDeps.audit,
+  now: () => new Date(),
+};
+
+/** Composition root for cleaning an edition's progress (XP, G-Credits and what earned them); an admin of every edition only. */
+export const progressDeps: ProgressResetDeps = {
+  catalog: editionsDeps.catalog,
+  resetter: new FirestoreProgressResetter(),
   audit: editionsDeps.audit,
   now: () => new Date(),
 };
