@@ -124,7 +124,7 @@ describe("StageControlView", () => {
   });
 
   it("says which prize is being drawn on the big screen", () => {
-    renderView({ ...DEFAULT_STAGE, display: "raffle", raffle: { drawId: "p-1", prizeName: "Polera", prizeImageUrl: null, winner: { alias: "Nova", squad: null }, tickets: 1, totalTickets: 2, reel: [], at: new Date() } });
+    renderView({ ...DEFAULT_STAGE, display: "raffle", raffle: { drawId: "p-1", prizeName: "Polera", prizeImageUrl: null, winner: { alias: "Nova", squad: null }, tickets: 1, totalTickets: 2, rule: { kind: "credits" }, reel: [], at: new Date() } });
 
     expect(screen.getByText("Sorteo: Polera")).toBeInTheDocument();
   });

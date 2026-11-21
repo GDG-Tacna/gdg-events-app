@@ -9,7 +9,7 @@ import { cn } from "@/shared/lib/utils";
 import type { PixelSpriteData } from "@/shared/types/pixel";
 import { SquadArt } from "@/shared/ui";
 import type { BoardCadet, SquadStanding } from "../../domain/ranking";
-import type { StageChampions, StageRaffle } from "../../domain/stage";
+import type { StageChampions, StageRaffle, StageRaffleRule } from "../../domain/stage";
 
 const t = copy.stage;
 
@@ -184,13 +184,21 @@ export function WaitingScreen({ next }: { next?: UpNext | null }) {
 /** How long the reel spins through names before it lands on the winner. */
 export const REEL_MS = 4500;
 
+/** Who took part in a draw, as the chip under the reel says it. */
+function ruleText(rule: StageRaffleRule): string {
+  if (rule.kind === "top") return interpolate(t.raffle.ruleTop, { n: formatNumber(rule.n) });
+  if (rule.kind === "xp") return interpolate(t.raffle.ruleXp, { min: formatNumber(rule.min) });
+  return t.raffle.rule;
+}
+
 /**
  * A raffle draw on the blue scene: the prize, then the reel spinning through entrants' names, slowing down, until it
  * lands on the winner. With reduced motion the winner shows at once. Mount it keyed by the draw, so each draw spins its
- * own reel.
+ * own reel. A top N or XP minimum draw gives every cadet one ticket, so it counts cadets instead of tickets.
  */
 export function RaffleScreen({ raffle }: { raffle: StageRaffle }) {
   const reduce = useReducedMotion();
+  const equalChance = raffle.rule.kind !== "credits";
   const names = raffle.reel.length > 0 ? raffle.reel : [raffle.winner.alias];
   const [index, setIndex] = useState(reduce ? names.length - 1 : 0);
   const landed = index >= names.length - 1;
@@ -234,15 +242,20 @@ export function RaffleScreen({ raffle }: { raffle: StageRaffle }) {
           </p>
           {landed ? (
             <p className="text-muted-foreground text-[clamp(1rem,2.8vh,2rem)] font-medium">
-              {raffle.winner.squad ?? t.noSquad} · <span className="text-lime-ink font-bold">{interpolate(t.raffle.tickets, { n: formatNumber(raffle.tickets), total: formatNumber(raffle.totalTickets) })}</span>
+              {raffle.winner.squad ?? t.noSquad} ·{" "}
+              <span className="text-lime-ink font-bold">
+                {equalChance
+                  ? interpolate(t.raffle.oneOf, { total: formatNumber(raffle.totalTickets) })
+                  : interpolate(t.raffle.tickets, { n: formatNumber(raffle.tickets), total: formatNumber(raffle.totalTickets) })}
+              </span>
             </p>
           ) : null}
         </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-[1.6vw] text-[clamp(0.95rem,2.4vh,1.6rem)] font-bold">
-        <span className="rounded-full border-2 border-current px-[1.4vw] py-[0.8vh]">{interpolate(t.raffle.inPlay, { n: formatNumber(raffle.totalTickets) })}</span>
-        <span className="rounded-full border-2 border-current px-[1.4vw] py-[0.8vh]">{t.raffle.rule}</span>
+        <span className="rounded-full border-2 border-current px-[1.4vw] py-[0.8vh]">{interpolate(equalChance ? t.raffle.inPlayCadets : t.raffle.inPlay, { n: formatNumber(raffle.totalTickets) })}</span>
+        <span className="rounded-full border-2 border-current px-[1.4vw] py-[0.8vh]">{ruleText(raffle.rule)}</span>
       </div>
 
       {/* Screen readers hear the result once, not every name the reel flashes. */}

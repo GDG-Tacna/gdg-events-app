@@ -94,6 +94,7 @@ const DRAW = {
   tickets: 5,
   totalTickets: 80,
   entrants: 20,
+  rule: { kind: "credits" as const },
   at: new Date("2026-11-21T16:30:00Z"),
   voided: false,
 };
@@ -261,6 +262,7 @@ describe("GET /api/show-feed/raffle", () => {
         winner: { alias: "NovaDev", squad: "Gemini" },
         tickets: 5,
         totalTickets: 80,
+        rule: { kind: "credits" },
         at: DRAW.at.getTime(),
         reel: ["Ana", "NovaDev"],
       },

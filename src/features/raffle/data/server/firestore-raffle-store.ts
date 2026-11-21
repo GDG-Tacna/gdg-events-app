@@ -6,7 +6,7 @@ import { getAdminFirestore } from "@/shared/lib/firebase/admin";
 import { EVENT_CONFIG_COLLECTION, PARTICIPANTS_COLLECTION, RAFFLE_DRAWS_COLLECTION, RAFFLE_PRIZES_COLLECTION, eventCollection } from "@/shared/lib/firebase/collections";
 import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
-import { parseRaffleSettings, type Entrant, type NewDraw, type RaffleDraw, type RaffleErrorCode, type RafflePrize, type RaffleSettings, type RaffleStore } from "../../domain/raffle";
+import { DEFAULT_RULE, parsePrizeRule, parseRaffleSettings, type Entrant, type NewDraw, type RaffleDraw, type RaffleErrorCode, type RafflePrize, type RaffleSettings, type RaffleStore } from "../../domain/raffle";
 
 const SETTINGS_DOC = "raffle";
 
@@ -24,7 +24,18 @@ function toPrize(id: string, data: Record<string, unknown> | undefined): RaffleP
   const drawSeq = count(data.drawSeq);
   if (!quantity || awarded === null || drawSeq === null) return null;
   const image = typeof data.imagePath === "string" ? imageRefOf(data.imagePath, "raffle-prize") : null;
-  return { id, name: data.name, quantity, awarded, drawSeq, active: data.active === true, order: typeof data.order === "number" ? data.order : Number.MAX_SAFE_INTEGER, image };
+  return {
+    id,
+    name: data.name,
+    quantity,
+    awarded,
+    drawSeq,
+    active: data.active === true,
+    order: typeof data.order === "number" ? data.order : Number.MAX_SAFE_INTEGER,
+    image,
+    // Prizes made before rules (or with a rule this version cannot read) follow the G-Credits raffle, as they always did.
+    rule: parsePrizeRule(data.rule) ?? DEFAULT_RULE,
+  };
 }
 
 function toDraw(id: string, data: Record<string, unknown> | undefined): RaffleDraw | null {
@@ -44,6 +55,8 @@ function toDraw(id: string, data: Record<string, unknown> | undefined): RaffleDr
     tickets,
     totalTickets,
     entrants,
+    // Draws made before rules were G-Credits draws.
+    rule: parsePrizeRule(data.rule) ?? DEFAULT_RULE,
     at,
     voided: data.voided === true,
   };
@@ -52,7 +65,7 @@ function toDraw(id: string, data: Record<string, unknown> | undefined): RaffleDr
 /**
  * Firestore adapter (Admin SDK) for the raffle: `config/raffle`, `rafflePrizes/{id}` and `raffleDraws/{prizeId}-{n}`.
  * A draw and a void are transactions over the prize and the draws, so two admins (or two taps) never give the same
- * unit twice or more units than the prize has. Entrants are read from the participants (their G-Credits of the
+ * unit twice or more units than the prize has. Entrants are read from the participants (their G-Credits and XP of the
  * edition) outside the transaction, so the draw never holds the profiles every reward writes to.
  */
 export class FirestoreRaffleStore implements RaffleStore {
@@ -115,7 +128,7 @@ export class FirestoreRaffleStore implements RaffleStore {
     }
   }
 
-  async updatePrize(id: string, patch: Partial<Pick<RafflePrize, "name" | "quantity" | "active" | "image">>): Promise<Result<{ before: RafflePrize; after: RafflePrize } | null, { code: string }>> {
+  async updatePrize(id: string, patch: Partial<Pick<RafflePrize, "name" | "quantity" | "active" | "image" | "rule">>): Promise<Result<{ before: RafflePrize; after: RafflePrize } | null, { code: string }>> {
     try {
       const { db, prizes } = await this.scope();
       const ref = prizes.doc(id);
@@ -201,17 +214,29 @@ export class FirestoreRaffleStore implements RaffleStore {
     }
   }
 
-  /** Every cadet of the edition with their G-Credits earned in it (the raffle's tickets). */
+  /**
+   * Every cadet of the edition with their G-Credits earned in it (the tickets of a G-Credits prize) and their XP in it
+   * with when they reached it (the ranking a top or XP prize draws from), from the same read.
+   */
   async entrants(): Promise<Result<readonly Entrant[], { code: string }>> {
     try {
       const snapshot = await (await this.scope()).participants.get();
+      const amount = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0);
       return ok(
         snapshot.docs.flatMap((doc) => {
           const data = doc.data();
           // A blocked cadet holds no tickets.
           if (typeof data.alias !== "string" || data.banned === true) return [];
-          const credits = typeof data.credits === "number" && Number.isFinite(data.credits) && data.credits > 0 ? Math.floor(data.credits) : 0;
-          return [{ uid: doc.id, alias: data.alias, squadId: typeof data.squad === "string" && data.squad.length > 0 ? data.squad : null, credits }];
+          return [
+            {
+              uid: doc.id,
+              alias: data.alias,
+              squadId: typeof data.squad === "string" && data.squad.length > 0 ? data.squad : null,
+              credits: amount(data.credits),
+              xp: amount(data.xp),
+              reachedAt: toDate(data.xpReachedAt),
+            },
+          ];
         }),
       );
     } catch (cause) {

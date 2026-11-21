@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { err, ok, type Result } from "@/shared/lib/result";
 import type { RankingEntry } from "./ranking";
-import { DEFAULT_STAGE, championsOf, getStage, parseStageCommand, parseStageState, presentRaffle, updateStage, type StageDeps, type StageState } from "./stage";
+import { DEFAULT_STAGE, championsOf, getStage, parseStageCommand, parseStageState, presentRaffle, updateStage, type RaffleShowing, type StageDeps, type StageState } from "./stage";
 
 const NOW = new Date("2026-10-24T22:40:00Z");
 const ADMIN = { uid: "a1", role: "admin" };
@@ -245,7 +245,7 @@ describe("parseStageState", () => {
 });
 
 describe("presentRaffle", () => {
-  const SHOWING = { drawId: "polera-1", prizeName: "Polera", prizeImageUrl: null, winnerAlias: "Nova", winnerSquadId: "firebase", tickets: 10, totalTickets: 40, reel: ["Orion", "Nova"], at: NOW };
+  const SHOWING: RaffleShowing = { drawId: "polera-1", prizeName: "Polera", prizeImageUrl: null, winnerAlias: "Nova", winnerSquadId: "firebase", tickets: 10, totalTickets: 40, rule: { kind: "credits" }, reel: ["Orion", "Nova"], at: NOW };
 
   it("puts the draw on the stage with the winner's squad named, giving way to a reveal", async () => {
     const ctx = setup({ ...DEFAULT_STAGE, display: "reveal", champions: { cadet: null, squad: null } });
@@ -257,7 +257,7 @@ describe("presentRaffle", () => {
         ...DEFAULT_STAGE,
         display: "raffle",
         champions: null,
-        raffle: { drawId: "polera-1", prizeName: "Polera", prizeImageUrl: null, winner: { alias: "Nova", squad: "Escuadrón Firebase" }, tickets: 10, totalTickets: 40, reel: ["Orion", "Nova"], at: NOW },
+        raffle: { drawId: "polera-1", prizeName: "Polera", prizeImageUrl: null, winner: { alias: "Nova", squad: "Escuadrón Firebase" }, tickets: 10, totalTickets: 40, rule: { kind: "credits" }, reel: ["Orion", "Nova"], at: NOW },
       }),
     );
     expect(ctx.stored()).toMatchObject({ display: "raffle" });
@@ -287,7 +287,7 @@ describe("presentRaffle", () => {
   it("reads a stored draw back, and refuses a broken one", () => {
     const stored = { display: "raffle", view: "both", raffle: { ...SHOWING, winner: { alias: "Nova", squad: null }, at: NOW.toISOString() } };
 
-    expect(parseStageState(stored)?.raffle).toEqual({ drawId: "polera-1", prizeName: "Polera", prizeImageUrl: null, winner: { alias: "Nova", squad: null }, tickets: 10, totalTickets: 40, reel: ["Orion", "Nova"], at: NOW });
+    expect(parseStageState(stored)?.raffle).toEqual({ drawId: "polera-1", prizeName: "Polera", prizeImageUrl: null, winner: { alias: "Nova", squad: null }, tickets: 10, totalTickets: 40, rule: { kind: "credits" }, reel: ["Orion", "Nova"], at: NOW });
     // The prize's photo is kept only as a web address; anything else leaves it out without dropping the draw.
     expect(parseStageState({ ...stored, raffle: { ...stored.raffle, prizeImageUrl: "https://cdn/p.webp" } })?.raffle?.prizeImageUrl).toBe("https://cdn/p.webp");
     expect(parseStageState({ ...stored, raffle: { ...stored.raffle, prizeImageUrl: "/media/public/e/raffle-prize/x1234567.webp" } })?.raffle?.prizeImageUrl).toBe("/media/public/e/raffle-prize/x1234567.webp");
@@ -296,5 +296,19 @@ describe("presentRaffle", () => {
     expect(parseStageState({ ...stored, raffle: { ...stored.raffle, reel: [1] } })).toBeNull();
     expect(parseStageState({ ...stored, raffle: { ...stored.raffle, winner: null } })).toBeNull();
     expect(parseStageState({ ...stored, raffle: { ...stored.raffle, tickets: -1 } })).toBeNull();
+  });
+
+  it("keeps a top N or XP minimum rule with the draw, and reads an older draw (or an odd rule) as a G-Credits one", async () => {
+    const ctx = setup();
+    expect(await presentRaffle(ctx.deps, { ...SHOWING, rule: { kind: "top", n: 10 } })).toMatchObject({ ok: true, value: { raffle: { rule: { kind: "top", n: 10 } } } });
+
+    const stored = { display: "raffle", view: "both", raffle: { ...SHOWING, winner: { alias: "Nova", squad: null }, at: NOW.toISOString() } };
+    expect(parseStageState({ ...stored, raffle: { ...stored.raffle, rule: { kind: "top", n: 5 } } })?.raffle?.rule).toEqual({ kind: "top", n: 5 });
+    expect(parseStageState({ ...stored, raffle: { ...stored.raffle, rule: { kind: "xp", min: 300 } } })?.raffle?.rule).toEqual({ kind: "xp", min: 300 });
+    const legacy: Record<string, unknown> = { ...stored.raffle };
+    delete legacy.rule;
+    expect(parseStageState({ ...stored, raffle: legacy })?.raffle?.rule).toEqual({ kind: "credits" });
+    expect(parseStageState({ ...stored, raffle: { ...stored.raffle, rule: { kind: "top", n: 0 } } })?.raffle?.rule).toEqual({ kind: "credits" });
+    expect(parseStageState({ ...stored, raffle: { ...stored.raffle, rule: "rank" } })?.raffle?.rule).toEqual({ kind: "credits" });
   });
 });

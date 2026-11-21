@@ -170,7 +170,7 @@ describe("StageScreen", () => {
     const { push } = renderScreen();
 
     await push((h) =>
-      h.stage({ ...DEFAULT_STAGE, display: "raffle", raffle: { drawId: "p-1", prizeName: "Polera", prizeImageUrl: null, winner: { alias: "Nova", squad: null }, tickets: 3, totalTickets: 90, reel: ["Orion", "Nova"], at: new Date() } }),
+      h.stage({ ...DEFAULT_STAGE, display: "raffle", raffle: { drawId: "p-1", prizeName: "Polera", prizeImageUrl: null, winner: { alias: "Nova", squad: null }, tickets: 3, totalTickets: 90, rule: { kind: "credits" }, reel: ["Orion", "Nova"], at: new Date() } }),
     );
 
     expect(screen.getByRole("heading", { name: "Polera" })).toBeInTheDocument();

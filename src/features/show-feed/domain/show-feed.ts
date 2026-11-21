@@ -156,6 +156,12 @@ export function feedPoll(poll: FeedPollSource & { status: "open" | "closed" }, t
   };
 }
 
+/**
+ * Who took part in a draw: every cadet with G-Credits (`credits`, one ticket per G-Credit), the top `n` by XP, or every
+ * cadet with `min` XP (in those two, one ticket each).
+ */
+export type FeedDrawRule = { kind: "credits" } | { kind: "top"; n: number } | { kind: "xp"; min: number };
+
 /** A raffle draw as the feed reads it (the raffle feature answers it), with the squad names to name the winner's. */
 export interface FeedDrawSource {
   id: string;
@@ -165,6 +171,7 @@ export interface FeedDrawSource {
   winnerSquadId: string | null;
   tickets: number;
   totalTickets: number;
+  rule: FeedDrawRule;
   at: Date;
   voided: boolean;
 }
@@ -176,6 +183,8 @@ export interface FeedDrawView {
   winner: { alias: string; squad: string | null };
   tickets: number;
   totalTickets: number;
+  /** Who took part, so the show can label the draw. */
+  rule: FeedDrawRule;
   at: number;
   /** The names the app's own stage spun through for this draw (the latest one only); empty otherwise. */
   reel: string[];
@@ -203,6 +212,7 @@ export function feedDraws(
       winner: { alias: draw.winnerAlias, squad: draw.winnerSquadId ? (squadName.get(draw.winnerSquadId) ?? null) : null },
       tickets: draw.tickets,
       totalTickets: draw.totalTickets,
+      rule: { ...draw.rule },
       at: draw.at.getTime(),
       reel: staged && staged.drawId === draw.id ? [...staged.reel] : [],
     }));

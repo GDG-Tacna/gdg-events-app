@@ -455,11 +455,19 @@ export const copy = {
       prize: "Premio",
       /** Placeholder: {n}. */
       inPlay: "{n} boletos en juego",
+      /** Top N and XP minimum draws, where each cadet holds one ticket. Placeholder: {n}. */
+      inPlayCadets: "{n} cadetes en juego",
       rule: "Cada G-Crédito es un boleto",
+      /** Placeholder: {n}. */
+      ruleTop: "Entre el top {n} por XP",
+      /** Placeholder: {min}. */
+      ruleXp: "Cadetes con {min}+ XP",
       spinning: "Sorteando…",
       winner: "¡Ganador!",
       /** Placeholders: {n}, {total}. */
       tickets: "{n} de {total} boletos",
+      /** Top N and XP minimum draws (the same chance for everyone). Placeholder: {total}. */
+      oneOf: "1 de {total} cadetes",
     },
     reveal: {
       title: "Campeones de la flota",
@@ -1190,13 +1198,45 @@ export const copy = {
     },
     raffle: {
       title: "Sorteo final",
-      subtitle: "Cada G-Credit que un cadete ganó en este evento es un boleto. Los créditos no se gastan. Cada sorteo se muestra en la pantalla grande y un ganador no repite.",
+      subtitle:
+        "Cada premio define quién participa: todos con G-Créditos (cada G-Credit ganado en este evento es un boleto y no se gasta), el top del ranking por XP o quienes tengan un XP mínimo. Cada sorteo se muestra en la pantalla grande y un ganador no repite.",
       /** Placeholders: {n}, {tickets}. */
-      entrants: "{n} cadetes participan con {tickets} boletos",
-      entrantsNone: "Todavía nadie tiene boletos suficientes.",
-      settingsTitle: "Para participar",
+      entrants: "En los premios por G-Créditos participan {n} cadetes con {tickets} boletos",
+      entrantsNone: "Todavía nadie tiene G-Credits suficientes para los premios por G-Créditos.",
+      settingsTitle: "Premios por G-Créditos",
       minCredits: "G-Credits mínimos",
-      minCreditsHint: "Entero entre 1 y 10000. Quien tenga menos no entra al sorteo.",
+      minCreditsHint: "Entero entre 1 y 10000. Solo vale para los premios por G-Créditos: quien tenga menos no entra en ellos.",
+      ruleLegend: "¿Quién participa?",
+      ruleOptions: {
+        credits: "Todos con G-Créditos (cada crédito es un boleto)",
+        top: "Top N por XP",
+        xp: "XP mínimo",
+      },
+      ruleHelp: {
+        credits: "Usa el mínimo de G-Credits de «Premios por G-Créditos».",
+        top: "Los primeros del ranking que aún no ganaron, todos con la misma chance. Si alguien gana, entra el siguiente.",
+        xp: "Todos los que tengan ese XP o más, con la misma chance.",
+      },
+      topLabel: "Cuántos del top",
+      topHint: "Entero entre 1 y 100.",
+      /** Placeholder: {n}. */
+      topQuick: "Top {n}",
+      minXpLabel: "XP mínimo",
+      minXpHint: "Entero entre 1 y 100000.",
+      /** The rule chip on each prize. */
+      ruleChip: {
+        credits: "G-Créditos",
+        /** Placeholder: {n}. */
+        top: "Top {n} por XP",
+        /** Placeholder: {min}. */
+        xp: "{min}+ XP",
+      },
+      /** Who takes part in one prize. Placeholder: {n}. */
+      prizeEntrants: "{n} cadetes participan",
+      prizeEntrantsOne: "1 cadete participa",
+      /** A G-Credits prize. Placeholders: {n}, {tickets}. */
+      prizeEntrantsTickets: "{n} cadetes participan con {tickets} boletos",
+      prizeEntrantsNone: "Nadie puede ganarlo ahora",
       saveSettings: "Guardar",
       prizesTitle: "Premios",
       noPrizes: "Agrega el primer premio para poder sortear.",
@@ -1210,6 +1250,8 @@ export const copy = {
       drawing: "Sorteando…",
       /** Placeholders: {alias}, {n}, {total}. */
       drawn: "Ganó {alias} con {n} de {total} boletos. Ya está en la pantalla grande.",
+      /** A top N or XP minimum draw. Placeholders: {alias}, {total}. */
+      drawnOneOf: "Ganó {alias} entre {total} cadetes. Ya está en la pantalla grande.",
       edit: "Editar",
       deactivate: "Desactivar",
       activate: "Activar",
@@ -1226,6 +1268,8 @@ export const copy = {
       noDraws: "Todavía no hay sorteos.",
       /** Placeholders: {n}, {total}. */
       tickets: "{n} de {total} boletos",
+      /** A top N or XP minimum draw. Placeholder: {total}. */
+      oneOf: "Entre {total} cadetes",
       voided: "Anulado",
       void: "Anular: no está presente",
       voidConfirm: "Se anula este sorteo, ese cadete no vuelve a participar y el premio queda para sortear de nuevo. ¿Anular?",
@@ -1237,11 +1281,12 @@ export const copy = {
         "invalid-name": "El nombre debe tener entre 2 y 60 caracteres.",
         "invalid-quantity": "La cantidad debe ser un número entero de 1 a 50.",
         "invalid-image": "Esa imagen no es válida para un premio. Súbela de nuevo.",
+        "invalid-rule": "Revisa quién participa: el top va de 1 a 100 y el XP mínimo de 1 a 100000.",
         "quantity-below-awarded": "No puede ser menor que los premios ya entregados.",
         "not-found": "Ese premio o sorteo ya no existe. Recarga la página.",
         inactive: "Ese premio está desactivado. Actívalo para sortearlo.",
         exhausted: "Ya se sortearon todas las unidades de este premio.",
-        "no-entrants": "No hay cadetes que puedan ganar: nadie tiene los G-Credits mínimos o todos ya ganaron.",
+        "no-entrants": "No hay cadetes que puedan ganar este premio: nadie cumple la regla del premio o todos ya ganaron.",
         "already-voided": "Ese sorteo ya estaba anulado.",
         unauthenticated: "Tu sesión terminó. Vuelve a entrar.",
         forbidden: "Solo un admin puede hacer el sorteo.",

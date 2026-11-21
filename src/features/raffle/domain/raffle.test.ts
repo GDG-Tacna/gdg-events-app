@@ -8,6 +8,7 @@ import {
   eligibleEntrants,
   getCadetTickets,
   getRaffleOverview,
+  parsePrizeRule,
   parseRaffleSettings,
   pickWinner,
   saveRaffleSettings,
@@ -15,6 +16,7 @@ import {
   voidRaffleDraw,
   type Entrant,
   type NewDraw,
+  type PrizeRule,
   type RaffleDeps,
   type RaffleDraw,
   type RaffleErrorCode,
@@ -24,7 +26,9 @@ import {
 
 const NOW = new Date("2026-10-24T23:50:00Z");
 const ADMIN = { uid: "a1", role: "admin" } as const;
-const entrant = (uid: string, credits: number, squadId: string | null = null): Entrant => ({ uid, alias: `Alias-${uid}`, squadId, credits });
+const entrant = (uid: string, credits: number, squadId: string | null = null, xp = 0, reachedAt: Date | null = null): Entrant => ({ uid, alias: `Alias-${uid}`, squadId, credits, xp, reachedAt });
+const cadet = (uid: string, xp: number, reachedAt: Date | null = null): Entrant => entrant(uid, 0, null, xp, reachedAt);
+const CREDITS: PrizeRule = { kind: "credits" };
 
 /** An in-memory raffle store whose draw and void behave like the transactions. */
 function memoryStore(prizes: RafflePrize[] = [], draws: RaffleDraw[] = [], settings: RaffleSettings | null = null) {
@@ -71,7 +75,7 @@ function memoryStore(prizes: RafflePrize[] = [], draws: RaffleDraw[] = [], setti
   };
 }
 
-const PRIZE: RafflePrize = { id: "polera", name: "Polera DevFest", quantity: 2, awarded: 0, drawSeq: 0, active: true, order: 0, image: null };
+const PRIZE: RafflePrize = { id: "polera", name: "Polera DevFest", quantity: 2, awarded: 0, drawSeq: 0, active: true, order: 0, image: null, rule: CREDITS };
 
 function setup(entrants: Entrant[] = [entrant("u1", 10, "firebase"), entrant("u2", 30), entrant("u3", 0), entrant("u4", 1)]) {
   const store = memoryStore([PRIZE]);
@@ -98,23 +102,23 @@ describe("raffle rules", () => {
     const entrants = [entrant("a", 5), entrant("b", 2), entrant("c", 9), entrant("d", 0)];
     const draws = [{ winnerUid: "c", voided: true }] as RaffleDraw[];
 
-    expect(eligibleEntrants(entrants, { minCredits: 3 }, draws).map((e) => e.uid)).toEqual(["a"]);
-    expect(eligibleEntrants(entrants, { minCredits: 1 }, []).map((e) => e.uid)).toEqual(["a", "b", "c"]);
+    expect(eligibleEntrants(entrants, CREDITS, { minCredits: 3 }, draws).map((e) => e.uid)).toEqual(["a"]);
+    expect(eligibleEntrants(entrants, CREDITS, { minCredits: 1 }, []).map((e) => e.uid)).toEqual(["a", "b", "c"]);
   });
 
   it("picks each entrant with a chance proportional to their tickets", () => {
     const eligible = [entrant("a", 1), entrant("b", 3)];
 
-    expect(pickWinner(eligible, () => 0)?.uid).toBe("a");
-    expect(pickWinner(eligible, () => 1)?.uid).toBe("b");
-    expect(pickWinner(eligible, () => 3)?.uid).toBe("b");
-    expect(pickWinner([], () => 0)).toBeNull();
-    expect(pickWinner([entrant("z", 0)], () => 0)).toBeNull();
+    expect(pickWinner(eligible, CREDITS, () => 0)?.uid).toBe("a");
+    expect(pickWinner(eligible, CREDITS, () => 1)?.uid).toBe("b");
+    expect(pickWinner(eligible, CREDITS, () => 3)?.uid).toBe("b");
+    expect(pickWinner([], CREDITS, () => 0)).toBeNull();
+    expect(pickWinner([entrant("z", 0)], CREDITS, () => 0)).toBeNull();
   });
 
   it("asks the random source for a number below the total tickets", () => {
     const random = vi.fn(() => 0);
-    pickWinner([entrant("a", 4), entrant("b", 6)], random);
+    pickWinner([entrant("a", 4), entrant("b", 6)], CREDITS, random);
     expect(random).toHaveBeenCalledWith(10);
   });
 
@@ -151,10 +155,10 @@ describe("drawing", () => {
     // Tickets 10 + 30 + 1 = 41; the last ticket belongs to u4.
     expect(ctx.deps.random).toHaveBeenCalledWith(41);
     expect(drawn).toEqual(
-      ok({ id: "polera-1", prizeId: "polera", prizeName: "Polera DevFest", winnerUid: "u4", winnerAlias: "Alias-u4", winnerSquadId: null, tickets: 1, totalTickets: 41, entrants: 3, at: NOW, voided: false }),
+      ok({ id: "polera-1", prizeId: "polera", prizeName: "Polera DevFest", winnerUid: "u4", winnerAlias: "Alias-u4", winnerSquadId: null, tickets: 1, totalTickets: 41, entrants: 3, rule: CREDITS, at: NOW, voided: false }),
     );
     expect(ctx.store.state.prizes.get("polera")).toMatchObject({ awarded: 1, drawSeq: 1 });
-    expect(ctx.audits[0]).toMatchObject({ action: "raffle.drawn", actorUid: "a1", targetUid: "polera-1", details: { prize: "Polera DevFest", winner: "u4", tickets: "1/41" } });
+    expect(ctx.audits[0]).toMatchObject({ action: "raffle.drawn", actorUid: "a1", targetUid: "polera-1", details: { prize: "Polera DevFest", winner: "u4", tickets: "1/41", rule: "credits" } });
     expect(ctx.deps.stage.present).toHaveBeenCalledWith(expect.objectContaining({ id: "polera-1" }), expect.arrayContaining(["Alias-u4"]));
   });
 
@@ -220,7 +224,7 @@ describe("prizes and settings", () => {
     const created = await createRafflePrize(ctx.deps, ADMIN, { name: "  Taza   GDG ", quantity: 3 });
 
     expect(created).toMatchObject({ ok: true, value: { name: "Taza GDG", quantity: 3, awarded: 0, drawSeq: 0, active: true, order: 1 } });
-    expect(ctx.audits[0]).toMatchObject({ action: "raffle.prize.created", details: { name: "Taza GDG", quantity: "3" } });
+    expect(ctx.audits[0]).toMatchObject({ action: "raffle.prize.created", details: { name: "Taza GDG", quantity: "3", rule: "credits" } });
   });
 
   it.each([
@@ -317,7 +321,7 @@ describe("overview and the cadet's tickets", () => {
 
     expect(overview).toMatchObject({
       ok: true,
-      value: { settings: { minCredits: 1 }, isDefault: true, prizes: [{ id: "taza" }, { id: "polera" }], draws: [{ id: "polera-1" }], eligible: 2, tickets: 40 },
+      value: { settings: { minCredits: 1 }, isDefault: true, prizes: [{ id: "taza", eligible: 2, tickets: 40 }, { id: "polera", eligible: 2, tickets: 40 }], draws: [{ id: "polera-1" }], eligible: 2, tickets: 40 },
     });
   });
 
@@ -349,5 +353,121 @@ describe("overview and the cadet's tickets", () => {
     expect(await getCadetTickets(ctx.deps, "u1", 1)).toEqual(err({ code: "unknown" }));
     ctx.store.draws.mockResolvedValue(err({ code: "x" }));
     expect(await getRaffleOverview(ctx.deps, ADMIN)).toEqual(err({ code: "unknown" }));
+  });
+});
+
+describe("prize rules", () => {
+  const at = (hour: number) => new Date(`2026-10-24T${String(hour).padStart(2, "0")}:00:00Z`);
+  // Ranking: a (500), then three at 300 (c reached it first, then b, then d whose moment is unknown), then e (100); z has no XP.
+  const FLEET = [cadet("z", 0), cadet("b", 300, at(9)), cadet("e", 100, at(7)), cadet("a", 500, at(10)), cadet("d", 300), cadet("c", 300, at(8))];
+  const TOP3: PrizeRule = { kind: "top", n: 3 };
+  const SETTINGS = { minCredits: 1 };
+  const uids = (entrants: readonly Entrant[]) => entrants.map((e) => e.uid);
+
+  it("reads the three kinds, and refuses anything else or a number out of range", () => {
+    expect(parsePrizeRule({ kind: "credits" })).toEqual({ kind: "credits" });
+    expect(parsePrizeRule({ kind: "top", n: 10, min: 4 })).toEqual({ kind: "top", n: 10 });
+    expect(parsePrizeRule({ kind: "top", n: 100 })).toEqual({ kind: "top", n: 100 });
+    expect(parsePrizeRule({ kind: "xp", min: 300 })).toEqual({ kind: "xp", min: 300 });
+    expect(parsePrizeRule({ kind: "xp", min: 100_000 })).toEqual({ kind: "xp", min: 100_000 });
+    for (const input of [{ kind: "top", n: 0 }, { kind: "top", n: 101 }, { kind: "top", n: 2.5 }, { kind: "top" }, { kind: "xp", min: 0 }, { kind: "xp", min: 100_001 }, { kind: "xp", min: "300" }, { kind: "rank" }, "top", null]) {
+      expect(parsePrizeRule(input)).toBeNull();
+    }
+  });
+
+  it("takes the first N by XP, ties to whoever reached it first (unknown last), then alias", () => {
+    expect(uids(eligibleEntrants(FLEET, TOP3, SETTINGS, []))).toEqual(["a", "c", "b"]);
+    expect(uids(eligibleEntrants(FLEET, { kind: "top", n: 4 }, SETTINGS, []))).toEqual(["a", "c", "b", "d"]);
+
+    const tied = [{ ...cadet("y", 200), alias: "Beta" }, { ...cadet("x", 200), alias: "Alfa" }];
+    expect(uids(eligibleEntrants(tied, { kind: "top", n: 1 }, SETTINGS, []))).toEqual(["x"]);
+  });
+
+  it("moves the top down past past winners, voided ones included", () => {
+    const draws = [{ winnerUid: "a", voided: false }, { winnerUid: "c", voided: true }] as RaffleDraw[];
+
+    expect(uids(eligibleEntrants(FLEET, TOP3, SETTINGS, draws))).toEqual(["b", "d", "e"]);
+  });
+
+  it("leaves cadets without XP out of a top or an XP minimum, even when the top has room", () => {
+    expect(uids(eligibleEntrants(FLEET, { kind: "top", n: 10 }, SETTINGS, []))).toEqual(["a", "c", "b", "d", "e"]);
+    expect(uids(eligibleEntrants([cadet("z", 0)], { kind: "xp", min: 1 }, SETTINGS, []))).toEqual([]);
+  });
+
+  it("lets in everyone with the XP minimum who has not won, whatever their G-Credits", () => {
+    const draws = [{ winnerUid: "b", voided: false }] as RaffleDraw[];
+
+    expect(uids(eligibleEntrants(FLEET, { kind: "xp", min: 300 }, SETTINGS, [])).sort()).toEqual(["a", "b", "c", "d"]);
+    expect(uids(eligibleEntrants(FLEET, { kind: "xp", min: 300 }, SETTINGS, draws)).sort()).toEqual(["a", "c", "d"]);
+    // The G-Credits minimum only applies to G-Credits prizes.
+    expect(uids(eligibleEntrants(FLEET, { kind: "xp", min: 100 }, { minCredits: 50 }, [])).sort()).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  it("gives each entrant of a top or an XP minimum one ticket, however many G-Credits they have", () => {
+    const rich = [entrant("a", 90, null, 500), entrant("b", 1, null, 300), entrant("c", 9, null, 200)];
+    const random = vi.fn(() => 1);
+
+    expect(pickWinner(rich, TOP3, random)?.uid).toBe("b");
+    expect(random).toHaveBeenCalledWith(3);
+    expect(pickWinner(rich, { kind: "xp", min: 100 }, () => 2)?.uid).toBe("c");
+    // Under G-Credits the same draw is weighted by them.
+    expect(pickWinner(rich, CREDITS, () => 89)?.uid).toBe("a");
+  });
+
+  describe("drawing a top N prize", () => {
+    let ctx: ReturnType<typeof setup>;
+    beforeEach(() => {
+      ctx = setup(FLEET.map((e) => ({ ...e, credits: 50 })));
+      ctx.store.state.prizes.set("top", { ...PRIZE, id: "top", name: "Mochila", rule: TOP3 });
+    });
+
+    it("draws among the top with one ticket each, keeps the rule with the draw and audits it", async () => {
+      const drawn = await drawRafflePrize(ctx.deps, ADMIN, { prizeId: "top" });
+
+      expect(ctx.deps.random).toHaveBeenNthCalledWith(1, 3);
+      expect(drawn).toMatchObject({ ok: true, value: { id: "top-1", winnerUid: "b", tickets: 1, totalTickets: 3, entrants: 3, rule: TOP3 } });
+      expect(ctx.audits[0]).toMatchObject({ action: "raffle.drawn", details: { tickets: "1/3", rule: "top:3" } });
+      expect(ctx.deps.stage.present).toHaveBeenCalledWith(expect.objectContaining({ rule: TOP3 }), expect.any(Array));
+    });
+
+    it("brings the next in the ranking in after a winner, and after a voided one", async () => {
+      await drawRafflePrize(ctx.deps, ADMIN, { prizeId: "top" });
+      // b won: the top is a, c and d now.
+      expect(await drawRafflePrize(ctx.deps, ADMIN, { prizeId: "top" })).toMatchObject({ ok: true, value: { winnerUid: "d", entrants: 3 } });
+
+      await voidRaffleDraw(ctx.deps, ADMIN, { drawId: "top-2" });
+      // d stays out after the void: a, c and e.
+      expect(await drawRafflePrize(ctx.deps, ADMIN, { prizeId: "top" })).toMatchObject({ ok: true, value: { winnerUid: "e", entrants: 3 } });
+    });
+
+    it("counts who could win each prize under its own rule in the overview", async () => {
+      ctx.store.state.prizes.set("xp", { ...PRIZE, id: "xp", name: "Taza", order: 1, rule: { kind: "xp", min: 300 } });
+      await drawRafflePrize(ctx.deps, ADMIN, { prizeId: "top" });
+
+      const overview = await getRaffleOverview(ctx.deps, ADMIN);
+
+      const byId = overview.ok ? Object.fromEntries(overview.value.prizes.map((p) => [p.id, [p.eligible, p.tickets]])) : {};
+      // b won: G-Credits has the other five with 50 each; the top still has 3; 300+ XP has a, c and d.
+      expect(byId).toEqual({ polera: [5, 250], top: [3, 3], xp: [3, 3] });
+      expect(overview).toMatchObject({ ok: true, value: { eligible: 5, tickets: 250 } });
+    });
+  });
+
+  it("creates a prize with a rule, refuses a broken one, and audits a changed rule", async () => {
+    const ctx = setup();
+
+    expect(await createRafflePrize(ctx.deps, ADMIN, { name: "Mochila", quantity: 1, rule: { kind: "top", n: 10 } })).toMatchObject({ ok: true, value: { rule: { kind: "top", n: 10 } } });
+    expect(ctx.audits[0]).toMatchObject({ action: "raffle.prize.created", details: { rule: "top:10" } });
+    expect(await createRafflePrize(ctx.deps, ADMIN, { name: "Mochila", quantity: 1, rule: { kind: "top", n: 101 } })).toEqual(err({ code: "invalid-rule" }));
+    expect(await createRafflePrize(ctx.deps, ADMIN, { name: "Mochila", quantity: 1, rule: { kind: "rank" } })).toEqual(err({ code: "invalid-rule" }));
+
+    expect(await updateRafflePrize(ctx.deps, ADMIN, { id: "polera", rule: { kind: "xp", min: 0 } })).toEqual(err({ code: "invalid-rule" }));
+    expect(ctx.store.updatePrize).not.toHaveBeenCalled();
+    expect(await updateRafflePrize(ctx.deps, ADMIN, { id: "polera", rule: { kind: "xp", min: 300 } })).toMatchObject({ ok: true, value: { rule: { kind: "xp", min: 300 } } });
+    expect(ctx.audits.at(-1)).toMatchObject({ action: "raffle.prize.updated", details: { changed: "rule" } });
+
+    // The same rule sent again is no change.
+    await updateRafflePrize(ctx.deps, ADMIN, { id: "polera", rule: { kind: "xp", min: 300 } });
+    expect(ctx.audits).toHaveLength(2);
   });
 });

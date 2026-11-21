@@ -17,6 +17,7 @@ const RAFFLE: StageRaffle = {
   winner: { alias: "Nova_7", squad: "Escuadrón Firebase" },
   tickets: 12,
   totalTickets: 480,
+  rule: { kind: "credits" },
   reel: ["Orion", "Lyra", "Vega", "Nova_7"],
   at: new Date(),
 };
@@ -75,6 +76,33 @@ describe("RaffleScreen", () => {
 
     expect(reel()).toHaveTextContent("Nova_7");
     expect(screen.getByText(/12 de 480 boletos/)).toBeInTheDocument();
+  });
+
+  it("says each G-Credit is a ticket in a G-Credits draw", () => {
+    motion.reduce = true;
+    render(<RaffleScreen raffle={RAFFLE} />);
+
+    expect(screen.getByText(t.rule)).toBeInTheDocument();
+    expect(screen.getByText("480 boletos en juego")).toBeInTheDocument();
+  });
+
+  it("counts cadets, one ticket each, in a top N draw", () => {
+    motion.reduce = true;
+    render(<RaffleScreen raffle={{ ...RAFFLE, rule: { kind: "top", n: 10 }, tickets: 1, totalTickets: 10 }} />);
+
+    expect(screen.getByText(/1 de 10 cadetes/)).toBeInTheDocument();
+    expect(screen.getByText("10 cadetes en juego")).toBeInTheDocument();
+    expect(screen.getByText("Entre el top 10 por XP")).toBeInTheDocument();
+    expect(screen.queryByText(/boletos/)).not.toBeInTheDocument();
+    expect(screen.queryByText(t.rule)).not.toBeInTheDocument();
+  });
+
+  it("names the XP minimum in an XP draw", () => {
+    motion.reduce = true;
+    render(<RaffleScreen raffle={{ ...RAFFLE, rule: { kind: "xp", min: 300 }, tickets: 1, totalTickets: 42 }} />);
+
+    expect(screen.getByText(/1 de 42 cadetes/)).toBeInTheDocument();
+    expect(screen.getByText("Cadetes con 300+ XP")).toBeInTheDocument();
   });
 
   it("shows the winner alone when there is no one else to spin through", () => {
