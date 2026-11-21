@@ -62,6 +62,16 @@ Ajustes hechos en esta revisión: la tarjeta del sorteo leía todos los sorteos 
   - `BUILD_ID`: puedes usar el commit de cada despliegue.
 - Región de las funciones: elige la más cercana a la región de Firestore del proyecto.
 
+### Inicio de sesión con Google en el dominio propio
+
+Si `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` es `<proyecto>.firebaseapp.com` y la app vive en otro dominio, los navegadores que bloquean el almacenamiento de terceros (Safari, Chrome en el teléfono, Brave…) pueden perder el resultado de la ventana de Google: eliges tu cuenta, la ventana se cierra y vuelve el login. La app ya sirve las páginas de Google desde su propio dominio (`/__/auth/*`, en `next.config.ts`); para usarlas:
+
+1. En Google Cloud Console › APIs y servicios › Credenciales, abre el cliente OAuth «Web client (auto created by Google Service)» y agrega en «URIs de redirección autorizados» `https://<tu-dominio>/__/auth/handler`.
+2. Comprueba que `<tu-dominio>` está en Firebase › Authentication › Settings › Dominios autorizados.
+3. En Vercel (Production), cambia `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` a `<tu-dominio>` (sin `https://`) y vuelve a desplegar.
+
+Las vistas previas pueden seguir con `<proyecto>.firebaseapp.com`.
+
 ## 5. Prueba de carga (con un proyecto de PRUEBA)
 
 La prueba crea cadetes falsos, así que **nunca se corre contra el proyecto del evento**: usa un proyecto de prueba con su propio despliegue. Los scripts se niegan a correr si el proyecto no se nombra a propósito y se confirma.

@@ -12,6 +12,21 @@ const nextConfig: NextConfig = {
     serverActions: { bodySizeLimit: "4.5mb" },
   },
 
+  /**
+   * Google sign-in's handler pages served from this site, so the sign-in window and the app share one site. Browsers
+   * that block third-party storage (Safari, Chrome on phones, Brave...) otherwise lose the result of the Google window
+   * when it lives on firebaseapp.com: it closes and the login shows again. Firebase's recommended fix; it takes effect
+   * where NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN is this site's own domain (docs/deploy.md).
+   */
+  async rewrites() {
+    const project = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    if (!project) return [];
+    return [
+      { source: "/__/auth/:path*", destination: `https://${project}.firebaseapp.com/__/auth/:path*` },
+      { source: "/__/firebase/:path*", destination: `https://${project}.firebaseapp.com/__/firebase/:path*` },
+    ];
+  },
+
   async headers() {
     return [
       {
@@ -29,6 +44,12 @@ const nextConfig: NextConfig = {
         // The stage screen alone may be framed, and only by this same site: the console shows a small copy of it. It
         // comes after the rule above, and the last rule for a header wins.
         source: "/escenario",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
+      {
+        // Google sign-in's own pages, served from this site (see rewrites): Firebase frames its helper page from the
+        // same site, so it may be framed here, by this site only.
+        source: "/__/auth/:path*",
         headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
       },
       {

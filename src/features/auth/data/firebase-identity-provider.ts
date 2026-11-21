@@ -10,6 +10,9 @@ function toAuthError(cause: unknown): AuthError {
     switch (cause.code) {
       case "auth/popup-closed-by-user":
       case "auth/cancelled-popup-request":
+        // Usually the person closed the window, but a browser that loses the Google window's result reports the same:
+        // a trace in the console tells the two apart when someone says the login keeps coming back.
+        console.warn(JSON.stringify({ type: "client_warning", scope: "auth.signIn", code: cause.code }));
         return authError("cancelled");
       case "auth/network-request-failed":
         return authError("network");
