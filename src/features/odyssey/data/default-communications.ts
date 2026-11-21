@@ -2,8 +2,9 @@ import type { Communication } from "../domain/communication";
 
 /**
  * The transmissions every edition starts with: per quadrant, an opening one and one that a mission opens
- * (the default missions of `features/missions`). Served until the edition saves its own; the admin seeds
- * and edits them in Odisea. The story is edition data, in Spanish.
+ * (one of the default missions of `features/missions`: a «Conoce a…» mission for the community, a talk mission for
+ * each technology). Loaded only when an admin asks for them in Historia; the admin edits them afterwards. The story is
+ * edition data, in Spanish.
  */
 const comm = (id: string, quadrantId: string, order: number, title: string, body: string, unlockMissionId: string | null): Communication => ({
   id,
@@ -29,15 +30,15 @@ export const DEFAULT_COMMUNICATIONS: readonly Communication[] = [
     "community",
     1,
     "Coordenadas de la travesía",
-    "La charla inaugural fijó el rumbo: aprender juntos, compartir lo que sabemos y construir comunidad. Esa es la energía que mueve a toda la tripulación del GDG.",
-    "keynote",
+    "Conocer a la tripulación fija el rumbo: aprender juntos, compartir lo que sabemos y construir comunidad. Esa es la energía que mueve a toda la flota del GDG.",
+    "meet-organizer",
   ),
   comm(
     "cloud-senal",
     "cloud",
     10,
     "Señal desde la nube",
-    "Una estación orbital transmite desde Google Cloud: aquí los servicios escalan solos cuando llega la tormenta de usuarios. Visita su stand para fijar la frecuencia.",
+    "Una estación orbital transmite desde Google Cloud: aquí los servicios escalan solos cuando llega la tormenta de usuarios. Completa la misión de la charla del auditorio para fijar la frecuencia.",
     null,
   ),
   comm(
@@ -46,14 +47,14 @@ export const DEFAULT_COMMUNICATIONS: readonly Communication[] = [
     11,
     "Bitácora de la estación orbital",
     "Frecuencia fijada. La estación confirma que desplegar en minutos y pagar solo por lo que se usa es el combustible de las misiones más largas.",
-    "cloud-stand",
+    "charla-ingeniero-agentico",
   ),
   comm(
     "firebase-senal",
     "firebase",
     20,
     "Llamarada en el radar",
-    "Desde el sector Firebase llega una llamarada: apps que despegan con autenticación, base de datos y hosting listos. Visita su stand para seguir la señal.",
+    "Desde el sector Firebase llega una llamarada: apps que despegan con autenticación, base de datos y hosting listos. Completa la misión de la charla del auditorio para seguir la señal.",
     null,
   ),
   comm(
@@ -62,14 +63,14 @@ export const DEFAULT_COMMUNICATIONS: readonly Communication[] = [
     21,
     "Bitácora del sector Firebase",
     "Señal descifrada. Los pilotos de Firebase lanzan una idea a producción antes de que se enfríen los motores.",
-    "firebase-stand",
+    "charla-github-actions-firebase",
   ),
   comm(
     "android-senal",
     "android",
     30,
     "La flota verde",
-    "Miles de naves Android cruzan la galaxia. Su capitanía está en el stand de Android: visítalo para unirte a la formación.",
+    "Miles de naves Android cruzan la galaxia. Su capitanía habla desde el auditorio: completa la misión de su charla para unirte a la formación.",
     null,
   ),
   comm(
@@ -78,14 +79,14 @@ export const DEFAULT_COMMUNICATIONS: readonly Communication[] = [
     31,
     "Bitácora de la flota verde",
     "Bienvenido a la formación. La flota se mantiene unida con interfaces declarativas y una comunidad que comparte cada mejora.",
-    "android-stand",
+    "charla-jarvis-voz-computer-use",
   ),
   comm(
     "ai-senal",
     "ai",
     40,
     "Una inteligencia despierta",
-    "En la zona AI una inteligencia aprende de cada transmisión. Visita su stand para conversar con ella.",
+    "En la zona AI una inteligencia aprende de cada transmisión. Completa la misión de la charla del auditorio para conversar con ella.",
     null,
   ),
   comm(
@@ -94,6 +95,6 @@ export const DEFAULT_COMMUNICATIONS: readonly Communication[] = [
     41,
     "Bitácora de la inteligencia",
     "Conversación establecida. La inteligencia recuerda que los mejores modelos se construyen con datos responsables y personas curiosas.",
-    "ai-stand",
+    "charla-agente-de-ia-con-genkit",
   ),
 ];

@@ -3,6 +3,7 @@ import { checkCommunication } from "../domain/communication";
 import { DEFAULT_COMMUNICATIONS } from "./default-communications";
 
 vi.mock("server-only", () => ({}));
+const { DEFAULT_MISSIONS } = await import("@/features/missions/server");
 const { DEFAULT_QUADRANTS } = await import("@/features/quadrants/server");
 
 describe("default communications", () => {
@@ -15,13 +16,17 @@ describe("default communications", () => {
     expect(new Set(DEFAULT_COMMUNICATIONS.map((c) => c.order)).size).toBe(DEFAULT_COMMUNICATIONS.length);
   });
 
-  it("give every bundled quadrant an opening transmission, and one that a mission opens", () => {
-    // The ids the missions that open them have in an edition are the edition's own (the bundled missions are the ones
-    // the 2026 edition had, which no longer match these), so only that each one names a mission is checked here.
+  it("give every bundled quadrant an opening transmission, and one opened by a bundled mission", () => {
+    const missions = new Set(DEFAULT_MISSIONS.map((m) => m.id));
     for (const quadrant of DEFAULT_QUADRANTS) {
       const own = DEFAULT_COMMUNICATIONS.filter((c) => c.quadrantId === quadrant.id);
       expect(own.some((c) => c.unlockMissionId === null), quadrant.id).toBe(true);
       expect(own.some((c) => c.unlockMissionId !== null), quadrant.id).toBe(true);
     }
+    for (const c of DEFAULT_COMMUNICATIONS) if (c.unlockMissionId) expect(missions.has(c.unlockMissionId), c.id).toBe(true);
+  });
+
+  it("send no transmission to a stand: the default missions have no stand per quadrant", () => {
+    expect(DEFAULT_COMMUNICATIONS.some((c) => /stand/i.test(c.body))).toBe(false);
   });
 });
