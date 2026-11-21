@@ -11,6 +11,7 @@ import { SignOutButton } from "@/features/auth";
 import { ThemeToggle } from "@/shared/ui";
 import { EditionSwitcher, WorkingEditionNotice } from "@/features/event";
 import { FEATURES } from "@/shared/config/features";
+import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 
 export const metadata: Metadata = {
@@ -46,6 +47,8 @@ export default async function AdminLayout({ children, modal }: LayoutProps<"/adm
           <SignOutButton variant="icon" />
         </div>
       }
+      // The team code is for whoever the edition's check-ins serve: it needs them, like its own screen does.
+      quickCode={FEATURES.checkins ? { href: ROUTES.teamCode, label: copy.teamCode.fab, accessibleLabel: copy.teamCode.fabLabel } : undefined}
       edition={editions?.current ? <EditionSwitcher choices={editions.choices} current={editions.current} choose={chooseWorkingEditionAction} /> : null}
       notice={editions?.current ? <WorkingEditionNotice current={editions.current} live={live} choose={chooseWorkingEditionAction} /> : null}
     >

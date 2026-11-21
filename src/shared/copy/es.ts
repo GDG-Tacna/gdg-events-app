@@ -3239,6 +3239,9 @@ export const copy = {
     roles: { organizer: "Organizador", volunteer: "Voluntario" },
     /** The entry point on the staff and admin homes. */
     open: "Mostrar mi código",
+    /** The button that goes with an admin or organizer on every screen of the control center. */
+    fab: "Mi QR",
+    fabLabel: "Mostrar mi código",
     qr: {
       scanHint: "Los cadetes escanean este código con la app para completar «Conoce a un organizador» o «Conoce a un voluntario».",
       errors: {

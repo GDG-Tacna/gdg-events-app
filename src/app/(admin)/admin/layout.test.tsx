@@ -65,6 +65,16 @@ describe("admin layout", () => {
     expect(tree.props.notice.props).toEqual({ current: draft, live, choose: chooseWorkingEditionAction });
   });
 
+  it("gives the shell the team code button, going to the team code screen, and none with check-ins off", async () => {
+    features.FEATURES.checkins = true;
+    const withCode = (await AdminLayout(props(<p>x</p>))) as unknown as { props: { quickCode?: { href: string; label: string; accessibleLabel: string } } };
+    expect(withCode.props.quickCode).toEqual({ href: "/staff/mi-codigo", label: "Mi QR", accessibleLabel: "Mostrar mi código" });
+
+    features.FEATURES.checkins = false;
+    const without = (await AdminLayout(props(<p>x</p>))) as unknown as { props: { quickCode?: unknown } };
+    expect(without.props.quickCode).toBeUndefined();
+  });
+
   it("requires the admin role: visitors, users without a role and non-admins are all stopped by the guard", async () => {
     await AdminLayout(props(<p>x</p>));
 
