@@ -8,11 +8,10 @@ const feed = {
   secret: vi.fn((): string | undefined => SECRET),
   talks: vi.fn(),
   issue: vi.fn(),
-  now: vi.fn(() => new Date("2026-11-21T15:20:00Z")),
 };
 vi.mock("@/app-shell/composition/show-feed.server", () => ({
   showFeedSecret: () => feed.secret(),
-  talkQrDeps: { talks: () => feed.talks(), issue: (id: string) => feed.issue(id), now: () => feed.now() },
+  talkQrDeps: { talks: () => feed.talks(), issue: (id: string) => feed.issue(id) },
 }));
 
 const modules = vi.fn<(name: string) => Promise<boolean>>(async () => true);
@@ -43,7 +42,6 @@ const TALK = {
 beforeEach(() => {
   vi.clearAllMocks();
   feed.secret.mockReturnValue(SECRET);
-  feed.now.mockReturnValue(new Date("2026-11-21T15:10:00Z"));
   feed.talks.mockResolvedValue(ok([TALK]));
   feed.issue.mockResolvedValue(ok({ checkpointId: "talk-genkit", name: "Genkit", cells: ["10", "01"], issuedAt: 1, expiresAt: 2 }));
   modules.mockResolvedValue(true);
@@ -125,7 +123,7 @@ describe("GET /api/show-feed/board", () => {
 });
 
 describe("GET /api/show-feed/talks", () => {
-  it("lists the talks with their schedule and whether their code is out now", async () => {
+  it("lists the talks with their schedule and whether their code can be handed out", async () => {
     const body = await (await talks.GET(request("talks"))).json();
 
     expect(body.talks).toEqual([
@@ -135,7 +133,7 @@ describe("GET /api/show-feed/talks", () => {
 });
 
 describe("GET /api/show-feed/qr", () => {
-  it("hands out the code of the talk in progress", async () => {
+  it("hands out the code of a talk, whatever the time", async () => {
     const response = await qr.GET(request("qr?talk=talk-genkit"));
 
     expect(response.status).toBe(200);
@@ -152,12 +150,12 @@ describe("GET /api/show-feed/qr", () => {
     expect(await response.json()).toMatchObject({ error: code });
   });
 
-  it("does not hand out the code of a talk out of its window", async () => {
-    feed.now.mockReturnValue(new Date("2026-11-21T15:16:00Z"));
+  it("does not hand out the code of an inactive talk", async () => {
+    feed.talks.mockResolvedValue(ok([{ ...TALK, active: false }]));
     const response = await qr.GET(request("qr?talk=talk-genkit"));
 
     expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ error: "not-live" });
+    expect(await response.json()).toMatchObject({ error: "inactive" });
     expect(feed.issue).not.toHaveBeenCalled();
   });
 });

@@ -27,7 +27,6 @@ export const talkQrDeps: TalkQrDeps = {
     const issued = await issueQr(ephemeralQrDeps, SHOW_FEED_ACTOR, { checkpointId: talkId });
     return issued.ok ? ok(issued.value) : err({ code: issued.error.code });
   },
-  now: () => new Date(),
 };
 
 /** The feed's bearer secret, read when used (a missing one switches the feed off). */
