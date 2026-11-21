@@ -18,8 +18,20 @@ const modules = vi.fn<(name: string) => Promise<boolean>>(async () => true);
 vi.mock("@/app-shell/modules.server", () => ({ moduleOn: (name: string) => modules(name) }));
 
 const getFleetBoard = vi.fn();
-vi.mock("@/app-shell/composition/leaderboard.server", () => ({ leaderboardDeps: {} }));
-vi.mock("@/features/leaderboard/server", () => ({ getFleetBoard: () => getFleetBoard() }));
+const getStage = vi.fn();
+vi.mock("@/app-shell/composition/leaderboard.server", () => ({ leaderboardDeps: {}, stageDeps: { squads: { list: () => squadsList() } } }));
+vi.mock("@/features/leaderboard/server", () => ({ getFleetBoard: () => getFleetBoard(), getStage: () => getStage() }));
+
+const LOGO = { rows: ["ab", "ba"], palette: { a: "#fff", b: "#000" } };
+const catalogList = vi.fn();
+vi.mock("@/app-shell/composition/squads.server", () => ({ squadCatalog: { list: () => catalogList() } }));
+const squadsList = vi.fn();
+
+const polls = { list: vi.fn(), tally: vi.fn() };
+vi.mock("@/app-shell/composition/polls.server", () => ({ pollStore: { list: () => polls.list(), tally: (id: string) => polls.tally(id) } }));
+
+const raffle = { draws: vi.fn(), prizes: vi.fn() };
+vi.mock("@/app-shell/composition/raffle.server", () => ({ raffleDeps: { store: { draws: () => raffle.draws(), prizes: () => raffle.prizes() } } }));
 
 const logServerError = vi.fn();
 vi.mock("@/shared/lib/log", () => ({ logServerError: (...args: unknown[]) => logServerError(...args) }));
@@ -27,6 +39,8 @@ vi.mock("@/shared/lib/log", () => ({ logServerError: (...args: unknown[]) => log
 const board = await import("./board/route");
 const talks = await import("./talks/route");
 const qr = await import("./qr/route");
+const pollsRoute = await import("./polls/route");
+const raffleRoute = await import("./raffle/route");
 
 const request = (path: string, token: string | null = SECRET) =>
   new Request(`https://app.test/api/show-feed/${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
@@ -51,7 +65,38 @@ beforeEach(() => {
       squads: [{ position: 1, id: "gemini", name: "Gemini", xp: 5210, members: 92 }],
     }),
   );
+  catalogList.mockResolvedValue(ok([{ id: "gemini", name: "Gemini", sprite: LOGO, logo: { url: "/media/x.png" }, active: true }]));
+  squadsList.mockResolvedValue(ok([{ id: "gemini", name: "Gemini", active: true }]));
+  polls.list.mockResolvedValue(ok([POLL, { ...POLL, id: "poll-draft-0001", status: "draft" }]));
+  polls.tally.mockResolvedValue(ok({ counts: { o1: 3, o2: 1 }, total: 4 }));
+  raffle.draws.mockResolvedValue(ok([DRAW, { ...DRAW, id: "mug-2", voided: true }]));
+  raffle.prizes.mockResolvedValue(ok([{ id: "mug", image: { url: "/media/mug.png" } }]));
+  getStage.mockResolvedValue(ok({ raffle: { drawId: "mug-1", reel: ["Ana", "NovaDev"] } }));
 });
+
+const POLL = {
+  id: "poll-mascota-01",
+  question: "¿Cómo se llama la mascota?",
+  status: "open",
+  options: [
+    { id: "o1", text: "Pixel", image: null },
+    { id: "o2", text: "Tacnito", image: { url: "/media/t.png" } },
+  ],
+  createdAt: new Date("2026-11-21T13:00:00Z"),
+};
+const DRAW = {
+  id: "mug-1",
+  prizeId: "mug",
+  prizeName: "Taza",
+  winnerUid: "uid-secret",
+  winnerAlias: "NovaDev",
+  winnerSquadId: "gemini",
+  tickets: 5,
+  totalTickets: 80,
+  entrants: 20,
+  at: new Date("2026-11-21T16:30:00Z"),
+  voided: false,
+};
 
 describe("show feed access", () => {
   it.each([
@@ -70,6 +115,8 @@ describe("show feed access", () => {
     ["board", board.GET],
     ["talks", talks.GET],
     ["qr?talk=talk-genkit", qr.GET],
+    ["polls", pollsRoute.GET],
+    ["raffle", raffleRoute.GET],
   ])("%s refuses a missing or wrong token, reading nothing", async (path, GET) => {
     expect((await GET(request(path, null))).status).toBe(401);
     expect((await GET(request(path, "w".repeat(40)))).status).toBe(401);
@@ -89,15 +136,21 @@ describe("show feed access", () => {
 });
 
 describe("GET /api/show-feed/board", () => {
-  it("answers the top cadets and the squads, without squad ids, and the server's clock", async () => {
+  it("answers the top cadets and the squads with their pixel logo, without squad ids, and the server's clock", async () => {
     const body = await (await board.GET(request("board"))).json();
 
     expect(body).toEqual({
       serverNow: expect.any(Number),
       cadets: [{ position: 1, alias: "NovaDev", squad: "Firebase", xp: 640 }],
-      squads: [{ position: 1, name: "Gemini", xp: 5210, members: 92 }],
+      squads: [{ position: 1, name: "Gemini", xp: 5210, members: 92, sprite: LOGO }],
       squadsOn: true,
     });
+  });
+
+  it("still ranks the squads without their logos when the catalog fails", async () => {
+    catalogList.mockResolvedValue(err({ code: "unknown" }));
+
+    expect((await (await board.GET(request("board"))).json()).squads).toEqual([{ position: 1, name: "Gemini", xp: 5210, members: 92, sprite: null }]);
   });
 
   it("leaves the squads out when the edition has them off", async () => {
@@ -157,5 +210,76 @@ describe("GET /api/show-feed/qr", () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ error: "inactive" });
     expect(feed.issue).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/show-feed/polls", () => {
+  it("lists the polls the show may project, without drafts", async () => {
+    const body = await (await pollsRoute.GET(request("polls"))).json();
+
+    expect(body.polls).toEqual([{ id: "poll-mascota-01", question: "¿Cómo se llama la mascota?", status: "open" }]);
+    expect(polls.tally).not.toHaveBeenCalled();
+  });
+
+  it("answers one poll's votes per option", async () => {
+    const body = await (await pollsRoute.GET(request("polls?id=poll-mascota-01"))).json();
+
+    expect(body.poll).toEqual({
+      id: "poll-mascota-01",
+      question: "¿Cómo se llama la mascota?",
+      status: "open",
+      options: [
+        { id: "o1", text: "Pixel", imageUrl: null, votes: 3 },
+        { id: "o2", text: "Tacnito", imageUrl: "/media/t.png", votes: 1 },
+      ],
+      total: 4,
+    });
+  });
+
+  it.each(["poll-draft-0001", "poll-missing-01", "NOT AN ID"])("answers 404 for %s", async (id) => {
+    expect((await pollsRoute.GET(request(`polls?id=${encodeURIComponent(id)}`))).status).toBe(404);
+    expect(polls.tally).not.toHaveBeenCalled();
+  });
+
+  it("answers off when the edition has the polls off", async () => {
+    modules.mockImplementation(async (name) => name !== "polls");
+
+    expect((await pollsRoute.GET(request("polls"))).status).toBe(404);
+    expect(polls.list).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/show-feed/raffle", () => {
+  it("lists the winners newest first without voided draws or uids, with the prize photo, squad and reel", async () => {
+    const body = await (await raffleRoute.GET(request("raffle"))).json();
+
+    expect(body.draws).toEqual([
+      {
+        id: "mug-1",
+        prizeName: "Taza",
+        prizeImageUrl: "/media/mug.png",
+        winner: { alias: "NovaDev", squad: "Gemini" },
+        tickets: 5,
+        totalTickets: 80,
+        at: DRAW.at.getTime(),
+        reel: ["Ana", "NovaDev"],
+      },
+    ]);
+    expect(JSON.stringify(body)).not.toContain("uid-secret");
+  });
+
+  it("still lists the winners when the decoration cannot be read", async () => {
+    raffle.prizes.mockResolvedValue(err({ code: "unknown" }));
+    squadsList.mockResolvedValue(err({ code: "unknown" }));
+    getStage.mockResolvedValue(err({ code: "unknown" }));
+
+    expect((await (await raffleRoute.GET(request("raffle"))).json()).draws[0]).toMatchObject({ prizeImageUrl: null, winner: { alias: "NovaDev", squad: null }, reel: [] });
+  });
+
+  it("logs and answers 500 when the draws cannot be read", async () => {
+    raffle.draws.mockResolvedValue(err({ code: "unknown" }));
+
+    expect((await raffleRoute.GET(request("raffle"))).status).toBe(500);
+    expect(logServerError).toHaveBeenCalledWith("show-feed.raffle", expect.anything());
   });
 });

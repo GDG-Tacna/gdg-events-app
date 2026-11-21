@@ -116,3 +116,94 @@ export async function getTalkQr(deps: TalkQrDeps, talkId: string | null): Promis
   const { checkpointId, name, cells, issuedAt, expiresAt } = issued.value;
   return ok({ talkId: checkpointId, name, cells, issuedAt, expiresAt });
 }
+
+/** A poll as the feed reads it (the polls feature answers it). */
+export interface FeedPollSource {
+  id: string;
+  question: string;
+  status: "draft" | "open" | "closed";
+  options: ReadonlyArray<{ id: string; text: string; image: { url: string } | null }>;
+  createdAt: Date;
+}
+
+export interface FeedPollItem {
+  id: string;
+  question: string;
+  status: "open" | "closed";
+}
+
+/** The polls the show may project: the open one first, then closed ones, newest first. Drafts have no votes yet. */
+export function feedPolls(polls: readonly FeedPollSource[]): FeedPollItem[] {
+  return polls
+    .filter((poll): poll is FeedPollSource & { status: "open" | "closed" } => poll.status !== "draft")
+    .sort((a, b) => (a.status === b.status ? b.createdAt.getTime() - a.createdAt.getTime() : a.status === "open" ? -1 : 1))
+    .map(({ id, question, status }) => ({ id, question, status }));
+}
+
+export interface FeedPollView extends FeedPollItem {
+  options: Array<{ id: string; text: string; imageUrl: string | null; votes: number }>;
+  total: number;
+}
+
+/** One poll's results for the show: each option with its votes (the show draws the shares). */
+export function feedPoll(poll: FeedPollSource & { status: "open" | "closed" }, tally: { counts: Readonly<Record<string, number>>; total: number }): FeedPollView {
+  return {
+    id: poll.id,
+    question: poll.question,
+    status: poll.status,
+    options: poll.options.map((option) => ({ id: option.id, text: option.text, imageUrl: option.image?.url ?? null, votes: tally.counts[option.id] ?? 0 })),
+    total: tally.total,
+  };
+}
+
+/** A raffle draw as the feed reads it (the raffle feature answers it), with the squad names to name the winner's. */
+export interface FeedDrawSource {
+  id: string;
+  prizeId: string;
+  prizeName: string;
+  winnerAlias: string;
+  winnerSquadId: string | null;
+  tickets: number;
+  totalTickets: number;
+  at: Date;
+  voided: boolean;
+}
+
+export interface FeedDrawView {
+  id: string;
+  prizeName: string;
+  prizeImageUrl: string | null;
+  winner: { alias: string; squad: string | null };
+  tickets: number;
+  totalTickets: number;
+  at: number;
+  /** The names the app's own stage spun through for this draw (the latest one only); empty otherwise. */
+  reel: string[];
+}
+
+/**
+ * The raffle's winners for the show, newest first: voided draws left out (the winner was not in the room). The draw
+ * itself is made in the app's admin; the show only projects it. No uid ever leaves.
+ */
+export function feedDraws(
+  draws: readonly FeedDrawSource[],
+  prizes: ReadonlyArray<{ id: string; image: { url: string } | null }>,
+  squads: ReadonlyArray<{ id: string; name: string }>,
+  staged: { drawId: string; reel: readonly string[] } | null,
+): FeedDrawView[] {
+  const prizeImage = new Map(prizes.map((prize) => [prize.id, prize.image?.url ?? null]));
+  const squadName = new Map(squads.map((squad) => [squad.id, squad.name]));
+  return draws
+    .filter((draw) => !draw.voided)
+    .sort((a, b) => b.at.getTime() - a.at.getTime())
+    .map((draw) => ({
+      id: draw.id,
+      prizeName: draw.prizeName,
+      prizeImageUrl: prizeImage.get(draw.prizeId) ?? null,
+      winner: { alias: draw.winnerAlias, squad: draw.winnerSquadId ? (squadName.get(draw.winnerSquadId) ?? null) : null },
+      tickets: draw.tickets,
+      totalTickets: draw.totalTickets,
+      at: draw.at.getTime(),
+      reel: staged && staged.drawId === draw.id ? [...staged.reel] : [],
+    }));
+}

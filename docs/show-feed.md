@@ -20,9 +20,12 @@ La spec completa está en `gdg-presentacion/docs/SPEC-FEED-ESCENARIO.md`. Códig
 
 | Ruta | Respuesta 200 | Errores |
 |---|---|---|
-| `GET /api/show-feed/board` | `cadets` (top 10: `position`, `alias`, `squad`, `xp`), `squads` (`position`, `name`, `xp`, `members`) y `squadsOn` | `404 off` (ranking apagado en la edición) |
+| `GET /api/show-feed/board` | `cadets` (top 10: `position`, `alias`, `squad`, `xp`), `squads` (`position`, `name`, `xp`, `members`, `sprite`: el logo pixel `{rows, palette}` o `null`) y `squadsOn` | `404 off` (ranking apagado en la edición) |
 | `GET /api/show-feed/talks` | `talks` (`id`, `name`, `startsAt`, `endsAt`, `active`, `qrNow`), por hora | — |
 | `GET /api/show-feed/qr?talk=<id>` | `talkId`, `name`, `cells` (filas de `"1"`/`"0"`, sin zona de silencio), `issuedAt`, `expiresAt` | `400 bad-request`, `404 not-found`, `409 inactive` |
+| `GET /api/show-feed/polls` | `polls` (`id`, `question`, `status`): la abierta primero, luego las cerradas; sin borradores | `404 off` (encuestas apagadas) |
+| `GET /api/show-feed/polls?id=<id>` | `poll`: `id`, `question`, `status`, `options` (`id`, `text`, `imageUrl`, `votes`) y `total` | `404 not-found` (no existe o es borrador) |
+| `GET /api/show-feed/raffle` | `draws` (más reciente primero, sin anulados): `id`, `prizeName`, `prizeImageUrl`, `winner` (`alias`, `squad`), `tickets`, `totalTickets`, `at`, `reel` (los nombres que giró el escenario de la app; solo el último sorteo) | `404 off` (sorteo apagado) |
 
 **Cuándo se entrega el QR:** para cualquier charla activa de la edición, a cualquier hora. El operador del show decide cuándo proyectarlo (los speakers lo piden antes o después de su charla, y las charlas se atrasan). `qrNow` en `talks` indica si la charla está activa. Cada llamada emite un código nuevo de 2 minutos, que se verifica como cualquier otro QR de charla. El texto firmado nunca sale del servidor.
 
@@ -31,3 +34,5 @@ La spec completa está en `gdg-presentacion/docs/SPEC-FEED-ESCENARIO.md`. Códig
 ## Rotar la clave
 
 Cambia `SHOW_FEED_TOKEN`, redespliega y actualiza `js/feed.js` en la laptop del show. La clave anterior deja de funcionar con el despliegue.
+
+El sorteo se hace en la app (Admin › Sorteo); el show solo lo proyecta. El feed sigue siendo de solo lectura: nunca vota, sortea ni cambia el escenario de la app. `imageUrl` y `prizeImageUrl` pueden ser rutas de la app (`/media/...`): el show les antepone la dirección del feed.
