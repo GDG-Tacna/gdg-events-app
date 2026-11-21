@@ -8,6 +8,8 @@ import { StaffShell } from "./StaffShell";
 const navigation = vi.hoisted(() => ({ pathname: "/staff" as string | null }));
 vi.mock("next/navigation", () => ({ usePathname: () => navigation.pathname }));
 vi.mock("@/features/auth", () => ({ SignOutButton: () => <button type="button">Cerrar sesión</button> }));
+const features = vi.hoisted(() => ({ FEATURES: { checkins: true } }));
+vi.mock("@/shared/config/features", () => features);
 
 describe("StaffShell", () => {
   it("has a bottom bar with the stations, the ticket change in the middle and the staff's own code", () => {
@@ -21,6 +23,45 @@ describe("StaffShell", () => {
     const nav = screen.getByRole("navigation", { name: copy.staff.nav.label });
     expect(within(nav).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/staff", "/staff/entradas", "/staff/mi-codigo"]);
     expect(within(nav).getByRole("link", { name: copy.staff.nav.stations })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("keeps the team code button within reach above the bottom bar, as a link to the staff's code", () => {
+    navigation.pathname = "/staff";
+    features.FEATURES.checkins = true;
+    render(
+      <StaffShell account="Bruno">
+        <p>x</p>
+      </StaffShell>,
+    );
+
+    const button = screen.getByRole("link", { name: copy.teamCode.fabLabel });
+    expect(button).toHaveAttribute("href", "/staff/mi-codigo");
+    expect(button).toHaveTextContent(copy.teamCode.fab);
+    expect(button.className).toContain("fixed");
+    expect(button.className).toContain("bottom-[calc(6.25rem");
+    expect(within(screen.getByRole("navigation", { name: copy.staff.nav.label })).queryByRole("link", { name: copy.teamCode.fabLabel })).not.toBeInTheDocument();
+  });
+
+  it("hides the team code button on the code's own screen, and when check-ins are off", () => {
+    navigation.pathname = "/staff/mi-codigo";
+    features.FEATURES.checkins = true;
+    const { unmount } = render(
+      <StaffShell account="Bruno">
+        <p>x</p>
+      </StaffShell>,
+    );
+    expect(screen.queryByRole("link", { name: copy.teamCode.fabLabel })).not.toBeInTheDocument();
+    unmount();
+
+    navigation.pathname = "/staff";
+    features.FEATURES.checkins = false;
+    render(
+      <StaffShell account="Bruno">
+        <p>x</p>
+      </StaffShell>,
+    );
+    expect(screen.queryByRole("link", { name: copy.teamCode.fabLabel })).not.toBeInTheDocument();
+    features.FEATURES.checkins = true;
   });
 
   it("keeps Puestos current on a station's page but not on the other tabs' pages", () => {
