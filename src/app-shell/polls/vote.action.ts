@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { pollStore, voteDeps } from "@/app-shell/composition/polls.server";
 import { getCadetSession } from "@/app-shell/guards";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { moduleOn } from "@/app-shell/modules.server";
 import type { VoteActionResult } from "@/features/polls";
 import { castVote } from "@/features/polls/server";
@@ -17,7 +18,7 @@ const inputSchema = z.object({ pollId: z.string().min(1).max(60), optionId: z.st
  * here, the voter is the session's account, and the use case checks the poll, the option and the prize.
  */
 export async function votePollAction(input: { pollId: string; optionId: string }): Promise<VoteActionResult> {
-  if (!FEATURES.polls || !(await moduleOn("polls"))) return { ok: false, code: "disabled" };
+  if (!FEATURES.polls || !(await moduleOn("polls")) || (await isPublicEventFinished())) return { ok: false, code: "disabled" };
   const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   if (session.role !== "attendee") return { ok: false, code: session.role === null ? "not-registered" : "forbidden" };

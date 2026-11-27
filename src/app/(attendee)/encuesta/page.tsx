@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { voteDeps } from "@/app-shell/composition/polls.server";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { moduleOn } from "@/app-shell/modules.server";
 import { pollTallyAction } from "@/app-shell/polls/cadet-tally.action";
@@ -18,6 +19,7 @@ export const metadata: Metadata = { title: `${copy.poll.title} · ${copy.brand.n
 export default async function PollPage() {
   if (!FEATURES.polls || !(await moduleOn("polls"))) notFound();
   const session = await requireAttendee();
+  if (await isPublicEventFinished()) redirect(ROUTES.dashboard);
   const current = await getCadetPoll(voteDeps, session.uid);
   if (!current.ok) throw new Error("Could not read the poll");
 

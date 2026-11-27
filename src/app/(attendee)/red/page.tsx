@@ -7,6 +7,7 @@ import { getNetwork } from "@/features/network/server";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { ScreenEnter, SpaceBackground } from "@/shared/ui";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { moduleOn } from "@/app-shell/modules.server";
 
 export const metadata: Metadata = { title: `${copy.network.title} · ${copy.brand.name}` };
@@ -23,6 +24,7 @@ export default async function NetworkPage() {
     throw new Error("Could not read the cadet network");
   }
   const { me, contacts, reward } = network.value;
+  const [achievementsOn, finished] = await Promise.all([moduleOn("achievements"), isPublicEventFinished()]);
 
   return (
     <>
@@ -34,7 +36,8 @@ export default async function NetworkPage() {
             // Plain data for the client: who, never when (the order already says it).
             contacts={contacts.map(({ id, alias, squad, links }) => ({ id, alias, squad, links }))}
             reward={reward}
-            achievementsHref={(await moduleOn("achievements")) ? ROUTES.achievements : undefined}
+            achievementsHref={achievementsOn ? ROUTES.achievements : undefined}
+            readOnly={finished}
           />
         </ScreenEnter>
       </main>

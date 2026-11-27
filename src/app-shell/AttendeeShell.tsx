@@ -4,6 +4,7 @@ import { FEATURES } from "@/shared/config/features";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { BottomNav, BrandMark, ThemeToggle, type BottomNavItem } from "@/shared/ui";
+import { isPublicEventFinished } from "./event-status.server";
 import { moduleOn } from "./modules.server";
 
 /**
@@ -11,26 +12,45 @@ import { moduleOn } from "./modules.server";
  * navigation with the scanner in the middle. It makes room for the bar (below it on phones, beside it from
  * 760px). Onboarding and the squad reveal do not use it: they happen before the attendee has an app to move around.
  * Tabs join as their phase ships: Misiones next to Inicio and Mapa on the right (phase 3), Logros after Mapa (phase 4).
- * A tab shows only while its module is on for the edition.
+ * Once the public edition finishes, live tabs (Misiones, Escáner, Mapa/Agenda) hide and the bar switches to
+ * post-event mode: Inicio · Logros · Certificados · Red (without a central QR scanner).
  *
  * Every tab starts with the same header: the event's brand and the way out, so the cadet can sign out from any view.
  * It stays on top while the page scrolls, like a phone app's bar, over a solid fill (the blur is only an extra). It
  * keeps the phone's top inset, so the pages below it only add their own spacing.
  */
 export async function AttendeeShell({ children }: { children: ReactNode }) {
-  const start: BottomNavItem[] = [
-    { href: ROUTES.dashboard, label: copy.nav.home, icon: "home" },
-    ...((await moduleOn("missions")) ? [{ href: ROUTES.missions, label: copy.nav.missions, icon: "target" } as const] : []),
-  ];
-  const end: BottomNavItem[] = [
-    // Without the map the talks' agenda keeps its own tab (talks are part of the core).
-    ...((await moduleOn("map"))
-      ? [{ href: ROUTES.map, label: copy.nav.map, icon: "map" } as const]
-      : FEATURES.checkins
-        ? [{ href: `${ROUTES.map}?vista=agenda`, label: copy.nav.agenda, icon: "calendar" } as const]
-        : []),
-    ...((await moduleOn("achievements")) ? [{ href: ROUTES.achievements, label: copy.nav.achievements, icon: "trophy" } as const] : []),
-  ];
+  const finished = await isPublicEventFinished();
+  const [missionsOn, mapOn, achievementsOn, networkOn] = await Promise.all([
+    finished ? Promise.resolve(false) : moduleOn("missions"),
+    finished ? Promise.resolve(false) : moduleOn("map"),
+    moduleOn("achievements"),
+    finished ? moduleOn("network") : Promise.resolve(false),
+  ]);
+
+  const start: BottomNavItem[] = finished
+    ? [
+        { href: ROUTES.dashboard, label: copy.nav.home, icon: "home" },
+        ...(achievementsOn ? [{ href: ROUTES.achievements, label: copy.nav.achievements, icon: "trophy" } as const] : []),
+        ...(FEATURES.certificates ? [{ href: ROUTES.certificates, label: copy.nav.certificates, icon: "certificate" } as const] : []),
+        ...(networkOn ? [{ href: ROUTES.network, label: copy.nav.network, icon: "users" } as const] : []),
+      ]
+    : [
+        { href: ROUTES.dashboard, label: copy.nav.home, icon: "home" },
+        ...(missionsOn ? [{ href: ROUTES.missions, label: copy.nav.missions, icon: "target" } as const] : []),
+      ];
+
+  const end: BottomNavItem[] = finished
+    ? []
+    : [
+        // Without the map the talks' agenda keeps its own tab (talks are part of the core).
+        ...(mapOn
+          ? [{ href: ROUTES.map, label: copy.nav.map, icon: "map" } as const]
+          : FEATURES.checkins
+            ? [{ href: `${ROUTES.map}?vista=agenda`, label: copy.nav.agenda, icon: "calendar" } as const]
+            : []),
+        ...(achievementsOn ? [{ href: ROUTES.achievements, label: copy.nav.achievements, icon: "trophy" } as const] : []),
+      ];
 
   return (
     <div className="pb-[calc(6rem+env(safe-area-inset-bottom))] min-[760px]:pb-0 min-[760px]:pl-24">
@@ -47,7 +67,7 @@ export async function AttendeeShell({ children }: { children: ReactNode }) {
       <BottomNav
         label={copy.nav.label}
         start={start}
-        action={{ href: ROUTES.scan, label: copy.nav.scan, icon: "qr" }}
+        action={finished ? undefined : { href: ROUTES.scan, label: copy.nav.scan, icon: "qr" }}
         end={end}
       />
     </div>

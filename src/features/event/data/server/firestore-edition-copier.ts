@@ -3,6 +3,7 @@ import type { DocumentData, Firestore } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/shared/lib/firebase/admin";
 import {
   ACHIEVEMENTS_COLLECTION,
+  CERTIFICATE_TEMPLATES_COLLECTION,
   CHECKPOINTS_COLLECTION,
   COMMUNICATIONS_COLLECTION,
   ECONOMY_DOC,
@@ -30,10 +31,19 @@ interface PartSource {
   documents: ReadonlyArray<{ collection: EventCollection; id: string }>;
   /** Fields that belong to people of the source edition and never travel (a speaker's linked account and invitation). */
   personal?: readonly string[];
+  /** Optional transformation when copying into a new edition (e.g. stripping personal allowlists and unpublishing templates). */
+  sanitize?: (data: Record<string, unknown>) => Record<string, unknown>;
 }
 
 const isTalk = (data: DocumentData) => data.kind === "talk";
 const MINIGAMES_DOC = "minigames";
+
+function sanitizeCertificateTemplate(data: Record<string, unknown>): Record<string, unknown> {
+  const eligibility = data.eligibility && typeof data.eligibility === "object"
+    ? { ...(data.eligibility as Record<string, unknown>), allowedEmails: [] }
+    : data.eligibility;
+  return { ...data, published: false, eligibility };
+}
 
 /** The storage of each part (talks share the checkpoints collection, told apart by their kind). */
 export const PART_SOURCES: Readonly<Record<CopyPart, PartSource>> = {
@@ -49,6 +59,7 @@ export const PART_SOURCES: Readonly<Record<CopyPart, PartSource>> = {
   economy: { collections: [], documents: [{ collection: EVENT_CONFIG_COLLECTION, id: ECONOMY_DOC }] },
   minigames: { collections: [], documents: [{ collection: EVENT_CONFIG_COLLECTION, id: MINIGAMES_DOC }] },
   squadPrizes: { collections: [{ name: SQUAD_PRIZES_COLLECTION }], documents: [] },
+  certificates: { collections: [{ name: CERTIFICATE_TEMPLATES_COLLECTION }], documents: [], sanitize: sanitizeCertificateTemplate },
 };
 
 /** Firestore's limit of writes per batch. */
@@ -97,7 +108,13 @@ export class FirestoreEditionCopier implements EditionCopier {
     try {
       const documents = await this.documentsOf(eventId, part);
       const personal = new Set(PART_SOURCES[part].personal ?? []);
-      return ok(documents.map(({ path, data }) => ({ path, data: Object.fromEntries(Object.entries(data).filter(([key]) => !OWN_FIELDS.has(key) && !personal.has(key))) })));
+      const sanitize = PART_SOURCES[part].sanitize;
+      return ok(
+        documents.map(({ path, data }) => {
+          const stripped = Object.fromEntries(Object.entries(data).filter(([key]) => !OWN_FIELDS.has(key) && !personal.has(key)));
+          return { path, data: sanitize ? sanitize(stripped) : stripped };
+        }),
+      );
     } catch (cause) {
       logServerError("event.copier.read", cause);
       return err({ code: "unknown" });

@@ -2,9 +2,22 @@ import { isValidElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/app-shell/composition/achievements.server", () => ({ achievementDeps: { marker: "achievements" } }));
+const composition = vi.hoisted(() => ({ getAttendeeAchievementsOverview: vi.fn() }));
+vi.mock("@/app-shell/composition/achievements.server", () => composition);
 
-const guards = { requireAttendee: vi.fn() };
+const eventStatus = vi.hoisted(() => ({
+  getPublicEventState: vi.fn(async () => ({
+    id: "devfest-2026",
+    name: "DevFest Tacna 2026" as string | null,
+    venue: null as string | null,
+    endsAt: null as Date | null,
+    finished: false,
+  })),
+  isPublicEventFinished: vi.fn(async () => false),
+}));
+vi.mock("@/app-shell/event-status.server", () => eventStatus);
+
+const guards = { requireAttendee: vi.fn(), requireSession: vi.fn() };
 vi.mock("@/app-shell/guards", () => guards);
 
 class NotFound extends Error {}
@@ -13,9 +26,6 @@ vi.mock("next/navigation", () => ({
     throw new NotFound("not-found");
   },
 }));
-
-const server = { syncAchievements: vi.fn() };
-vi.mock("@/features/achievements/server", () => server);
 
 const features = vi.hoisted(() => ({ FEATURES: { achievements: true } }));
 vi.mock("@/shared/config/features", () => features);
@@ -41,8 +51,19 @@ describe("AchievementsPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     features.FEATURES.achievements = true;
+    eventStatus.getPublicEventState.mockResolvedValue({
+      id: "devfest-2026",
+      name: "DevFest Tacna 2026",
+      venue: null,
+      endsAt: null,
+      finished: false,
+    });
     guards.requireAttendee.mockResolvedValue({ uid: "u1", role: "attendee", displayName: null, photoUrl: null });
-    server.syncAchievements.mockResolvedValue({ ok: true, value: { badges: [{ marker: "standing" }], unlocked: [] } });
+    guards.requireSession.mockResolvedValue({ uid: "u1", role: null, displayName: null, photoUrl: null });
+    composition.getAttendeeAchievementsOverview.mockResolvedValue({
+      ok: true,
+      value: { globalBadges: [{ marker: "global" }], editions: [{ eventId: "devfest-2026", eventName: "DevFest Tacna 2026", isLive: true, badges: [] }] },
+    });
   });
 
   it("does not exist with achievements off", async () => {
@@ -52,19 +73,47 @@ describe("AchievementsPage", () => {
     expect(guards.requireAttendee).not.toHaveBeenCalled();
   });
 
-  it("serves attendees only, and evaluates their badges as it opens", async () => {
+  it("serves attendees while live and loads global + edition achievements overview", async () => {
     guards.requireAttendee.mockRejectedValue(new Error("redirect:/login"));
     await expect(AchievementsPage()).rejects.toThrow("redirect:/login");
-    expect(server.syncAchievements).not.toHaveBeenCalled();
+    expect(composition.getAttendeeAchievementsOverview).not.toHaveBeenCalled();
 
     guards.requireAttendee.mockResolvedValue({ uid: "u1", role: "attendee", displayName: null, photoUrl: null });
     const view = findElement(await AchievementsPage(), AchievementsView);
-    expect(server.syncAchievements).toHaveBeenCalledWith({ marker: "achievements" }, "u1");
-    expect(view?.props).toEqual({ badges: [{ marker: "standing" }] });
+    expect(composition.getAttendeeAchievementsOverview).toHaveBeenCalledWith("u1", {
+      activeEventId: "devfest-2026",
+      activeEventName: "DevFest Tacna 2026",
+      activeEventFinished: false,
+      includeLiveActive: true,
+    });
+    expect(view?.props).toEqual({
+      globalBadges: [{ marker: "global" }],
+      editions: [{ eventId: "devfest-2026", eventName: "DevFest Tacna 2026", isLive: true, badges: [] }],
+    });
+  });
+
+  it("allows any signed-in user once the active edition has finished", async () => {
+    eventStatus.getPublicEventState.mockResolvedValue({
+      id: "devfest-2026",
+      name: "DevFest Tacna 2026",
+      venue: null,
+      endsAt: new Date("2026-11-22T00:00:00Z"),
+      finished: true,
+    });
+
+    await AchievementsPage();
+    expect(guards.requireSession).toHaveBeenCalledTimes(1);
+    expect(guards.requireAttendee).not.toHaveBeenCalled();
+    expect(composition.getAttendeeAchievementsOverview).toHaveBeenCalledWith("u1", {
+      activeEventId: "devfest-2026",
+      activeEventName: "DevFest Tacna 2026",
+      activeEventFinished: true,
+      includeLiveActive: false,
+    });
   });
 
   it("lets a failed read reach the error boundary", async () => {
-    server.syncAchievements.mockResolvedValue({ ok: false, error: { code: "unknown" } });
+    composition.getAttendeeAchievementsOverview.mockResolvedValue({ ok: false, error: { code: "unknown" } });
 
     await expect(AchievementsPage()).rejects.toThrow("Could not read the achievements");
   });

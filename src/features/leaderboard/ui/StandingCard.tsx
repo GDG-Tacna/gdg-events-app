@@ -9,6 +9,8 @@ export interface StandingCardProps {
   /** The cadet's own alias and squad name, for their row when they are below the top. */
   alias: string;
   squad: string | null;
+  /** True once the event has ended, labeling the standing as the frozen final result. */
+  final?: boolean;
 }
 
 function Row({ cadet }: { cadet: RankedCadet }) {
@@ -38,7 +40,7 @@ function Row({ cadet }: { cadet: RankedCadet }) {
  * The cadet's place in the fleet ("#23 de 280 cadetes") and the top 10. When the cadet is further down, their own
  * row follows the top so they always see where they are.
  */
-export function StandingCard({ standing, alias, squad }: StandingCardProps) {
+export function StandingCard({ standing, alias, squad, final = false }: StandingCardProps) {
   const t = copy.leaderboard.card;
   const inTop = standing.top.some((cadet) => cadet.isMe);
   const total = formatNumber(standing.total);
@@ -47,7 +49,14 @@ export function StandingCard({ standing, alias, squad }: StandingCardProps) {
     <Card role="region" aria-label={t.title} className="gap-space-4 flex flex-col">
       <div className="gap-space-3 flex items-start justify-between">
         <div className="gap-space-1 flex min-w-0 flex-col">
-          <h2 className="type-title text-foreground">{t.title}</h2>
+          <div className="gap-space-2 flex flex-wrap items-center">
+            <h2 className="type-title text-foreground">{t.title}</h2>
+            {final ? (
+              <span className="border-line-strong bg-bg-deep text-text-subtle type-caption rounded-pill border px-2.5 py-0.5 font-semibold">
+                {t.finalBadge}
+              </span>
+            ) : null}
+          </div>
           {standing.position === null ? <p className="type-body-sm text-muted-foreground">{t.noPosition}</p> : null}
         </div>
         <Icon name="trophy" size={28} className="text-gold-ink" />

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { attendeeDeps } from "@/app-shell/composition/attendee.server";
 import { squadDeps } from "@/app-shell/composition/squads.server";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { assignSquadAction } from "@/app-shell/squads/assign-squad.action";
 import { getAttendee } from "@/features/attendee/server";
@@ -22,6 +23,7 @@ export default async function SquadPage() {
 
   // Visitors go to /login and users without a profile go to onboarding (inside the guard).
   const session = await requireAttendee();
+  if (await isPublicEventFinished()) redirect(ROUTES.dashboard);
 
   const [attendee, squads] = await Promise.all([
     getAttendee({ attendees: attendeeDeps.attendees }, session.uid),

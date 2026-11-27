@@ -52,18 +52,18 @@ const START = new Date("2026-10-24T14:00:00Z");
 const END = new Date("2026-10-24T23:00:00Z");
 
 describe("FirestoreEventStore", () => {
-  it("reads the public edition's end and status from its document", async () => {
-    const fake = fakeFirestore({ "events/e1": { name: "DevFest", endsAt: Timestamp.fromDate(END), status: "finished" } });
+  it("reads the public edition's name, venue, end and status from its document", async () => {
+    const fake = fakeFirestore({ "events/e1": { name: "DevFest", venue: "UTP", endsAt: Timestamp.fromDate(END), status: "finished" } });
 
-    expect(await new FirestoreEventStore(() => fake.db, testEventResolver).get()).toEqual({ ok: true, value: { id: "e1", endsAt: END, status: "finished" } });
+    expect(await new FirestoreEventStore(() => fake.db, testEventResolver).get()).toEqual({ ok: true, value: { id: "e1", name: "DevFest", venue: "UTP", endsAt: END, status: "finished" } });
   });
 
   it("has no end and is a draft while the document is missing or holds something else", async () => {
     const missing = fakeFirestore({});
     const odd = fakeFirestore({ "events/e1": { endsAt: "mañana", status: "over" } });
 
-    expect(await new FirestoreEventStore(() => missing.db, testEventResolver).get()).toEqual({ ok: true, value: { id: "e1", endsAt: null, status: "draft" } });
-    expect(await new FirestoreEventStore(() => odd.db, testEventResolver).get()).toEqual({ ok: true, value: { id: "e1", endsAt: null, status: "draft" } });
+    expect(await new FirestoreEventStore(() => missing.db, testEventResolver).get()).toEqual({ ok: true, value: { id: "e1", name: null, venue: null, endsAt: null, status: "draft" } });
+    expect(await new FirestoreEventStore(() => odd.db, testEventResolver).get()).toEqual({ ok: true, value: { id: "e1", name: null, venue: null, endsAt: null, status: "draft" } });
   });
 
   it("turns failures into an unknown error", async () => {

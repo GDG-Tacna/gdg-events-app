@@ -133,6 +133,14 @@ service cloud.firestore {
         allow read, write: if false;
       }
 
+      // Certificate templates and per-edition claim locks: server only (the app verifies eligibility and issues codes).
+      match /certificateTemplates/{template} {
+        allow read, write: if false;
+      }
+      match /certificateClaims/{claim} {
+        allow read, write: if false;
+      }
+
       // Staff and organizers of this edition: written and read by the server (the rules above read it for organizers).
       match /team/{uid} {
         allow read, write: if false;
@@ -164,6 +172,19 @@ service cloud.firestore {
 
     // Uploaded images and their chunks: written and read by the server only (the app serves them at /media).
     match /images/{image=**} {
+      allow read, write: if false;
+    }
+
+    // Issued certificates across editions: server only (public /verificar/{code} reads through Admin SDK without exposing emails/uids).
+    match /certificates/{code} {
+      allow read, write: if false;
+    }
+
+    // Global community badges and awards across editions: server only.
+    match /globalAchievements/{badge} {
+      allow read, write: if false;
+    }
+    match /globalAchievementAwards/{award} {
       allow read, write: if false;
     }
 

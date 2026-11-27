@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { issuePassAction } from "@/app-shell/pass/issue-pass.action";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { attendeeDeps } from "@/app-shell/composition/attendee.server";
 import { PassDisplay } from "@/features/pass";
 import { getAttendee } from "@/features/attendee/server";
 import { FEATURES } from "@/shared/config/features";
+import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { ScreenEnter, SpaceBackground } from "@/shared/ui";
 
@@ -15,6 +17,7 @@ export default async function PassPage() {
   if (!FEATURES.checkins) notFound();
   // Visitors go to /login, users without a role go to onboarding, staff and admin go to their own home.
   const session = await requireAttendee();
+  if (await isPublicEventFinished()) redirect(ROUTES.dashboard);
   // The ticket only decorates the pass: when it cannot be read the pass still shows.
   const attendee = await getAttendee(attendeeDeps, session.uid);
 

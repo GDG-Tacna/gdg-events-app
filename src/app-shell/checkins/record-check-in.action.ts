@@ -24,6 +24,7 @@ import { verifySpeakerCode } from "@/features/speakers/server";
 import { isTeamCode } from "@/features/team-code";
 import { verifyTeamCode } from "@/features/team-code/server";
 import { FEATURES } from "@/shared/config/features";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { moduleOn } from "@/app-shell/modules.server";
 
 /** A QR payload is short text; anything longer is not one of ours. */
@@ -42,7 +43,7 @@ const MISSION_KINDS: ReadonlySet<string> = new Set(["talk", "stand"]);
  * if it fails, scanning again retries it (both steps are idempotent).
  */
 export async function recordCheckInAction(payload: string): Promise<RecordCheckInActionResult> {
-  if (!FEATURES.checkins) return { ok: false, code: "disabled" };
+  if (!FEATURES.checkins || (await isPublicEventFinished())) return { ok: false, code: "disabled" };
 
   const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };

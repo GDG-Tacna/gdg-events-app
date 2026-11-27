@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { odysseyDeps, storyTitleSource } from "@/app-shell/composition/odyssey.server";
 import { galaxyDeps } from "@/app-shell/composition/quadrants.server";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { OdysseyView } from "@/features/odyssey";
 import { getOdyssey, getStoryTitle } from "@/features/odyssey/server";
@@ -16,6 +17,7 @@ export const metadata: Metadata = { title: `${copy.odyssey.title} · ${copy.bran
 export default async function OdysseyPage() {
   if (!(await moduleOn("odyssey"))) notFound();
   const session = await requireAttendee();
+  if (await isPublicEventFinished()) redirect(ROUTES.dashboard);
 
   const [log, galaxy, title] = await Promise.all([getOdyssey(odysseyDeps, session.uid), getGalaxyMap(galaxyDeps), getStoryTitle(storyTitleSource)]);
   if (!log.ok) throw new Error("Could not read the odyssey");

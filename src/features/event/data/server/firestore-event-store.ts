@@ -50,7 +50,7 @@ export class FirestoreEventStore implements EventStore {
       const id = await this.getEventId();
       const snapshot = await eventDocument(this.getDb(), id).get();
       const edition = toEdition(id, snapshot.data());
-      return ok({ id, endsAt: edition.endsAt, status: edition.status });
+      return ok({ id, name: edition.name, venue: edition.venue, endsAt: edition.endsAt, status: edition.status });
     } catch (cause) {
       logServerError("event.store.get", cause);
       return err({ code: "unknown" });

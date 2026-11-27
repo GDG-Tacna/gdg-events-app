@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getSession, teamPlayState } from "@/app-shell/guards";
 import { attendeeDeps } from "@/app-shell/composition/attendee.server";
 import { ticketHolders } from "@/app-shell/composition/tickets.server";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { moduleOn } from "@/app-shell/modules.server";
 import { linkedSpeaker } from "@/app-shell/speakers/linked-speaker.server";
 import type { RegisterAttendeeActionResult, RegisterAttendeeInput } from "@/features/attendee";
@@ -22,6 +23,7 @@ const inputSchema = z.object({ alias: z.string().max(64) });
 export async function registerAttendeeAction(input: RegisterAttendeeInput): Promise<RegisterAttendeeActionResult> {
   const session = await getSession();
   if (!session) return { ok: false, code: "unauthenticated" };
+  if (await isPublicEventFinished()) return { ok: false, code: "forbidden" };
   // A team account is onboarded as a cadet only where «Staff como cadetes» is on, and keeps its role.
   const isTeam = session.role !== null && session.role !== "attendee";
   if (isTeam && (await teamPlayState(session.role, session.uid)) === "off") return { ok: false, code: "forbidden" };

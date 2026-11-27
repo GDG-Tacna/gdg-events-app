@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { enabledMinigames, minigameViewDeps } from "@/app-shell/composition/minigames.server";
 import { missionDeps } from "@/app-shell/composition/missions.server";
 import { galaxyDeps } from "@/app-shell/composition/quadrants.server";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { submitMissionAnswerAction } from "@/app-shell/missions/answer.action";
 import { missionPeopleNames } from "@/app-shell/missions/people-names.server";
@@ -22,6 +23,7 @@ export const metadata: Metadata = { title: `${copy.missions.title} · ${copy.bra
 export default async function MissionPage({ params }: PageProps<"/missions/[missionId]">) {
   if (!(await moduleOn("missions"))) notFound();
   const session = await requireAttendee();
+  if (await isPublicEventFinished()) redirect(ROUTES.dashboard);
   const { missionId } = await params;
 
   const [board, galaxy, games] = await Promise.all([

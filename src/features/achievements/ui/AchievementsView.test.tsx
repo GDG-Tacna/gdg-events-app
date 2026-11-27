@@ -5,8 +5,9 @@ import { copy } from "@/shared/copy/es";
 import { axe } from "@/test-utils/axe";
 import type { BadgeStanding } from "../domain/achievements";
 import type { Badge } from "../domain/badge";
+import type { EditionAchievementsGroup, GlobalBadgeStanding } from "../domain/global-achievements";
 import { AchievementsView } from "./AchievementsView";
-import { ruleText } from "./rule-text";
+import { globalRuleText, ruleText } from "./rule-text";
 
 const t = copy.achievements;
 const badge = (id: string, name: string, rule: Badge["rule"]): Badge => ({ id, name, description: `Descripción de ${name}.`, tone: "gold", rule, order: 0, active: true, image: null });
@@ -49,6 +50,70 @@ describe("AchievementsView", () => {
 
     expect(screen.getByText(t.empty)).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("renders global community badges (earned + pending) and hides pending badges on finished editions", async () => {
+    const globals: GlobalBadgeStanding[] = [
+      {
+        badge: {
+          id: "primer-evento",
+          name: "Primer evento GDG",
+          description: "Participa en tu primer evento.",
+          tone: "cyan",
+          rule: { type: "events-attended", count: 1 },
+          order: 0,
+          active: true,
+          image: null,
+        },
+        earnedAt: new Date("2026-11-21T15:00:00Z"),
+        current: 1,
+        target: 1,
+      },
+      {
+        badge: {
+          id: "miembro-recurrente",
+          name: "Miembro recurrente",
+          description: "Participa en 2 eventos.",
+          tone: "lime",
+          rule: { type: "events-attended", count: 2 },
+          order: 1,
+          active: true,
+          image: null,
+        },
+        earnedAt: null,
+        current: 1,
+        target: 2,
+      },
+    ];
+    const editions: EditionAchievementsGroup[] = [
+      {
+        eventId: "devfest-2026",
+        eventName: "DevFest Tacna 2026",
+        isLive: false,
+        badges: [FIRST, FIVE],
+      },
+    ];
+
+    const { container } = render(<AchievementsView globalBadges={globals} editions={editions} />);
+
+    expect(screen.getByRole("heading", { level: 2, name: t.globalSection.title })).toBeInTheDocument();
+    expect(screen.getByText("Primer evento GDG")).toBeInTheDocument();
+    expect(screen.getByText("Miembro recurrente")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "DevFest Tacna 2026" })).toBeInTheDocument();
+    expect(screen.getByText(t.eventsSection.finishedBadge)).toBeInTheDocument();
+    expect(screen.getByText("Primer salto")).toBeInTheDocument();
+    // Pending edition badge ("Explorador") is hidden on finished editions.
+    expect(screen.queryByText("Explorador")).not.toBeInTheDocument();
+    expect((await axe(container)).violations).toEqual([]);
+  });
+});
+
+describe("globalRuleText", () => {
+  it("formats global community rules in Spanish", () => {
+    expect(globalRuleText({ type: "events-attended", count: 1 })).toBe("Participa en 1 evento de GDG Tacna");
+    expect(globalRuleText({ type: "events-attended", count: 3 })).toBe("Participa en 3 eventos de GDG Tacna");
+    expect(globalRuleText({ type: "certificates-earned", count: 1 })).toBe("Obtén 1 certificado verificado");
+    expect(globalRuleText({ type: "total-badges", count: 5 })).toBe("Desbloquea 5 logros en eventos");
   });
 });
 

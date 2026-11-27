@@ -21,6 +21,8 @@ vi.mock("./attendee.server", () => ({ attendeeDeps: { attendees: { findByUid: mo
 vi.mock("./ranks.server", () => ({ rankDeps: { marker: "ranks" } }));
 vi.mock("./quadrants.server", () => ({ galaxyDeps: { marker: "galaxy" } }));
 vi.mock("./network.server", () => ({ networkStore: { countFor: mocks.contactsOf } }));
+vi.mock("./event.server", () => ({ editionCatalogCached: vi.fn(async () => ({ ok: true, value: [] })) }));
+vi.mock("./media.server", () => ({ recordImages: { marker: "images" }, globalRecordImages: { marker: "global-images" } }));
 vi.mock("@/features/network/server", async () => {
   const network = await import("@/features/network/domain/network");
   return { countContacts: network.countContacts };
@@ -36,16 +38,39 @@ vi.mock("@/features/checkins/server", () => ({
 vi.mock("@/shared/config/features", () => ({ FEATURES: mocks.features }));
 vi.mock("@/features/achievements/server", async () => {
   const domain = await import("@/features/achievements/domain/achievements");
+  const globalDomain = await import("@/features/achievements/domain/global-achievements");
   return {
     ...domain,
+    ...globalDomain,
     DEFAULT_BADGES: [],
+    DEFAULT_GLOBAL_BADGES: [],
     CachedBadgeSource: class {
       list = mocks.badges;
     },
+    CachedGlobalBadgeSource: class {
+      list = vi.fn(async () => ({ ok: true, value: [] }));
+      invalidate = vi.fn();
+    },
     FirestoreBadgeStore: class {},
+    FirestoreGlobalBadgeStore: class {},
     FirestoreAwardStore: class {
       awardsOf = mocks.awardsOf;
       award = mocks.award;
+    },
+    FirestoreGlobalAwardStore: class {
+      awardsOf = vi.fn(async () => ({ ok: true, value: new Map() }));
+      award = vi.fn(async () => ({ ok: true, value: { awarded: false } }));
+    },
+    FirestoreCrossEditionAchievementsReader: class {
+      readSnapshot = vi.fn(async () => ({
+        ok: true,
+        value: {
+          progress: { eventsAttended: 0, totalCredits: 0, totalBadges: 0, certificatesEarned: 0, totalContacts: 0 },
+          earnedByEdition: new Map(),
+        },
+      }));
+      buildFinishedGroups = vi.fn(async () => ({ ok: true, value: [] }));
+      invalidateEdition = vi.fn();
     },
   };
 });

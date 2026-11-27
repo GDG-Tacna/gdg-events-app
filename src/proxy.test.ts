@@ -28,7 +28,14 @@ describe("proxy", () => {
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 
-  it.each(["/login", "/", "/offline", "/dashboards-info", "/administrator", "/invite/speaker/devfest-2026.abc", "/speakers-info"])(
+  it("sends /certificados to /login preserving next=/certificados when there is no session cookie", () => {
+    const response = proxy(request("/certificados"));
+
+    expect(response.status).toBe(307);
+    expect(redirectTarget(response)).toBe("http://localhost/login?next=%2Fcertificados");
+  });
+
+  it.each(["/login", "/", "/offline", "/dashboards-info", "/administrator", "/invite/speaker/devfest-2026.abc", "/speakers-info", "/verificar", "/verificar/GDG-4K9P7-X2M8R"])(
     "does not protect %s",
     (path) => {
       expect(redirectTarget(proxy(request(path)))).toBeNull();

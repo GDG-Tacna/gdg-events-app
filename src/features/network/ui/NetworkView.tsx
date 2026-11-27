@@ -25,6 +25,8 @@ export interface NetworkViewProps {
   camera: QrCamera;
   /** The Logros tab, linked from a badge a contact unlocked (absent when achievements are off). */
   achievementsHref?: string;
+  /** Once the event ends, the Red becomes read-only: contacts and own link editing stay, QR/scanner hide. */
+  readOnly?: boolean;
 }
 
 const TABS = ["code", "scan", "contacts"] as const;
@@ -34,7 +36,7 @@ type Tab = (typeof TABS)[number];
  * The Red: the cadet's own contact code and card (with the links they choose to show), a scanner for other
  * cadets' codes, and their contacts. The camera only runs on the "Escanear" tab.
  */
-export function NetworkView({ me, contacts, reward, issue, connect, saveLinks, camera, achievementsHref }: NetworkViewProps) {
+export function NetworkView({ me, contacts, reward, issue, connect, saveLinks, camera, achievementsHref, readOnly = false }: NetworkViewProps) {
   const t = copy.network;
   const router = useRouter();
   const id = useId();
@@ -63,6 +65,78 @@ export function NetworkView({ me, contacts, reward, issue, connect, saveLinks, c
   }
 
   const label = (value: Tab) => (value === "contacts" ? `${t.tabs.contacts} (${formatNumber(contacts.length)})` : t.tabs[value]);
+
+  const ownCardBlock = (
+    <Card className="gap-space-4 flex flex-col">
+      <div className="gap-space-1 flex flex-col">
+        <h2 className="type-heading text-foreground">{t.card.title}</h2>
+        <p className="type-body-sm text-muted-foreground">{t.card.help}</p>
+      </div>
+      <CadetCardView card={card} className="bg-surface-raised border-border p-space-4 rounded-md border" />
+      {saved && !editing ? (
+        <p role="status" className="type-body-sm text-foreground">
+          {t.links.saved}
+        </p>
+      ) : null}
+      {editing ? (
+        <LinksForm
+          links={card.links}
+          save={saveLinks}
+          onSaved={(links) => {
+            setCard((current) => ({ ...current, links }));
+            setEditing(false);
+            setSaved(true);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      ) : (
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setSaved(false);
+            setEditing(true);
+          }}
+        >
+          {t.links.edit}
+        </Button>
+      )}
+    </Card>
+  );
+
+  if (readOnly) {
+    return (
+      <div className="gap-space-5 mx-auto flex w-full max-w-[520px] flex-col">
+        <header className="gap-space-2 flex flex-col">
+          <h1 className="type-title-xl text-foreground">{t.title}</h1>
+          <p className="type-body text-muted-foreground">{t.readOnly.subtitle}</p>
+          <p className="type-caption text-text-subtle">{t.readOnly.notice}</p>
+        </header>
+
+        <section aria-labelledby={`${id}-contacts-heading`} className="gap-space-3 flex flex-col">
+          <h2 id={`${id}-contacts-heading`} className="type-heading text-foreground">
+            {label("contacts")}
+          </h2>
+          {contacts.length > 0 ? (
+            <ul aria-label={t.contacts.label} className="gap-space-3 flex flex-col">
+              {contacts.map((contact) => (
+                <li key={contact.id}>
+                  <Card>
+                    <CadetCardView card={contact} as="h3" />
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Card>
+              <p className="type-body text-muted-foreground">{t.contacts.emptyFinished}</p>
+            </Card>
+          )}
+        </section>
+
+        {ownCardBlock}
+      </div>
+    );
+  }
 
   return (
     <div className="gap-space-5 mx-auto flex w-full max-w-[520px] flex-col">
@@ -108,40 +182,7 @@ export function NetworkView({ me, contacts, reward, issue, connect, saveLinks, c
             <Card className="gap-space-4 flex flex-col">
               <ContactCode issue={issue} />
             </Card>
-            <Card className="gap-space-4 flex flex-col">
-              <div className="gap-space-1 flex flex-col">
-                <h2 className="type-heading text-foreground">{t.card.title}</h2>
-                <p className="type-body-sm text-muted-foreground">{t.card.help}</p>
-              </div>
-              <CadetCardView card={card} className="bg-surface-raised border-border p-space-4 rounded-md border" />
-              {saved && !editing ? (
-                <p role="status" className="type-body-sm text-foreground">
-                  {t.links.saved}
-                </p>
-              ) : null}
-              {editing ? (
-                <LinksForm
-                  links={card.links}
-                  save={saveLinks}
-                  onSaved={(links) => {
-                    setCard((current) => ({ ...current, links }));
-                    setEditing(false);
-                    setSaved(true);
-                  }}
-                  onCancel={() => setEditing(false)}
-                />
-              ) : (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setSaved(false);
-                    setEditing(true);
-                  }}
-                >
-                  {t.links.edit}
-                </Button>
-              )}
-            </Card>
+            {ownCardBlock}
           </>
         ) : null}
 

@@ -8,7 +8,7 @@ import type { EditionCatalog, EditionsActor, EditionsAuditEntry } from "./editio
  * results, the team, invitations, the raffle. A closed set of parts, each copied only into an edition that has
  * nothing of that part yet, so nothing is ever overwritten or mixed.
  */
-export const COPY_PARTS = ["squads", "map", "checkpoints", "speakers", "talks", "missions", "story", "achievements", "ranks", "economy", "minigames", "squadPrizes"] as const;
+export const COPY_PARTS = ["squads", "map", "checkpoints", "speakers", "talks", "missions", "story", "achievements", "ranks", "economy", "minigames", "squadPrizes", "certificates"] as const;
 export type CopyPart = (typeof COPY_PARTS)[number];
 
 export const isCopyPart = (value: unknown): value is CopyPart => typeof value === "string" && (COPY_PARTS as readonly string[]).includes(value);
@@ -27,6 +27,7 @@ export const COPY_NEEDS: Readonly<Record<CopyPart, readonly CopyPart[]>> = {
   economy: [],
   minigames: [],
   squadPrizes: [],
+  certificates: [],
 };
 
 /** The parts asked for plus everything they need, in the canonical order. */

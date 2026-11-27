@@ -31,6 +31,7 @@ const AREAS: readonly Area[] = [
   { href: ROUTES.adminEvent, label: n.event, icon: "calendar", card: a.event, group: "event", section: "event" },
   { href: ROUTES.adminTeam, label: n.team, icon: "users", card: a.team, group: "event", section: "team" },
   { href: ROUTES.adminCadets, label: n.cadets, icon: "person", card: a.cadets, group: "event", section: "cadets" },
+  { href: ROUTES.adminCertificates, label: n.certificates, icon: "certificate", card: a.certificates, group: "event", module: "certificates", section: "certificates" },
 
   { href: ROUTES.adminTalks, label: n.talks, icon: "mic", card: a.talks, group: "program", section: "talks" },
   { href: ROUTES.adminSpeakers, label: n.speakers, icon: "person", card: a.speakers, group: "program", section: "talks" },

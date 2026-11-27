@@ -1,7 +1,8 @@
 "use server";
 
-import { passDeps } from "@/app-shell/composition/pass.server";
 import { getCadetSession } from "@/app-shell/guards";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
+import { passDeps } from "@/app-shell/composition/pass.server";
 import type { IssuePassActionResult } from "@/features/pass";
 import { issuePass } from "@/features/pass/server";
 import { FEATURES } from "@/shared/config/features";
@@ -12,7 +13,7 @@ import { FEATURES } from "@/shared/config/features";
  * It returns the picture and timing, never the signed text.
  */
 export async function issuePassAction(): Promise<IssuePassActionResult> {
-  if (!FEATURES.checkins) return { ok: false, code: "disabled" };
+  if (!FEATURES.checkins || (await isPublicEventFinished())) return { ok: false, code: "disabled" };
 
   const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };

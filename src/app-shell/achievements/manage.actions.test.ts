@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-const composition = vi.hoisted(() => ({ achievementAdminDeps: { marker: "admin" }, badgeSource: { invalidate: vi.fn() } }));
+const composition = vi.hoisted(() => ({
+  achievementAdminDeps: { marker: "admin" },
+  badgeSource: { invalidate: vi.fn() },
+  crossEditionReader: { invalidateEdition: vi.fn() },
+}));
 vi.mock("@/app-shell/composition/achievements.server", () => composition);
 
 const deletion = vi.hoisted(() => ({ mayDeleteItems: vi.fn(async () => true) }));

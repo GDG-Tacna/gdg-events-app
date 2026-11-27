@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { readUserCertificates } from "@/app-shell/composition/certificates.server";
 import { serveDeps } from "@/app-shell/composition/checkpoints.server";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { requireRole, teamPlayState } from "@/app-shell/guards";
 import { staffCheckpoints, staffStations } from "@/app-shell/permissions.server";
 import { TeamPlayCallout } from "@/features/attendee";
 import { STATION_KINDS } from "@/features/checkpoints";
 import { listServePoints, type ServePoint } from "@/features/checkpoints/server";
+import { FEATURES } from "@/shared/config/features";
 import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { ActionMenu, ButtonLink, Card, Icon, ScreenEnter, Thumbnail, type ActionMenuItem } from "@/shared/ui";
@@ -32,15 +35,21 @@ export default async function StaffHomePage() {
 
   const kinds = session.role === "staff" ? await staffStations() : undefined;
   const checkpointIds = await staffCheckpoints(session);
-  const points = await listServePoints(serveDeps, { uid: session.uid, role: session.role, kinds, checkpointIds });
+  const [points, certs, finished] = await Promise.all([
+    listServePoints(serveDeps, { uid: session.uid, role: session.role, kinds, checkpointIds }),
+    FEATURES.certificates ? readUserCertificates({ uid: session.uid, email: session.verifiedEmail ?? null, displayName: session.displayName }) : null,
+    isPublicEventFinished(),
+  ]);
   // A failed read goes to the route error boundary instead of claiming there is nothing to operate.
   if (!points.ok) throw new Error("Could not read the stations");
+  const hasCertificates = Boolean(certs?.ok && (certs.value.claimable.length > 0 || certs.value.issued.length > 0));
 
   // The use case already orders them entrance, catering, stand; each kind with stations gets its own group.
   // Changing a ticket needs a station to operate, like serving: staff the organizer limited to none do not get the card.
   const mayChangeTickets = kinds === undefined || (kinds.length > 0 && (checkpointIds === undefined || checkpointIds.length > 0));
   const hasEntrance = points.value.some((point) => point.kind === "entrance");
   const groups = STATION_KINDS.map((kind) => ({ kind, points: points.value.filter((point) => point.kind === kind) })).filter((group) => group.points.length > 0);
+  const showPlay = play === "play" || (!finished && play === "join");
 
   return (
     <ScreenEnter>
@@ -48,12 +57,27 @@ export default async function StaffHomePage() {
         <header className="gap-space-1 flex flex-col">
           <h1 className="type-title-xl text-foreground">{copy.staff.title}</h1>
           <p className="type-body text-muted-foreground">{copy.staff.subtitle}</p>
-          <ButtonLink href={ROUTES.teamCode} variant="secondary" className="mt-space-3 self-start">
-            {copy.teamCode.open}
-          </ButtonLink>
+          {finished ? (
+            <p role="status" className="border-line-strong bg-bg-deep text-foreground type-body-sm mt-space-2 p-space-3 rounded-md border">
+              {copy.staff.finishedNotice}
+            </p>
+          ) : null}
+          <div className="mt-space-3 gap-space-2 flex flex-wrap items-center">
+            {!finished ? (
+              <ButtonLink href={ROUTES.teamCode} variant="secondary">
+                {copy.teamCode.open}
+              </ButtonLink>
+            ) : null}
+            {hasCertificates ? (
+              <ButtonLink href={ROUTES.certificates} variant="secondary" className="gap-space-2">
+                <Icon name="certificate" size={18} />
+                {copy.certificates.title}
+              </ButtonLink>
+            ) : null}
+          </div>
         </header>
 
-        {play !== "off" ? <TeamPlayCallout kind={play === "play" ? "toCadet" : "join"} href={play === "play" ? ROUTES.dashboard : ROUTES.onboarding} /> : null}
+        {showPlay ? <TeamPlayCallout kind={play === "play" ? "toCadet" : "join"} href={play === "play" ? ROUTES.dashboard : ROUTES.onboarding} /> : null}
 
         {groups.length === 0 ? (
           <Card>

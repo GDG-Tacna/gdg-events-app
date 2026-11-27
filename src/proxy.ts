@@ -2,7 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/features/auth/constants";
 
 /** Surfaces that need a signed-in user. Later phases append their prefixes here. */
-const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/squad", "/scan", "/pass", "/map", "/missions", "/odyssey", "/achievements", "/minigame", "/red", "/escenario", "/staff", "/admin", "/mis-eventos", "/speaker", "/encuesta", "/avatar"];
+const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/squad", "/scan", "/pass", "/map", "/missions", "/odyssey", "/achievements", "/minigame", "/red", "/escenario", "/staff", "/admin", "/mis-eventos", "/speaker", "/encuesta", "/avatar", "/certificados"];
+
+/** Routes that preserve their return destination across Google sign-in (shared directly via email/WhatsApp). */
+const RETURN_AFTER_LOGIN = ["/certificados"];
 
 /**
  * Optimistic check only: it looks for the session cookie, never verifies it.
@@ -17,7 +20,11 @@ export function proxy(request: NextRequest) {
   );
 
   if (isProtected && !request.cookies.has(SESSION_COOKIE_NAME)) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const login = new URL("/login", request.url);
+    if (RETURN_AFTER_LOGIN.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+      login.searchParams.set("next", pathname);
+    }
+    return NextResponse.redirect(login);
   }
   return NextResponse.next();
 }

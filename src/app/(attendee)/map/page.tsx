@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { galaxyDeps } from "@/app-shell/composition/quadrants.server";
 import { agendaDeps } from "@/app-shell/composition/talks.server";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { VenueMapView } from "@/features/quadrants";
 import { getGalaxyMap } from "@/features/quadrants/server";
@@ -29,6 +30,7 @@ export default async function MapPage({ searchParams }: PageProps<"/map">) {
   if (!mapOn && !FEATURES.checkins) notFound();
   // Visitors go to /login, users without a role go to onboarding, staff and admin go to their own home.
   const session = await requireAttendee();
+  if (await isPublicEventFinished()) redirect(ROUTES.dashboard);
   const { vista } = await searchParams;
   const galaxy = await getGalaxyMap(galaxyDeps);
   // The route's error boundary shows a retry; the cause is already logged by the adapter.

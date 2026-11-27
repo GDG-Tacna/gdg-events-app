@@ -31,7 +31,13 @@ export default async function AdminAchievementsPage() {
         move={moveBadgeAction}
         remove={deleteBadgeAction}
         canDelete={await mayDeleteItems(session)}
-        hrefs={{ create: `${ROUTES.adminAchievements}/nueva`, editBase: ROUTES.adminAchievements }}
+        hrefs={{
+          create: `${ROUTES.adminAchievements}/nueva`,
+          editBase: ROUTES.adminAchievements,
+          ...(session.adminScope === "global"
+            ? { editionList: ROUTES.adminAchievements, globalList: ROUTES.adminGlobalAchievements }
+            : {}),
+        }}
       />
     </ScreenEnter>
   );
