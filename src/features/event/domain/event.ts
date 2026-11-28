@@ -4,6 +4,10 @@ import { err, ok, type Result } from "@/shared/lib/result";
 /** The edition the app serves, as other features need it. */
 export interface EventInfo {
   id: string;
+  /** Human-readable name of the edition, or `null` when unnamed. */
+  name?: string | null;
+  /** Venue of the edition, or `null` when unset. */
+  venue?: string | null;
   /** When the event is over, or `null` while nobody has said. */
   endsAt: Date | null;
   /** An admin can mark it finished before (or without) an end date. */

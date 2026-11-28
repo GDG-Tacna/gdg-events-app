@@ -227,6 +227,18 @@ describe("NetworkView", () => {
     expect(screen.queryByLabelText(t.links.web)).not.toBeInTheDocument();
     expect(saveLinks).toHaveBeenCalledTimes(2);
   });
+
+  it("switches to read-only archive mode once the event ends: keeps contacts and editable links, hides QR code and scanner", async () => {
+    await renderView({ readOnly: true });
+
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Por contacto nuevo/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: t.code.label })).not.toBeInTheDocument();
+    expect(screen.getByText(t.readOnly.subtitle)).toBeInTheDocument();
+    expect(screen.getByText("Bruno")).toBeInTheDocument();
+    expect(screen.getByText("Carla")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: t.links.edit })).toBeInTheDocument();
+  });
 });
 
 describe("CadetCardView", () => {

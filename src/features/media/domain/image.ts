@@ -2,7 +2,7 @@ import { logServerError } from "@/shared/lib/log";
 import { err, ok, type Result } from "@/shared/lib/result";
 
 /** What an image is for. A closed set: each one has its rules and its own folder. */
-export const IMAGE_PURPOSES = ["badge", "raffle-prize", "squad-prize", "squad-logo", "rank", "mission", "venue-plan", "stage-background", "speaker", "poll-option", "checkpoint"] as const;
+export const IMAGE_PURPOSES = ["badge", "raffle-prize", "squad-prize", "squad-logo", "rank", "mission", "venue-plan", "stage-background", "speaker", "poll-option", "checkpoint", "certificate"] as const;
 export type ImagePurpose = (typeof IMAGE_PURPOSES)[number];
 
 export type ImageFormat = "jpeg" | "png" | "webp" | "svg";
@@ -15,6 +15,8 @@ export const IMAGE_RULES = {
   logo: { formats: ["jpeg", "png", "webp", "svg"], maxBytes: 2 * MB, maxSide: 512 },
   // 4 MB keeps a plan's upload under the 4.5 MB request limit of serverless hosts such as Vercel.
   plan: { formats: ["jpeg", "png", "webp", "svg"], maxBytes: 4 * MB, maxSide: 2400 },
+  // Certificate templates are high-resolution rasters drawn onto an HTML5 canvas (no SVG tainting).
+  certificate: { formats: ["jpeg", "png", "webp"], maxBytes: 4 * MB, maxSide: 2400 },
 } as const satisfies Record<string, { formats: readonly ImageFormat[]; maxBytes: number; maxSide: number }>;
 export type ImageRule = keyof typeof IMAGE_RULES;
 
@@ -32,6 +34,7 @@ export const RULE_OF: Record<ImagePurpose, ImageRule> = {
   "venue-plan": "plan",
   // A projector background is large, like the venue plan.
   "stage-background": "plan",
+  certificate: "certificate",
 };
 
 /** The largest upload any purpose accepts, for the request body limit. */

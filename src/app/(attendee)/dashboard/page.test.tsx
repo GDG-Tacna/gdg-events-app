@@ -48,8 +48,19 @@ vi.mock("@/features/dashboard", async (importOriginal) => ({
 const squadsServer = { listSquads: vi.fn() };
 vi.mock("@/features/squads/server", () => squadsServer);
 
-const features = vi.hoisted(() => ({ FEATURES: { squads: true, checkins: true, network: true, leaderboard: true, raffle: true, missions: true, polls: true } }));
+const features = vi.hoisted(() => ({ FEATURES: { squads: true, checkins: true, network: true, leaderboard: true, raffle: true, missions: true, polls: true, achievements: true, certificates: false } }));
 vi.mock("@/shared/config/features", () => features);
+const eventStatus = vi.hoisted(() => ({
+  getPublicEventState: vi.fn(async () => ({
+    id: "devfest-2026",
+    name: "DevFest Tacna 2026" as string | null,
+    venue: null as string | null,
+    endsAt: null as Date | null,
+    finished: false,
+  })),
+  isPublicEventFinished: vi.fn(async () => false),
+}));
+vi.mock("@/app-shell/event-status.server", () => eventStatus);
 
 const { DashboardView, MissionsCard } = await import("@/features/dashboard");
 const { InstallHint } = await import("@/features/pwa");
@@ -137,6 +148,10 @@ describe("DashboardPage", () => {
     features.FEATURES.leaderboard = true;
     leaderboardServer.getCadetStanding.mockResolvedValue({ ok: true, value: STANDING_VALUE });
     features.FEATURES.raffle = true;
+    features.FEATURES.achievements = true;
+    features.FEATURES.certificates = false;
+    eventStatus.getPublicEventState.mockResolvedValue({ id: "devfest-2026", name: "DevFest Tacna 2026", venue: null, endsAt: null, finished: false });
+    eventStatus.isPublicEventFinished.mockResolvedValue(false);
     pollsServer.getCadetPoll.mockResolvedValue({ ok: true, value: null });
     avatarServer.getAvatarLook.mockResolvedValue(null);
   });
@@ -280,7 +295,7 @@ describe("DashboardPage", () => {
 
     expect(leaderboardServer.getCadetStanding).toHaveBeenCalledWith({ marker: "leaderboard" }, "u1");
     expect(slot.type).toBe(StandingCard);
-    expect(slot.props).toEqual({ standing: STANDING_VALUE, alias: "Nova_7", squad: "Escuadrón Firebase" });
+    expect(slot.props).toEqual({ standing: STANDING_VALUE, alias: "Nova_7", squad: "Escuadrón Firebase", final: false });
 
     leaderboardServer.getCadetStanding.mockResolvedValue({ ok: false, error: { code: "unknown" } });
     expect((await renderPage()).standingSlot).toBeUndefined();
@@ -370,5 +385,32 @@ describe("DashboardPage", () => {
     features.FEATURES.network = false;
     expect((await renderPage()).networkHref).toBeUndefined();
     features.FEATURES.network = true;
+  });
+
+  it("switches to post-event archive mode when the public edition is finished", async () => {
+    eventStatus.getPublicEventState.mockResolvedValue({
+      id: "devfest-2026",
+      name: "DevFest Tacna 2026",
+      venue: "UTP",
+      endsAt: new Date("2026-11-22T00:00:00Z"),
+      finished: true,
+    });
+    dashboard.getAttendeeOverview.mockResolvedValue({ ok: true, value: overviewOf(null) });
+
+    const props = await renderPage();
+
+    expect(props.eventFinished).toBe(true);
+    expect(props.eventName).toBe("DevFest Tacna 2026");
+    expect(props.qrHref).toBeUndefined();
+    expect(props.missionsSlot).toBeUndefined();
+    expect(props.pollSlot).toBeUndefined();
+    expect(props.squadCreditsSlot).toBeUndefined();
+    expect(props.speakerSlot).toBeUndefined();
+    expect(props.squadCallout).toBe("none");
+    expect(props.networkHref).toBe("/red");
+    expect(props.achievementsHref).toBe("/achievements");
+    expect((props.standingSlot as { props: { final: boolean } }).props.final).toBe(true);
+    expect(dashboardComposition.openMissionsSummary).not.toHaveBeenCalled();
+    expect(pollsServer.getCadetPoll).not.toHaveBeenCalled();
   });
 });

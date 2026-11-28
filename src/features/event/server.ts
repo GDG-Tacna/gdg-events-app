@@ -23,7 +23,7 @@ export { COPY_NEEDS, COPY_PARTS, copyEditionContent, isCopyPart, withNeeds, type
 export { FirestoreEditionCopier } from "./data/server/firestore-edition-copier";
 export { resetEditionProgress, type ProgressResetDeps, type ProgressResetErrorCode, type ProgressResetSummary, type ProgressResetter } from "./domain/progress-reset";
 export { FirestoreProgressResetter } from "./data/server/firestore-progress-resetter";
-export { EDITION_MODULES, MODULE_NEEDS, effectiveModules, getEditionModules, isEditionModule, listOffModules, setEditionModules, type EditionModule, type ModuleDeps, type ModuleStore, type ModuleSwitches, type ModulesErrorCode } from "./domain/modules";
+export { EDITION_MODULES, MODULE_NEEDS, effectiveModules, getEditionModules, isEditionModule, listOffModules, parseOffModules, setEditionModules, type EditionModule, type ModuleDeps, type ModuleStore, type ModuleSwitches, type ModulesErrorCode } from "./domain/modules";
 export { FirestoreModuleStore } from "./data/server/firestore-module-store";
 export {
   ADMIN_SECTIONS,

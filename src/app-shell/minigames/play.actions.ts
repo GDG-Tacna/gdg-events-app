@@ -8,6 +8,7 @@ import { getCadetSession } from "@/app-shell/guards";
 import type { FinishMinigameActionResult, StartMinigameActionResult } from "@/features/minigames";
 import { finishMinigame, startMinigame } from "@/features/minigames/server";
 import { ROUTES } from "@/shared/config/routes";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { moduleOn } from "@/app-shell/modules.server";
 
 const startSchema = z.object({ missionId: z.string().min(1).max(60) });
@@ -15,7 +16,7 @@ const finishSchema = z.object({ missionId: z.string().min(1).max(60), won: z.boo
 
 /** Flags, session and role: a Server Action is a public endpoint, so each one checks them first. */
 async function attendee(): Promise<{ ok: true; uid: string } | { ok: false; code: "disabled" | "unauthenticated" | "forbidden" | "not-registered" }> {
-  if (!(await moduleOn("missions")) || !(await moduleOn("minigames"))) return { ok: false, code: "disabled" };
+  if (!(await moduleOn("missions")) || !(await moduleOn("minigames")) || (await isPublicEventFinished())) return { ok: false, code: "disabled" };
   const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };
   if (session.role !== "attendee") return { ok: false, code: session.role === null ? "not-registered" : "forbidden" };

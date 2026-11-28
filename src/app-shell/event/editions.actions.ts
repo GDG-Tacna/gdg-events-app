@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { copyDeps, editionModules, editionPermissions, editionsDeps, moduleDeps, permissionDeps, progressDeps } from "@/app-shell/composition/event.server";
+import { copyDeps, editionCatalogCached, editionModules, editionPermissions, editionsDeps, moduleDeps, permissionDeps, progressDeps, publicEventInfo } from "@/app-shell/composition/event.server";
 import { dropEditionCaches } from "@/app-shell/composition/per-edition";
 import { getSession } from "@/app-shell/guards";
 import type { CopyEditionResult, EditionActionResult, EditionsErrorCode, ResetProgressResult, SaveModulesResult, SavePermissionsResult } from "@/features/event";
@@ -47,7 +47,9 @@ export async function createEditionAction(input: { id: string; draft: z.infer<ty
   if (isResult(who)) return who;
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "invalid-name" };
-  return done(await createEdition(editionsDeps, who, parsed.data));
+  const result = await createEdition(editionsDeps, who, parsed.data);
+  if (result.ok) editionCatalogCached.clear();
+  return done(result);
 }
 
 export async function updateEditionAction(input: { id: string; draft: z.infer<typeof draftSchema> }): Promise<EditionActionResult> {
@@ -55,7 +57,12 @@ export async function updateEditionAction(input: { id: string; draft: z.infer<ty
   if (isResult(who)) return who;
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "invalid-name" };
-  return done(await updateEdition(editionsDeps, who, parsed.data));
+  const result = await updateEdition(editionsDeps, who, parsed.data);
+  if (result.ok) {
+    publicEventInfo.clear();
+    editionCatalogCached.clear();
+  }
+  return done(result);
 }
 
 export async function setEditionStatusAction(input: { id: string; status: "draft" | "finished" }): Promise<EditionActionResult> {
@@ -63,7 +70,12 @@ export async function setEditionStatusAction(input: { id: string; status: "draft
   if (isResult(who)) return who;
   const parsed = statusSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "not-found" };
-  return done(await setEditionStatus(editionsDeps, who, parsed.data));
+  const result = await setEditionStatus(editionsDeps, who, parsed.data);
+  if (result.ok) {
+    publicEventInfo.clear();
+    editionCatalogCached.clear();
+  }
+  return done(result);
 }
 
 /** After publishing, this server forgets the cached public edition so its next request already serves the new one. */
@@ -73,7 +85,11 @@ export async function publishEditionAction(input: { id: string }): Promise<Editi
   const parsed = publishSchema.safeParse(input);
   if (!parsed.success) return { ok: false, code: "not-found" };
   const result = await publishEdition(editionsDeps, who, parsed.data);
-  if (result.ok) forgetPublicEdition();
+  if (result.ok) {
+    forgetPublicEdition();
+    publicEventInfo.clear();
+    editionCatalogCached.clear();
+  }
   return done(result);
 }
 

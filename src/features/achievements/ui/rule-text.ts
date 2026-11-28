@@ -1,6 +1,7 @@
 import { copy } from "@/shared/copy/es";
 import { formatNumber, interpolate } from "@/shared/lib/format";
 import type { BadgeRule } from "../domain/badge";
+import type { GlobalBadgeRule } from "../domain/global-badge";
 
 /** Names of the quadrants and missions a rule may point at, as plain data (it crosses to the client). */
 export interface RuleNames {
@@ -27,4 +28,10 @@ export function ruleText(rule: BadgeRule, names: RuleNames): string {
     case "mission-completed":
       return interpolate(t["mission-completed"], { name: names.missions[rule.missionId] ?? rule.missionId });
   }
+}
+
+/** A global community badge's rule in words (e.g., "Participa en 2 eventos de GDG Tacna"). */
+export function globalRuleText(rule: GlobalBadgeRule): string {
+  const forms = copy.achievements.globalRules[rule.type];
+  return rule.count === 1 ? forms.one : interpolate(forms.many, { n: formatNumber(rule.count) });
 }

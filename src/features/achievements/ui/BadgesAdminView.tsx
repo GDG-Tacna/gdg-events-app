@@ -23,7 +23,7 @@ export interface BadgesAdminViewProps {
   canDelete?: boolean;
   move: MoveBadgeAction;
   /** Plain paths (a client component cannot receive functions from the server). */
-  hrefs: { create: string; editBase: string };
+  hrefs: { create: string; editBase: string; globalList?: string; editionList?: string };
 }
 
 const chip = "type-caption border-line-strong text-foreground px-space-3 rounded-full border py-1";
@@ -60,6 +60,24 @@ export function BadgesAdminView({ badges, names, defaultsCount, seed, setActive,
 
   return (
     <div className="gap-space-6 flex flex-col">
+      {hrefs.globalList && hrefs.editionList ? (
+        <nav aria-label={t.tabs.label} className="bg-surface border-border p-space-1 grid grid-cols-2 rounded-md border">
+          <Link
+            href={hrefs.editionList}
+            aria-current="page"
+            className="type-label bg-primary text-primary-foreground focus-visible:ring-ring inline-flex h-11 items-center justify-center rounded-sm focus-visible:ring-[3px] focus-visible:outline-none"
+          >
+            {t.tabs.edition}
+          </Link>
+          <Link
+            href={hrefs.globalList}
+            className="type-label text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-ring inline-flex h-11 items-center justify-center rounded-sm focus-visible:ring-[3px] focus-visible:outline-none"
+          >
+            {t.tabs.global}
+          </Link>
+        </nav>
+      ) : null}
+
       <header className="gap-space-3 flex flex-wrap items-end justify-between">
         <div className="gap-space-1 flex flex-col">
           <h1 className="type-title-xl text-foreground">{t.title}</h1>

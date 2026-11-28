@@ -8,6 +8,7 @@ import { getCadetSession } from "@/app-shell/guards";
 import type { SubmitMissionActionResult } from "@/features/missions";
 import { submitMissionProof } from "@/features/missions/server";
 import { ROUTES } from "@/shared/config/routes";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { moduleOn } from "@/app-shell/modules.server";
 
 const inputSchema = z.object({
@@ -24,7 +25,7 @@ const inputSchema = z.object({
  * right, how many tries are left and the XP are decided on the server.
  */
 export async function submitMissionAnswerAction(input: unknown): Promise<SubmitMissionActionResult> {
-  if (!(await moduleOn("missions"))) return { ok: false, code: "disabled" };
+  if (!(await moduleOn("missions")) || (await isPublicEventFinished())) return { ok: false, code: "disabled" };
 
   const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };

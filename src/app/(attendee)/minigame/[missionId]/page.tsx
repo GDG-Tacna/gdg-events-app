@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { minigameViewDeps } from "@/app-shell/composition/minigames.server";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { finishMinigameAction, startMinigameAction } from "@/app-shell/minigames/play.actions";
 import { MinigamePlayer } from "@/features/minigames";
@@ -19,6 +20,7 @@ export const metadata: Metadata = { title: `${copy.minigames.offer.label} · ${c
 export default async function MinigamePage({ params }: { params: Promise<{ missionId: string }> }) {
   if (!(await moduleOn("missions")) || !(await moduleOn("minigames"))) notFound();
   const session = await requireAttendee();
+  if (await isPublicEventFinished()) redirect(ROUTES.dashboard);
   const { missionId } = await params;
   const missionHref = `${ROUTES.missions}/${missionId}`;
 

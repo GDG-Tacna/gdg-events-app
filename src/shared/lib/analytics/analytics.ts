@@ -9,7 +9,8 @@ export type AnalyticsEvent =
       kind: string;
       /** Who made it happen: the attendee scanning a code, or staff scanning the attendee's pass. */
       source?: "self" | "staff";
-    };
+    }
+  | { name: "certificate_issued"; uid: string; eventId: string; templateId: string };
 
 export interface Analytics {
   track(event: AnalyticsEvent): void;

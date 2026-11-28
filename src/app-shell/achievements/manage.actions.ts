@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { achievementAdminDeps, badgeSource } from "@/app-shell/composition/achievements.server";
+import { achievementAdminDeps, badgeSource, crossEditionReader } from "@/app-shell/composition/achievements.server";
 import { mayDeleteItems } from "@/app-shell/deletion.server";
 import { getSession } from "@/app-shell/guards";
 import type { AchievementAdminActionResult, BadgeDraft } from "@/features/achievements";
@@ -52,6 +52,7 @@ const isResult = (value: unknown): value is AchievementAdminActionResult => type
 function done(result: { ok: true } | { ok: false; error: { code: AchievementAdminErrorCode } }): AchievementAdminActionResult {
   if (!result.ok) return { ok: false, code: result.error.code };
   badgeSource.invalidate();
+  crossEditionReader.invalidateEdition();
   return { ok: true };
 }
 

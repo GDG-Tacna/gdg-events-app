@@ -96,6 +96,7 @@ describe("admin home page", () => {
       "/admin/eventos",
       "/admin/team",
       "/admin/cadetes",
+      "/admin/certificados",
       "/admin/charlas",
       "/admin/speakers",
       "/admin/puestos",

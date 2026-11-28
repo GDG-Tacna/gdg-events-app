@@ -25,7 +25,7 @@ function messageFor(code: AuthErrorCode | null): string | null {
  * Login view. States: idle, pending (button busy, label changes), error (alert above the button),
  * cancelled (back to idle, no message). The loading skeleton lives in the route's `loading.tsx`.
  */
-export function SignInPanel() {
+export function SignInPanel({ nextPath = ROUTES.afterSignIn }: { nextPath?: string } = {}) {
   const router = useRouter();
   const { status, errorCode, run } = useGoogleSignIn();
   const pending = status === "pending" || status === "success";
@@ -33,7 +33,7 @@ export function SignInPanel() {
 
   async function handleSignIn() {
     const finished = await run();
-    if (finished) router.replace(ROUTES.afterSignIn);
+    if (finished) router.replace(nextPath);
   }
 
   return (

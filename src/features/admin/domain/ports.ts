@@ -140,7 +140,16 @@ export interface AuditEntry {
     | "cadet.unbanned"
     | "cadet.deleted"
     | "cadet.ticket"
-    | "tickets.imported";
+    | "tickets.imported"
+    | "certificate.template.created"
+    | "certificate.template.updated"
+    | "certificate.template.published"
+    | "certificate.template.unpublished"
+    | "certificate.template.deleted"
+    | "certificate.renamed"
+    | "certificate.revoked"
+    | "certificate.reinstated"
+    | "certificate.issued-manual";
   actorUid: string;
   targetUid: string;
   /** Small, non-secret facts about the change (for example the new role). */

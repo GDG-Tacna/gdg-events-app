@@ -8,8 +8,10 @@ import { ok } from "@/shared/lib/result";
 import { AttendeeShell } from "./AttendeeShell";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard", useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
-const features = vi.hoisted(() => ({ FEATURES: { missions: true, map: true, achievements: true, checkins: true } }));
+const features = vi.hoisted(() => ({ FEATURES: { missions: true, map: true, achievements: true, checkins: true, certificates: true, network: true } }));
 vi.mock("@/shared/config/features", () => features);
+const eventStatus = vi.hoisted(() => ({ isPublicEventFinished: vi.fn(async () => false) }));
+vi.mock("@/app-shell/event-status.server", () => eventStatus);
 
 const renderShell = (shell: ReactElement) => render(<AuthActionsProvider actions={actions}>{shell}</AuthActionsProvider>);
 
@@ -73,5 +75,21 @@ describe("AttendeeShell", () => {
     const nav = screen.getByRole("navigation", { name: copy.nav.label });
     expect(within(nav).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/dashboard", "/scan", "/map?vista=agenda"]);
     expect(within(nav).getByRole("link", { name: copy.nav.agenda })).toBeInTheDocument();
+  });
+
+  it("switches to post-event tabs (Inicio, Logros, Certificados, Red) without the QR scanner once finished", async () => {
+    eventStatus.isPublicEventFinished.mockResolvedValueOnce(true);
+    renderShell(await AttendeeShell({ children: <p>x</p> }));
+
+    const nav = screen.getByRole("navigation", { name: copy.nav.label });
+    expect(within(nav).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
+      "/dashboard",
+      "/achievements",
+      "/certificados",
+      "/red",
+    ]);
+    expect(within(nav).queryByRole("link", { name: copy.nav.scan })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole("link", { name: copy.nav.missions })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole("link", { name: copy.nav.map })).not.toBeInTheDocument();
   });
 });

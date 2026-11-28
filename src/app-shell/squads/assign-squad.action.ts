@@ -4,6 +4,7 @@ import { getCadetSession } from "@/app-shell/guards";
 import { squadDeps } from "@/app-shell/composition/squads.server";
 import type { AssignSquadActionResult } from "@/features/squads";
 import { assignSquad } from "@/features/squads/server";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { moduleOn } from "@/app-shell/modules.server";
 
 /**
@@ -12,7 +13,7 @@ import { moduleOn } from "@/app-shell/modules.server";
  * Idempotent: an attendee who already has a squad gets the same one back.
  */
 export async function assignSquadAction(): Promise<AssignSquadActionResult> {
-  if (!(await moduleOn("squads"))) return { ok: false, code: "disabled" };
+  if (!(await moduleOn("squads")) || (await isPublicEventFinished())) return { ok: false, code: "disabled" };
 
   const session = await getCadetSession();
   if (!session) return { ok: false, code: "unauthenticated" };

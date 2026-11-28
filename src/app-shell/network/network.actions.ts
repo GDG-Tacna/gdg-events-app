@@ -10,6 +10,7 @@ import { completeBySquads } from "@/features/missions/server";
 import type { ConnectContactActionResult, IssueContactCodeActionResult, SaveContactLinksActionResult } from "@/features/network";
 import { connectCadets, issueContactCode, saveContactLinks, verifyContactCode, type NetworkActor } from "@/features/network/server";
 import { ROUTES } from "@/shared/config/routes";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { moduleOn } from "@/app-shell/modules.server";
 
 /** A QR payload is short text; anything longer is not one of ours. */
@@ -30,16 +31,18 @@ async function cadet(): Promise<NetworkActor | { ok: false; code: "disabled" | "
 
 const isRefusal = (value: NetworkActor | { ok: false }): value is { ok: false; code: "disabled" | "unauthenticated" } => "ok" in value;
 
-/** The cadet's own contact code: the picture and timing, never the signed text. */
+/** The cadet's own contact code: the picture and timing, never the signed text. Disabled once the event finishes. */
 export async function issueContactCodeAction(): Promise<IssueContactCodeActionResult> {
+  if (await isPublicEventFinished()) return { ok: false, code: "disabled" };
   const actor = await cadet();
   if (isRefusal(actor)) return actor;
   const issued = issueContactCode(networkDeps, actor);
   return issued.ok ? { ok: true, code: issued.value } : { ok: false, code: issued.error.code };
 }
 
-/** Makes the cadet of the session and the one whose code was scanned contacts; answers the other's card and the reward. */
+/** Makes the cadet of the session and the one whose code was scanned contacts; answers the other's card and the reward. Disabled once the event finishes. */
 export async function connectContactAction(payload: string): Promise<ConnectContactActionResult> {
+  if (await isPublicEventFinished()) return { ok: false, code: "disabled" };
   const actor = await cadet();
   if (isRefusal(actor)) return actor;
   const parsed = payloadSchema.safeParse(payload);

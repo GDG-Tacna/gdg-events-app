@@ -9,6 +9,7 @@ export interface NetworkScreenProps {
   contacts: ReadonlyArray<CadetCard & { id: string }>;
   reward: ContactReward;
   achievementsHref?: string;
+  readOnly?: boolean;
 }
 
 /**

@@ -25,6 +25,19 @@ vi.mock("@/app-shell/modules.server", async () => {
   };
 });
 
+// Screens and actions ask `isPublicEventFinished` / `getPublicEventState` whether the public edition has ended.
+// In tests the event is live by default; post-event tests override this mock and event-status.server.test.ts unmocks it.
+vi.mock("@/app-shell/event-status.server", () => ({
+  getPublicEventState: async () => ({
+    id: "devfest-2026",
+    name: "DevFest Tacna 2026",
+    venue: null,
+    endsAt: null,
+    finished: false,
+  }),
+  isPublicEventFinished: async () => false,
+}));
+
 // Control center permissions: in tests an admin edits every section and staff operate every station, unlimited; the edition's
 // own permissions are tested in permissions.server.test.ts, which unmocks it.
 vi.mock("@/app-shell/permissions.server", async () => {

@@ -15,10 +15,26 @@ export const mediaDeps: MediaDeps = {
   now: () => new Date(),
 };
 
+/** Composition root for global assets (e.g., global community badge images stored under `public/global/...`). */
+export const globalMediaDeps: MediaDeps = {
+  processor: imageProcessor,
+  store: imageStore,
+  eventId: async () => "global",
+  newId: () => crypto.randomUUID(),
+  audit: new FirestoreAuditLog(),
+  now: () => new Date(),
+};
+
 /** What record use cases (badges, prizes, squads…) use to point at an uploaded image and drop a replaced one. */
 export const recordImages: RecordImages = {
   ref: imageRefOf,
   remove: (path) => removeImage({ store: imageStore, eventId: currentImageEventId }, path),
+};
+
+/** Image helper for global records (`public/global/...`). */
+export const globalRecordImages: RecordImages = {
+  ref: imageRefOf,
+  remove: (path) => removeImage({ store: imageStore, eventId: async () => "global" }, path),
 };
 
 /** What the /media route reads: the same cached store. */

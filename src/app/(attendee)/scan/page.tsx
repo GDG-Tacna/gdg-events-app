@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ScannerScreen } from "@/app-shell/ScannerScreen";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { moduleOn } from "@/app-shell/modules.server";
 import { FEATURES } from "@/shared/config/features";
+import { ROUTES } from "@/shared/config/routes";
 import { copy } from "@/shared/copy/es";
 import { ScreenEnter, SpaceBackground } from "@/shared/ui";
 
@@ -13,6 +15,7 @@ export default async function ScanPage() {
   if (!FEATURES.checkins) notFound();
   // Visitors go to /login, users without a role go to onboarding, staff and admin go to their own home: only attendees scan.
   await requireAttendee();
+  if (await isPublicEventFinished()) redirect(ROUTES.dashboard);
   const [achievementsOn, networkOn, missionsOn] = await Promise.all([moduleOn("achievements"), moduleOn("network"), moduleOn("missions")]);
 
   return (

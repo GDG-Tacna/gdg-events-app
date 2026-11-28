@@ -2,12 +2,22 @@ import "server-only";
 import { FirestoreAuditLog } from "@/features/admin/server";
 import {
   CachedBadgeSource,
+  CachedGlobalBadgeSource,
   DEFAULT_BADGES,
+  DEFAULT_GLOBAL_BADGES,
   FirestoreAwardStore,
   FirestoreBadgeStore,
+  FirestoreCrossEditionAchievementsReader,
+  FirestoreGlobalAwardStore,
+  FirestoreGlobalBadgeStore,
   syncAchievements,
+  syncGlobalAchievements,
   type AchievementAdminDeps,
   type AchievementDeps,
+  type EditionAchievementsGroup,
+  type EditionSummaryRef,
+  type GlobalAchievementAdminDeps,
+  type GlobalBadgeStanding,
   type PlayerProgress,
 } from "@/features/achievements/server";
 import { rankFor } from "@/features/attendee";
@@ -18,9 +28,10 @@ import { countContacts } from "@/features/network/server";
 import { getGalaxyMap } from "@/features/quadrants/server";
 import { err, ok, type Result } from "@/shared/lib/result";
 import { attendeeDeps } from "./attendee.server";
+import { editionCatalogCached } from "./event.server";
 import { missionDeps, missionSource } from "./missions.server";
 import { networkStore } from "./network.server";
-import { recordImages } from "./media.server";
+import { globalRecordImages, recordImages } from "./media.server";
 import { galaxyDeps } from "./quadrants.server";
 import { rankDeps } from "./ranks.server";
 import { perEdition } from "./per-edition";
@@ -67,6 +78,12 @@ async function progressOf(uid: string): Promise<Result<PlayerProgress, { code: s
 /** The edition's badges, kept for a minute. Admin changes invalidate it. */
 export const badgeSource = perEdition(() => new CachedBadgeSource(new FirestoreBadgeStore()));
 
+/** Global community badges, kept for a minute. Global admin changes invalidate it. */
+const globalBadgeStore = new FirestoreGlobalBadgeStore();
+export const globalBadgeSource = new CachedGlobalBadgeSource(globalBadgeStore);
+const globalAwardStore = new FirestoreGlobalAwardStore();
+export const crossEditionReader = new FirestoreCrossEditionAchievementsReader();
+
 /** Composition root for earning badges: after check-ins and missions, and when the Logros tab opens. */
 export const achievementDeps: AchievementDeps = {
   badges: badgeSource,
@@ -76,16 +93,118 @@ export const achievementDeps: AchievementDeps = {
   now: () => new Date(),
 };
 
+async function knownEditionRefs(active?: { id: string; name: string | null }): Promise<readonly EditionSummaryRef[]> {
+  const listed = await editionCatalogCached();
+  const refs: EditionSummaryRef[] = listed.ok
+    ? listed.value.map(({ id, name, startsAt }) => ({ id, name, startsAt }))
+    : [];
+  if (active && active.id && !refs.some((edition) => edition.id === active.id)) {
+    refs.unshift({ id: active.id, name: active.name, startsAt: null });
+  }
+  return refs;
+}
+
 /**
- * Awards whatever the attendee has just earned and answers with the new badges, for the scan or mission
- * result. Never fails the caller: with achievements off or a failed evaluation it answers none, and the
- * next scan, answer or visit to Logros awards them.
+ * Evaluates and awards newly earned global community badges for one user (e.g., after earning
+ * an edition badge or claiming a certificate). Never fails the caller.
+ */
+export async function unlockGlobalAchievements(
+  uid: string,
+): Promise<ReadonlyArray<{ id: string; name: string; tone: string; imageUrl: string | null }>> {
+  if (!(await moduleOn("achievements"))) return [];
+  const editions = await knownEditionRefs();
+  if (editions.length === 0) return [];
+  const snapshot = await crossEditionReader.readSnapshot(uid, editions);
+  if (!snapshot.ok) return [];
+  const synced = await syncGlobalAchievements(
+    {
+      badges: globalBadgeSource,
+      defaults: DEFAULT_GLOBAL_BADGES,
+      awards: globalAwardStore,
+      progress: { progress: async () => ok(snapshot.value.progress) },
+      now: () => new Date(),
+    },
+    uid,
+  );
+  return synced.ok
+    ? synced.value.unlocked.map(({ id, name, tone, image }) => ({ id, name, tone, imageUrl: image?.url ?? null }))
+    : [];
+}
+
+/**
+ * Awards whatever the attendee has just earned (edition + global) and answers with the new badges,
+ * for the scan or mission result. Never fails the caller.
  */
 export async function unlockAchievements(uid: string): Promise<ReadonlyArray<{ id: string; name: string; tone: string; imageUrl: string | null }>> {
   if (!(await moduleOn("achievements"))) return [];
   const synced = await syncAchievements(achievementDeps, uid);
-  return synced.ok ? synced.value.unlocked.map(({ id, name, tone, image }) => ({ id, name, tone, imageUrl: image?.url ?? null })) : [];
+  const editionUnlocked = synced.ok ? synced.value.unlocked.map(({ id, name, tone, image }) => ({ id, name, tone, imageUrl: image?.url ?? null })) : [];
+  const globalUnlocked = await unlockGlobalAchievements(uid);
+  return [...editionUnlocked, ...globalUnlocked];
 }
+
+export interface AttendeeAchievementsOverview {
+  globalBadges: readonly GlobalBadgeStanding[];
+  editions: readonly EditionAchievementsGroup[];
+}
+
+/**
+ * Loads the complete Logros view for a signed-in user:
+ * 1) Global community badges (always active: earned + pending progress).
+ * 2) Per-edition badges: live active edition with earned + pending (when live & user has profile),
+ *    plus finished active edition and past editions with earned badges only.
+ */
+export async function getAttendeeAchievementsOverview(
+  uid: string,
+  options: { activeEventId: string; activeEventName: string | null; activeEventFinished: boolean; includeLiveActive: boolean },
+): Promise<Result<AttendeeAchievementsOverview, { code: "unknown" }>> {
+  let liveActiveGroup: EditionAchievementsGroup | null = null;
+  if (!options.activeEventFinished && options.includeLiveActive) {
+    const active = await syncAchievements(achievementDeps, uid);
+    if (!active.ok) return err({ code: "unknown" });
+    liveActiveGroup = {
+      eventId: options.activeEventId,
+      eventName: options.activeEventName ?? options.activeEventId,
+      isLive: true,
+      badges: active.value.badges,
+    };
+  }
+
+  const editions = await knownEditionRefs({ id: options.activeEventId, name: options.activeEventName });
+  const snapshot = await crossEditionReader.readSnapshot(uid, editions);
+  if (!snapshot.ok) return err({ code: "unknown" });
+
+  const [globalResult, finishedGroups] = await Promise.all([
+    syncGlobalAchievements(
+      {
+        badges: globalBadgeSource,
+        defaults: DEFAULT_GLOBAL_BADGES,
+        awards: globalAwardStore,
+        progress: { progress: async () => ok(snapshot.value.progress) },
+        now: () => new Date(),
+      },
+      uid,
+    ),
+    crossEditionReader.buildFinishedGroups(editions, snapshot.value.earnedByEdition, {
+      activeEventId: options.activeEventId,
+      activeEventFinished: options.activeEventFinished,
+    }),
+  ]);
+  if (!globalResult.ok || !finishedGroups.ok) return err({ code: "unknown" });
+
+  return ok({
+    globalBadges: globalResult.value.badges,
+    editions: liveActiveGroup ? [liveActiveGroup, ...finishedGroups.value] : finishedGroups.value,
+  });
+}
+
+/** Composition root for managing global community badges (global admins only). */
+export const globalAchievementAdminDeps: GlobalAchievementAdminDeps = {
+  store: globalBadgeStore,
+  images: globalRecordImages,
+  audit: new FirestoreAuditLog(),
+  now: () => new Date(),
+};
 
 /** Composition root for managing badges: quadrants from the galaxy map, missions from the missions feature. */
 export const achievementAdminDeps: AchievementAdminDeps = {

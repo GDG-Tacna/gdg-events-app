@@ -23,6 +23,8 @@ vi.mock("next/navigation", () => ({
 
 const features = vi.hoisted(() => ({ FEATURES: { network: true, achievements: true } }));
 vi.mock("@/shared/config/features", () => features);
+const eventStatus = vi.hoisted(() => ({ isPublicEventFinished: vi.fn(async () => false) }));
+vi.mock("@/app-shell/event-status.server", () => eventStatus);
 
 const { NetworkScreen } = await import("@/app-shell/NetworkScreen");
 const { default: NetworkPage } = await import("./page");
@@ -53,6 +55,7 @@ describe("Red page", () => {
     vi.resetAllMocks();
     features.FEATURES.network = true;
     features.FEATURES.achievements = true;
+    eventStatus.isPublicEventFinished.mockResolvedValue(false);
     guards.requireAttendee.mockResolvedValue({ uid: "u1", role: "attendee", displayName: null, photoUrl: null });
     server.getNetwork.mockResolvedValue({ ok: true, value: OVERVIEW });
   });
@@ -73,7 +76,11 @@ describe("Red page", () => {
       contacts: [{ id: "p1", alias: "Bruno", squad: null, links: NO_LINKS }],
       reward: OVERVIEW.reward,
       achievementsHref: "/achievements",
+      readOnly: false,
     });
+
+    eventStatus.isPublicEventFinished.mockResolvedValueOnce(true);
+    expect(findElement(await NetworkPage(), NetworkScreen)?.props.readOnly).toBe(true);
   });
 
   it("links badges to Logros only while achievements are on", async () => {

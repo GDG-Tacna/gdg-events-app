@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import type { AvatarLook } from "@/shared/ui";
+import { ButtonLink, Card, Icon, type AvatarLook } from "@/shared/ui";
 import { copy } from "@/shared/copy/es";
+import { interpolate } from "@/shared/lib/format";
 import type { PixelSpriteData } from "@/shared/types/pixel";
 import type { DashboardOverview, SquadCalloutKind } from "../domain/overview";
 import { PlayerCard } from "./PlayerCard";
@@ -37,6 +38,14 @@ export interface DashboardViewProps {
   speakerSlot?: ReactNode;
   /** For a team account that plays as a cadet: the way back to its team screen, built by the app shell; at the top. */
   teamSlot?: ReactNode;
+  /** Event certificates entry card in the mission terminal when certificates are available or issued. */
+  certificatesSlot?: ReactNode;
+  /** True once the public edition has ended, switching the dashboard into post-event archive mode. */
+  eventFinished?: boolean;
+  /** Edition name for the post-event banner when available. */
+  eventName?: string | null;
+  /** Direct link to Logros shown as a summary card in post-event mode. */
+  achievementsHref?: string;
 }
 
 /**
@@ -61,11 +70,29 @@ export function DashboardView({
   pollSlot,
   speakerSlot,
   teamSlot,
+  certificatesSlot,
+  eventFinished = false,
+  eventName,
+  achievementsHref,
 }: DashboardViewProps) {
   const t = copy.dashboard;
+  const finishedTitle = eventName ? interpolate(t.finished.titleNamed, { name: eventName }) : t.finished.titleFallback;
   return (
     <div className="gap-space-5 flex flex-col">
       <h1 className="sr-only">{t.title}</h1>
+
+      {eventFinished ? (
+        <Card className="border-ink bg-pastel-blue/30 gap-space-2 flex flex-col border-2">
+          <div className="gap-space-2 flex items-center">
+            <span className="bg-primary text-primary-foreground border-ink grid size-8 shrink-0 place-items-center rounded-full border-2">
+              <Icon name="verified" size={18} />
+            </span>
+            <p className="type-caption text-cyan-ink font-semibold uppercase tracking-wider">{t.finished.badge}</p>
+          </div>
+          <h2 className="type-title text-foreground">{finishedTitle}</h2>
+          <p className="type-body-sm text-muted-foreground">{t.finished.body}</p>
+        </Card>
+      ) : null}
 
       <div className="gap-space-5 grid min-[760px]:grid-cols-2 min-[760px]:items-start">
         <div className="gap-space-4 flex flex-col">
@@ -80,13 +107,26 @@ export function DashboardView({
           <div className="gap-space-3 flex items-center justify-between">
             <h2 id="terminal-title" className="type-pixel-heading text-cyan-ink gap-space-2 flex items-center">
               <span aria-hidden="true" className="bg-cyan inline-block size-2 rounded-[2px]" />
-              {t.terminal.title}
+              {eventFinished ? t.finished.terminalTitle : t.terminal.title}
             </h2>
             <span aria-hidden="true" className="type-caption text-text-subtle tracking-wider uppercase">
-              {t.terminal.flavor}
+              {eventFinished ? t.finished.terminalFlavor : t.terminal.flavor}
             </span>
           </div>
-          {squadCallout === "discover" ? <SquadCallout previews={squadPreviews} href={squadHref} /> : null}
+          {!eventFinished && squadCallout === "discover" ? <SquadCallout previews={squadPreviews} href={squadHref} /> : null}
+          {certificatesSlot}
+          {eventFinished && achievementsHref ? (
+            <Card className="gap-space-3 flex flex-col">
+              <div className="gap-space-2 flex items-center">
+                <Icon name="trophy" size={22} className="text-gold-ink" />
+                <h3 className="type-title text-foreground">{t.finished.achievementsCard.title}</h3>
+              </div>
+              <p className="type-body-sm text-muted-foreground">{t.finished.achievementsCard.none}</p>
+              <ButtonLink href={achievementsHref} variant="secondary" block>
+                {t.finished.achievementsCard.open}
+              </ButtonLink>
+            </Card>
+          ) : null}
           {missionsSlot}
           {squadCallout === "badge" ? squadCreditsSlot : null}
           {installSlot}

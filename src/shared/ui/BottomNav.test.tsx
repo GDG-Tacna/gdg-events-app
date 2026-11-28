@@ -41,21 +41,28 @@ describe("BottomNav", () => {
     ]);
   });
 
-  it("has only its tabs when there is no main action", () => {
+  it("has only its tabs when there is no main action, without adding empty balance spacers", () => {
     renderNav({
       label: "Navegación principal",
-      start: [{ href: "/dashboard", label: "Inicio", icon: "home" }],
-      end: [{ href: "/missions", label: "Misiones", icon: "home" }],
+      start: [
+        { href: "/dashboard", label: "Inicio", icon: "home" },
+        { href: "/achievements", label: "Logros", icon: "trophy" },
+        { href: "/certificados", label: "Certificados", icon: "certificate" },
+        { href: "/red", label: "Red", icon: "users" },
+      ],
     });
 
     const nav = screen.getByRole("navigation", {
       name: "Navegación principal",
     });
+    const items = Array.from(nav.querySelectorAll("ul > li"));
+    expect(items).toHaveLength(4);
+    expect(items.some((item) => item.getAttribute("aria-hidden") === "true")).toBe(false);
     expect(
       within(nav)
         .getAllByRole("link")
         .map((link) => link.getAttribute("href")),
-    ).toEqual(["/dashboard", "/missions"]);
+    ).toEqual(["/dashboard", "/achievements", "/certificados", "/red"]);
   });
 
   it("keeps the main action in the true middle when only one side has tabs: an empty slot balances the bar", () => {

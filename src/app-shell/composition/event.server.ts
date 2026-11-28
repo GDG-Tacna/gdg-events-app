@@ -4,11 +4,14 @@ import { FirestoreEditionCatalog, FirestoreEditionCopier, FirestoreProgressReset
 import { ttlCached } from "@/shared/lib/ttl-cache";
 import { copyEditionImage } from "./media.server";
 
-/** "Is the public edition over?", for other features' rules (retiring a squad). */
+/** "Is the public edition over?", for other features' rules (retiring a squad, post-event mode). */
 export const eventDeps: EventDeps = {
   store: new FirestoreEventStore(),
   now: () => new Date(),
 };
+
+/** Public edition metadata kept 30 seconds per edition (every attendee screen & action checks finished state). */
+export const publicEventInfo = ttlCached(() => eventDeps.store.get(), { ttlMs: 30_000, key: currentEditionOf });
 
 /** Composition root for the Eventos screen: every edition and which one is public. Changes go to the admin audit trail. */
 export const editionsDeps: EditionsDeps = {
@@ -16,6 +19,9 @@ export const editionsDeps: EditionsDeps = {
   audit: new FirestoreAuditLog(),
   now: () => new Date(),
 };
+
+/** Edition catalog cached for 60 seconds for cross-edition views (achievements history, global progress). */
+export const editionCatalogCached = ttlCached(() => editionsDeps.catalog.list(), { ttlMs: 60_000 });
 
 /** Composition root for copying one edition's content into another: images are copied by the media feature. */
 export const copyDeps: CopyDeps = {

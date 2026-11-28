@@ -90,7 +90,14 @@ export const STAFF_SCOPES_COLLECTION = "staffScopes";
 /** Who bought which ticket in one edition (`events/{eventId}/ticketHolders/{encoded email}`). Personal data: server only, never copied to another edition. */
 export const TICKET_HOLDERS_COLLECTION = "ticketHolders";
 
+/** Certificate templates of one edition (`events/{eventId}/certificateTemplates/{templateId}`). Server only. */
+export const CERTIFICATE_TEMPLATES_COLLECTION = "certificateTemplates";
+/** Per-edition claim records (`events/{eventId}/certificateClaims/{uid}_{templateId}`): idempotency lock and edition index. Server only. */
+export const CERTIFICATE_CLAIMS_COLLECTION = "certificateClaims";
+
 export type EventCollection =
+  | typeof CERTIFICATE_TEMPLATES_COLLECTION
+  | typeof CERTIFICATE_CLAIMS_COLLECTION
   | typeof SPEAKERS_COLLECTION
   | typeof POLLS_COLLECTION
   | typeof RAFFLE_PRIZES_COLLECTION
@@ -145,5 +152,11 @@ export const WALLET_LEDGER_COLLECTION = "walletLedger";
 /** Uploaded images (`images/{path with / as ~}`), large ones split into an `images/{id}/chunks` subcollection. Global: the path names the edition. */
 export const IMAGES_COLLECTION = "images";
 export const IMAGE_CHUNKS_COLLECTION = "chunks";
+/** Issued certificates across every edition (`certificates/{code}`): direct O(1) public verification and cross-edition user history. Server only. */
+export const CERTIFICATES_COLLECTION = "certificates";
+/** Global community badges earned across editions (`globalAchievements/{badgeId}`). Server only. */
+export const GLOBAL_ACHIEVEMENTS_COLLECTION = "globalAchievements";
+/** Who earned each global badge (`globalAchievementAwards/{uid}_{badgeId}`): idempotent and never removed. Server only. */
+export const GLOBAL_ACHIEVEMENT_AWARDS_COLLECTION = "globalAchievementAwards";
 /** The economy settings of one edition: `events/{eventId}/config/economy`. */
 export const ECONOMY_DOC = "economy";

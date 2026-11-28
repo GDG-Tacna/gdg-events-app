@@ -23,8 +23,11 @@ import { ROUTES, homeFor } from "@/shared/config/routes";
 import { TeamPlayCallout } from "@/features/attendee";
 import { copy } from "@/shared/copy/es";
 import { ScreenEnter, SpaceBackground } from "@/shared/ui";
+import { getPublicEventState } from "@/app-shell/event-status.server";
 import { moduleOn } from "@/app-shell/modules.server";
+import { readUserCertificates } from "@/app-shell/composition/certificates.server";
 import { linkedSpeaker } from "@/app-shell/speakers/linked-speaker.server";
+import { CertificatesDashboardCard } from "@/features/certificates";
 import { SpeakerCallout } from "@/features/speakers";
 
 export const metadata: Metadata = { title: `${copy.dashboard.title} · ${copy.brand.name}` };
@@ -45,26 +48,36 @@ export default async function DashboardPage() {
 
   // The squad catalog is optional decoration: if it cannot be read the dashboard still works, without the squad parts.
   const squads = catalog.ok ? catalog.value : [];
-  const squadsOn = await moduleOn("squads");
+  const [eventState, squadsOn, networkOn, achievementsOn] = await Promise.all([
+    getPublicEventState(),
+    moduleOn("squads"),
+    moduleOn("network"),
+    moduleOn("achievements"),
+  ]);
+  const finished = eventState.finished;
   // With squads switched off for the edition nothing about the attendee's squad shows.
   const squadId = squadsOn ? overview.value.squadId : null;
   const squad = squadId === null ? null : (squads.find((candidate) => candidate.id === squadId) ?? null);
 
-  const squadCallout = decideSquadCallout({
+  const rawSquadCallout = decideSquadCallout({
     featureEnabled: squadsOn,
     squadId,
     availableSquads: offeredSquads(squads).length,
   });
+  const squadCallout = finished && rawSquadCallout === "discover" ? "none" : rawSquadCallout;
 
-  const [squadCredits, standing, missions, poll, avatarLook, speaker] = await Promise.all([
-    squadId === null ? null : squadStanding(squadId),
+  const [squadCredits, standing, missions, poll, avatarLook, speaker, certificates] = await Promise.all([
+    finished || squadId === null ? null : squadStanding(squadId),
     (await moduleOn("leaderboard")) ? fleetStanding(session.uid) : null,
-    (await moduleOn("missions")) ? openMissionsSummary() : null,
-    FEATURES.polls && (await moduleOn("polls")) ? livePoll(session.uid) : null,
+    !finished && (await moduleOn("missions")) ? openMissionsSummary() : null,
+    !finished && FEATURES.polls && (await moduleOn("polls")) ? livePoll(session.uid) : null,
     getAvatarLook(avatarDeps, session.uid),
-    // A speaker who plays here (the guard sent them to their code otherwise) gets the way to it.
-    linkedSpeaker(session.uid),
+    // A speaker who plays here (the guard sent them to their code otherwise) gets the way to it while the event is live.
+    finished ? null : linkedSpeaker(session.uid),
+    FEATURES.certificates ? userCertificateCounts(session) : null,
   ]);
+  const showCertificates =
+    certificates !== null && (certificates.claimable > 0 || certificates.issued > 0);
 
   return (
     <>
@@ -78,9 +91,9 @@ export default async function DashboardPage() {
             squadPreviews={offeredSquads(squads)}
             squadHref={ROUTES.squad}
             squadCreditsSlot={squadCredits ? <SquadCreditsCard balance={squadCredits.wallet.balance} prizes={squadCredits.prizes} /> : undefined}
-            standingSlot={standing ? <StandingCard standing={standing} alias={overview.value.alias} squad={squad?.name ?? null} /> : undefined}
-            qrHref={FEATURES.checkins ? ROUTES.pass : undefined}
-            networkHref={(await moduleOn("network")) ? ROUTES.network : undefined}
+            standingSlot={standing ? <StandingCard standing={standing} alias={overview.value.alias} squad={squad?.name ?? null} final={finished} /> : undefined}
+            qrHref={!finished && FEATURES.checkins ? ROUTES.pass : undefined}
+            networkHref={networkOn ? ROUTES.network : undefined}
             avatarLook={avatarLook}
             avatarHref={ROUTES.avatar}
             missionsSlot={missions ? <MissionsCard href={ROUTES.missions} xp={missions.xp} quadrants={missions.quadrants} /> : undefined}
@@ -88,6 +101,10 @@ export default async function DashboardPage() {
             pollSlot={poll ? <LivePollCard poll={poll} href={ROUTES.poll} /> : undefined}
             teamSlot={session.playsAs ? <TeamPlayCallout kind="toTeam" href={homeFor(session.playsAs)} role={copy.admin.team.roles[session.playsAs === "admin" ? "admin" : "staff"]} /> : undefined}
             speakerSlot={speaker ? <SpeakerCallout name={speaker.name} href={ROUTES.speaker} /> : undefined}
+            certificatesSlot={showCertificates ? <CertificatesDashboardCard claimableCount={certificates.claimable} issuedCount={certificates.issued} href={ROUTES.certificates} /> : undefined}
+            eventFinished={finished}
+            eventName={eventState.name}
+            achievementsHref={finished && achievementsOn ? ROUTES.achievements : undefined}
           />
         </ScreenEnter>
       </main>
@@ -116,6 +133,16 @@ async function fleetStanding(uid: string) {
 async function livePoll(uid: string) {
   const current = await getCadetPoll(voteDeps, uid);
   return current.ok ? current.value : null;
+}
+
+/** Counts of claimable and issued certificates for the dashboard card. Optional decoration: failures hide the card. */
+async function userCertificateCounts(session: { uid: string; verifiedEmail?: string | null; displayName: string | null }) {
+  const result = await readUserCertificates({
+    uid: session.uid,
+    email: session.verifiedEmail ?? null,
+    displayName: session.displayName,
+  });
+  return result.ok ? { claimable: result.value.claimable.length, issued: result.value.issued.length } : null;
 }
 
 /** An attendee whose squad was retired from the catalog keeps a sensible, plain label. */

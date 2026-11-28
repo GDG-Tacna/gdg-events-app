@@ -66,13 +66,21 @@ export const ROUTES = {
   adminOdyssey: "/admin/odisea",
   adminEconomy: "/admin/economia",
   adminAchievements: "/admin/logros",
+  adminGlobalAchievements: "/admin/logros-globales",
   adminSquadCredits: "/admin/creditos-escuadron",
   adminMinigames: "/admin/minijuegos",
   adminStage: "/admin/escenario",
   adminRaffle: "/admin/sorteo",
   /** Live polls: prepared as drafts, opened one at a time, with their results. */
   adminPolls: "/admin/encuestas",
+  /** Event certificates: visual templates, eligibility rules and issued certificates. */
+  adminCertificates: "/admin/certificados",
+  adminCertificatesIssued: "/admin/certificados/emitidos",
   adminEvent: "/admin/eventos",
+  /** Signed-in user's certificates portal across current and past editions. */
+  certificates: "/certificados",
+  /** Public certificate verification lookup and `/verificar/{code}`. Never protected. */
+  verify: "/verificar",
   /** Static fallback page the service worker serves when a navigation fails offline. Never protected. */
   offline: "/offline",
   /** Where a freshly signed-in user lands; the guards send attendees without a profile on to onboarding. */

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { enabledMinigames } from "@/app-shell/composition/minigames.server";
 import { missionDeps } from "@/app-shell/composition/missions.server";
 import { storyTitleSource } from "@/app-shell/composition/odyssey.server";
 import { galaxyDeps } from "@/app-shell/composition/quadrants.server";
+import { isPublicEventFinished } from "@/app-shell/event-status.server";
 import { requireAttendee } from "@/app-shell/guards";
 import { MissionBoardView, type BoardQuadrant } from "@/features/missions";
 import { getMissionBoard } from "@/features/missions/server";
@@ -29,6 +30,7 @@ export default async function MissionsPage({ searchParams }: PageProps<"/mission
   if (!(await moduleOn("missions"))) notFound();
   // Visitors go to /login, users without a role go to onboarding, staff and admin go to their own home.
   const session = await requireAttendee();
+  if (await isPublicEventFinished()) redirect(ROUTES.dashboard);
   const { completadas } = await searchParams;
 
   const [board, galaxy, games, storyTitle] = await Promise.all([

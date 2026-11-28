@@ -82,9 +82,9 @@ export function BottomNav({ label, start, action, end = [] }: BottomNavProps) {
   const pathname = usePathname();
   const actionActive = action ? isActive(pathname, action) : false;
   // The action stays in the true middle even when one side has fewer tabs (only Inicio exists at first):
-  // empty slots take the room of the missing tabs on phones. The side rail has no use for them.
-  const startSpacers = Math.max(0, end.length - start.length);
-  const endSpacers = Math.max(0, start.length - end.length);
+  // empty slots take the room of the missing tabs on phones. Without a center action, tabs share the full width evenly.
+  const startSpacers = action ? Math.max(0, end.length - start.length) : 0;
+  const endSpacers = action ? Math.max(0, start.length - end.length) : 0;
 
   return (
     <nav
