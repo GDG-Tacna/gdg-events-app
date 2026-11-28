@@ -67,7 +67,7 @@ export function TemplateEditorView({ mode, editionName, initial, save, upload, b
   const [notice, setNotice] = useState<string | null>(null);
 
   const sampleCode = "GDG-4K9P7-X2M8R";
-  const cleanOrigin = (sampleBaseUrl || (typeof window !== "undefined" ? window.location.origin : "https://devfest.gdgtacna.com")).replace(/\/+$/, "");
+  const cleanOrigin = (sampleBaseUrl || (typeof window !== "undefined" ? window.location.origin : "https://app.gdgtacna.com")).replace(/\/+$/, "");
   const sampleValues = {
     recipientName: sampleName.trim() || t.sampleNameDefault,
     verificationCode: sampleCode,
