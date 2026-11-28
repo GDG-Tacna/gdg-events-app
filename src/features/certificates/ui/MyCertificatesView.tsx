@@ -182,7 +182,7 @@ function ClaimCertificateCard({
           values={{
             recipientName: fullName.trim() || t.previewPlaceholderName,
             verificationCode: "GDG-XXXXX-XXXXX",
-            verificationUrl: `${origin || "https://devfest.gdgtacna.com"}/verificar/GDG-XXXXX-XXXXX`,
+            verificationUrl: `${origin || "https://app.gdgtacna.com"}/verificar/GDG-XXXXX-XXXXX`,
             issueDateText: item.issueDateText,
             eventName: item.eventName,
           }}
